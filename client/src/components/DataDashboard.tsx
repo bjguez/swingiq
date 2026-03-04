@@ -1,6 +1,6 @@
-import { Activity, Zap, Target, BarChart, ChevronRight, Info } from "lucide-react";
-import sprayChartImg from "@/assets/images/spray-chart.png";
-import heatmapImg from "@/assets/images/heatmap.png";
+import { Activity, Zap, Target, BarChart, ChevronRight, Info, ExternalLink } from "lucide-react";
+import sprayChartImg from "@/assets/images/savant-spray.png";
+import heatmapImg from "@/assets/images/savant-heatmap.png";
 import { Button } from "./ui/button";
 
 export default function DataDashboard() {
@@ -14,7 +14,10 @@ export default function DataDashboard() {
             <BarChart className="w-5 h-5 text-primary" />
             Pro Profile: Mike Trout
           </h3>
-          <span className="text-[10px] uppercase tracking-wider text-muted-foreground bg-secondary px-2 py-0.5 rounded">Savant Data</span>
+          <span className="text-[10px] uppercase tracking-wider text-muted-foreground bg-secondary px-2 py-0.5 rounded flex items-center gap-1">
+            Savant Data
+            <ExternalLink className="w-3 h-3" />
+          </span>
         </div>
         
         <div className="grid grid-cols-2 gap-3">
@@ -24,7 +27,7 @@ export default function DataDashboard() {
           <SavantMetricCard title="Hard Hit %" value="51.0" unit="%" percentile={92} />
         </div>
         
-        <div className="bg-card border border-border rounded-xl p-5 mt-2 shadow-sm">
+        <div className="bg-card border border-border rounded-xl p-5 mt-2 shadow-sm flex-1 flex flex-col">
           <div className="flex justify-between items-center mb-4">
             <h4 className="font-bold text-sm text-muted-foreground flex items-center gap-1">
               Swing Biomechanics
@@ -45,13 +48,13 @@ export default function DataDashboard() {
               <span className="font-mono text-foreground">18.4 g</span>
             </div>
           </div>
-          <p className="text-xs text-muted-foreground mt-4 leading-relaxed pt-3 border-t border-border/50">
+          <p className="text-xs text-muted-foreground mt-auto leading-relaxed pt-4 border-t border-border/50">
             Trout generates elite bat speed with a steep attack angle, optimized for elevating the ball in the lower third of the zone.
           </p>
         </div>
       </div>
 
-      {/* Visualizations */}
+      {/* Visualizations - Savant Imports */}
       <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
         
         {/* Spray Chart */}
@@ -59,18 +62,17 @@ export default function DataDashboard() {
           <div className="p-4 border-b border-border bg-card/80 backdrop-blur z-10 flex justify-between items-center absolute top-0 left-0 right-0">
             <h3 className="font-display font-bold text-lg flex items-center gap-2">
               <Target className="w-4 h-4 text-primary" />
-              Pro Spray Chart
+              Savant Spray Chart
             </h3>
             <Button variant="ghost" size="icon" className="h-6 w-6">
-              <ChevronRight className="w-4 h-4" />
+              <ExternalLink className="w-4 h-4 text-muted-foreground" />
             </Button>
           </div>
-          <div className="relative flex-1 bg-[#0a1128] min-h-[250px]">
-             <img src={sprayChartImg} alt="Spray Chart Data" className="w-full h-full object-cover opacity-80 mix-blend-screen" />
-             <div className="absolute bottom-4 left-4 right-4 flex justify-between text-xs font-mono text-white/70 bg-black/40 px-3 py-1.5 rounded backdrop-blur-sm">
-               <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-red-500"></div> HR</div>
-               <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-yellow-500"></div> XBH</div>
-               <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-blue-500"></div> 1B</div>
+          <div className="relative flex-1 bg-[#1A1C20] min-h-[250px] flex items-center justify-center p-4 pt-16">
+             <img src={sprayChartImg} alt="Baseball Savant Spray Chart" className="w-full h-full object-contain mix-blend-screen opacity-90" />
+             <div className="absolute bottom-4 left-4 right-4 flex justify-between text-[10px] font-mono text-white/50 px-2">
+               <span>*Filtered by Fastballs, 2023 Season</span>
+               <span>via baseballsavant.mlb.com</span>
              </div>
           </div>
         </div>
@@ -80,19 +82,18 @@ export default function DataDashboard() {
           <div className="p-4 border-b border-border bg-card/80 backdrop-blur z-10 flex justify-between items-center absolute top-0 left-0 right-0">
             <h3 className="font-display font-bold text-lg flex items-center gap-2">
               <Zap className="w-4 h-4 text-primary" />
-              Damage Zones (SLG)
+              SLG Heatmap (RHP)
             </h3>
             <Button variant="ghost" size="icon" className="h-6 w-6">
-              <ChevronRight className="w-4 h-4" />
+              <ExternalLink className="w-4 h-4 text-muted-foreground" />
             </Button>
           </div>
-          <div className="relative flex-1 bg-[#0a1128] min-h-[250px]">
-             <img src={heatmapImg} alt="Damage Zone Heatmap" className="w-full h-full object-cover opacity-90 mix-blend-screen" />
-             <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent pointer-events-none"></div>
+          <div className="relative flex-1 bg-[#1A1C20] min-h-[250px] flex items-center justify-center p-4 pt-16">
+             <img src={heatmapImg} alt="Baseball Savant Damage Zone Heatmap" className="w-full h-full object-contain mix-blend-screen opacity-90" />
              
-             <div className="absolute bottom-4 left-4">
-               <div className="text-2xl font-bold font-display text-white">Middle-Low</div>
-               <div className="text-xs text-white/70">Highest Slugging % Zone</div>
+             <div className="absolute bottom-4 left-4 right-4 flex justify-between text-[10px] font-mono text-white/50 px-2">
+               <span>*Slugging Percentage</span>
+               <span>via baseballsavant.mlb.com</span>
              </div>
           </div>
         </div>
@@ -106,11 +107,11 @@ export default function DataDashboard() {
 function SavantMetricCard({ title, value, unit, percentile }: any) {
   // Color based on percentile (Savant red/blue scale)
   const getPercentileColor = (p: number) => {
-    if (p >= 90) return 'bg-red-500';
-    if (p >= 75) return 'bg-red-400';
-    if (p >= 50) return 'bg-neutral-500';
-    if (p >= 25) return 'bg-blue-400';
-    return 'bg-blue-500';
+    if (p >= 90) return 'bg-[#d73027]'; // Savant Red
+    if (p >= 75) return 'bg-[#fc8d59]'; // Savant Light Red/Orange
+    if (p >= 50) return 'bg-[#fee090]'; // Savant Yellow/Neutral
+    if (p >= 25) return 'bg-[#91bfdb]'; // Savant Light Blue
+    return 'bg-[#4575b4]'; // Savant Blue
   };
 
   const pColor = getPercentileColor(percentile);
