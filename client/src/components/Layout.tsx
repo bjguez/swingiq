@@ -16,7 +16,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center text-primary-foreground">
                 <Video size={18} />
               </div>
-              SwingMetrics
+              Hitting Observations
             </div>
             
             <nav className="hidden md:flex items-center gap-1 ml-4">
