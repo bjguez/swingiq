@@ -8,15 +8,15 @@ import extensionImg from "@/assets/images/extension.png";
 import proSwingImg from "@/assets/images/pro-swing.png";
 
 export default function Library() {
-  const categories = ["All", "Load & Stride", "Launch Position", "Contact", "Extension", "Full Swings"];
+  const categories = ["All", "Gather", "Touchdown", "Thrust", "Hand Path", "Head Position", "Scissor Kick", "Full Swings"];
   
   const libraryItems = [
-    { id: 1, title: "Trout - Explosive Lower Half", category: "Load & Stride", image: mechanicLowerHalfImg, player: "Mike Trout", duration: "0:12" },
-    { id: 2, title: "Bregman - Ideal Hand Path", category: "Launch Position", image: mechanicHandsImg, player: "Alex Bregman", duration: "0:08" },
-    { id: 3, title: "Ohtani - Perfect Impact Point", category: "Contact", image: contactPointImg, player: "Shohei Ohtani", duration: "0:15" },
-    { id: 4, title: "Judge - Post-Contact Extension", category: "Extension", image: extensionImg, player: "Aaron Judge", duration: "0:10" },
+    { id: 1, title: "Trout - Explosive Gather", category: "Gather", image: mechanicLowerHalfImg, player: "Mike Trout", duration: "0:12" },
+    { id: 2, title: "Bregman - Ideal Hand Path", category: "Hand Path", image: mechanicHandsImg, player: "Alex Bregman", duration: "0:08" },
+    { id: 3, title: "Ohtani - Perfect Touchdown", category: "Touchdown", image: contactPointImg, player: "Shohei Ohtani", duration: "0:15" },
+    { id: 4, title: "Judge - Powerful Thrust", category: "Thrust", image: extensionImg, player: "Aaron Judge", duration: "0:10" },
     { id: 5, title: "Betts - Compact Swing Mechanics", category: "Full Swings", image: proSwingImg, player: "Mookie Betts", duration: "0:22" },
-    { id: 6, title: "Altuve - Generating Power", category: "Load & Stride", image: mechanicLowerHalfImg, player: "Jose Altuve", duration: "0:14" },
+    { id: 6, title: "Altuve - Scissor Kick", category: "Scissor Kick", image: mechanicLowerHalfImg, player: "Jose Altuve", duration: "0:14" },
   ];
 
   return (

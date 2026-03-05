@@ -25,11 +25,22 @@ export default function Development() {
       </div>
 
       {/* Progress Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <PhaseCard title="Phase 1: Load & Stride" status="in-progress" progress={65} />
-        <PhaseCard title="Phase 2: Launch Position" status="locked" progress={0} />
-        <PhaseCard title="Phase 3: Connection" status="locked" progress={0} />
-        <PhaseCard title="Phase 4: Extension" status="locked" progress={0} />
+      <div className="mt-4">
+        <h3 className="font-display font-bold text-xl mb-3">Core Phases</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <PhaseCard title="Phase 1: Gather" status="in-progress" progress={65} />
+          <PhaseCard title="Phase 2: Touchdown" status="locked" progress={0} />
+          <PhaseCard title="Phase 3: Thrust" status="locked" progress={0} />
+        </div>
+      </div>
+
+      <div className="mt-6">
+        <h3 className="font-display font-bold text-xl mb-3">Swing Details</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <PhaseCard title="Hand Path" status="locked" progress={0} />
+          <PhaseCard title="Head Position" status="locked" progress={0} />
+          <PhaseCard title="Scissor Kick" status="locked" progress={0} />
+        </div>
       </div>
 
       {/* Current Focus Area */}
@@ -37,7 +48,7 @@ export default function Development() {
         <div className="flex items-center justify-between border-b border-border pb-2">
           <h2 className="text-2xl font-bold font-display flex items-center gap-2">
             <Target className="text-primary w-6 h-6" />
-            Current Focus: Lower Half Engagement
+            Current Focus: Gather
           </h2>
           <Button variant="ghost" className="text-primary hover:text-primary/80">View Full Path <ArrowRight className="w-4 h-4 ml-1" /></Button>
         </div>

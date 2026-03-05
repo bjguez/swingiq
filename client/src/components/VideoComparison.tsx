@@ -146,10 +146,9 @@ export default function VideoComparison() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="hidden sm:flex space-x-1 mr-4 border-r border-border pr-4">
-                <Badge active>Load</Badge>
-                <Badge>Stride</Badge>
-                <Badge>Contact</Badge>
-                <Badge>Extension</Badge>
+                <Badge active>Gather</Badge>
+                <Badge>Touchdown</Badge>
+                <Badge>Thrust</Badge>
               </div>
 
               <Button variant="ghost" size="icon" className="h-10 w-10 text-muted-foreground hover:text-foreground">
