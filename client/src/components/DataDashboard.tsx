@@ -1,6 +1,7 @@
-import { Activity, Zap, Target, BarChart, ChevronRight, Info, ExternalLink } from "lucide-react";
+import { Activity, Zap, Target, BarChart, ChevronRight, Info, ExternalLink, Box } from "lucide-react";
 import sprayChartImg from "@/assets/images/savant-spray.png";
 import heatmapImg from "@/assets/images/savant-heatmap.png";
+import swingPathImg from "@/assets/images/swing-path.png";
 import { Button } from "./ui/button";
 
 export default function DataDashboard() {
@@ -93,6 +94,27 @@ export default function DataDashboard() {
              
              <div className="absolute bottom-4 left-4 right-4 flex justify-between text-[10px] font-mono text-white/50 px-2">
                <span>*Slugging Percentage</span>
+               <span>via baseballsavant.mlb.com</span>
+             </div>
+          </div>
+        </div>
+
+        {/* Swing Path 3D */}
+        <div className="bg-card border border-border rounded-xl p-0 overflow-hidden flex flex-col shadow-sm relative group md:col-span-2">
+          <div className="p-4 border-b border-border bg-card/80 backdrop-blur z-10 flex justify-between items-center absolute top-0 left-0 right-0">
+            <h3 className="font-display font-bold text-lg flex items-center gap-2">
+              <Box className="w-4 h-4 text-primary" />
+              3D Swing Path & Attack Angle
+            </h3>
+            <Button variant="ghost" size="icon" className="h-6 w-6">
+              <ExternalLink className="w-4 h-4 text-muted-foreground" />
+            </Button>
+          </div>
+          <div className="relative flex-1 bg-[#1A1C20] min-h-[250px] md:min-h-[300px] flex items-center justify-center p-4 pt-16">
+             <img src={swingPathImg} alt="Baseball Savant 3D Swing Path" className="w-full h-full object-cover mix-blend-screen opacity-90" />
+             
+             <div className="absolute bottom-4 left-4 right-4 flex justify-between text-[10px] font-mono text-white/50 px-2">
+               <span>*Attack Angle: 12.5°</span>
                <span>via baseballsavant.mlb.com</span>
              </div>
           </div>
