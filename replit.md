@@ -11,7 +11,7 @@ SwingIQ allows baseball players (ages 10+) to upload videos of their swings and 
 
 ## Key Features
 - **Analysis Tab**: Side-by-side video comparison with synced playback, drawing tools (pen, circle, rectangle, text), and per-player Savant stats
-- **Development Tab**: Swing phase breakdown (Gather/Touchdown/Thrust + Hand Path/Head Position/Scissor Kick) with pro model clips and drills from DB
+- **Development Tab**: Swing phase breakdown (Gather/Touchdown/Thrust/Contact/Post-Contact + Hand Path/Head Position/Scissor Kick) with pro model clips and drills from DB
 - **Library Tab**: Filterable/searchable video database of pro swing clips by category
 - **Video Upload**: Real file upload via multer → `/uploads/` directory, stored in `videos` table
 - **Drawing Canvas**: HTML5 Canvas overlay on each video panel for annotations

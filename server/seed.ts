@@ -147,6 +147,12 @@ async function seed() {
     { title: "Betts - Scissor Kick Isolation", category: "Scissor Kick", playerId: betts.id, playerName: "Mookie Betts", source: "MLB.com", duration: "0:09", fps: 120, isProVideo: true },
     { title: "Altuve - Scissor Kick Power", category: "Scissor Kick", playerId: altuve.id, playerName: "Jose Altuve", source: "MLB.com", duration: "0:14", fps: 120, isProVideo: true },
     { title: "Altuve - Gather and Load", category: "Gather", playerId: altuve.id, playerName: "Jose Altuve", source: "YouTube", duration: "0:11", fps: 60, isProVideo: true },
+    { title: "Trout - Contact Point Precision", category: "Contact", playerId: trout.id, playerName: "Mike Trout", source: "MLB.com", duration: "0:10", fps: 120, isProVideo: true },
+    { title: "Judge - Extension Through Contact", category: "Contact", playerId: judge.id, playerName: "Aaron Judge", source: "MLB.com", duration: "0:11", fps: 120, isProVideo: true },
+    { title: "Ohtani - Barrel Through Zone", category: "Contact", playerId: ohtani.id, playerName: "Shohei Ohtani", source: "YouTube", duration: "0:09", fps: 60, isProVideo: true },
+    { title: "Betts - Post-Contact Extension", category: "Post-Contact", playerId: betts.id, playerName: "Mookie Betts", source: "MLB.com", duration: "0:12", fps: 120, isProVideo: true },
+    { title: "Altuve - Finish and Follow Through", category: "Post-Contact", playerId: altuve.id, playerName: "Jose Altuve", source: "MLB.com", duration: "0:10", fps: 120, isProVideo: true },
+    { title: "Bregman - Post-Contact Balance", category: "Post-Contact", playerId: bregman.id, playerName: "Alex Bregman", source: "YouTube", duration: "0:13", fps: 60, isProVideo: true },
   ]);
 
   await db.insert(drills).values([
@@ -215,6 +221,51 @@ async function seed() {
         "Perform your gather and stride in slow motion.",
         "After foot strike, let your back foot naturally scissors/rotate through.",
         "Repeat at increasing speeds, then add the bat.",
+      ],
+    },
+    {
+      name: "Flat Bat Contact Drill",
+      phase: "Contact",
+      reps: "12 Reps",
+      description: "Train palm-up / palm-down hand position at contact to maximize barrel coverage.",
+      steps: [
+        "Set up on a tee at belt height in the middle of the zone.",
+        "Focus on keeping the barrel flat through the hitting zone — palm up with the top hand, palm down with the bottom hand at contact.",
+        "Hold your finish for one second at the contact point and check hand position before resetting.",
+      ],
+    },
+    {
+      name: "Inside-Out Tee Drill",
+      phase: "Contact",
+      reps: "10 Reps",
+      description: "Develop the feel for staying inside the ball and driving it to the opposite field.",
+      steps: [
+        "Place the tee on the inner half of the plate.",
+        "Swing with the goal of hitting a line drive to the opposite field gap.",
+        "Focus on keeping your hands inside the ball and letting the barrel work through the zone.",
+      ],
+    },
+    {
+      name: "Extension Towel Drill",
+      phase: "Post-Contact",
+      reps: "10 Reps",
+      description: "Build full extension and follow-through after contact using a towel for feedback.",
+      steps: [
+        "Hold a bat with a small towel draped over the barrel end.",
+        "Take your normal swing off a tee.",
+        "Focus on extending fully through contact — the towel should fly off the barrel toward the pitcher.",
+        "If the towel falls to the side, you're cutting your extension short.",
+      ],
+    },
+    {
+      name: "Finish Position Freeze",
+      phase: "Post-Contact",
+      reps: "8 Reps",
+      description: "Reinforce a balanced, athletic finish position after the swing.",
+      steps: [
+        "Take a full swing off a tee or soft toss.",
+        "After contact, complete your full follow-through and freeze in your finish position for 3 seconds.",
+        "Check: weight should be on a firm front leg, back foot on toe, hands high, eyes on contact point.",
       ],
     },
   ]);

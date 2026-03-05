@@ -6,7 +6,7 @@ import { fetchDrills, fetchVideos } from "@/lib/api";
 import { useState } from "react";
 import type { Drill, Video } from "@shared/schema";
 
-const corePhases = ["Gather", "Touchdown", "Thrust"];
+const corePhases = ["Gather", "Touchdown", "Thrust", "Contact", "Post-Contact"];
 const detailPhases = ["Hand Path", "Head Position", "Scissor Kick"];
 
 export default function Development() {
@@ -45,7 +45,7 @@ export default function Development() {
       {/* Progress Overview */}
       <div className="mt-4">
         <h3 className="font-display font-bold text-xl mb-3">Core Phases</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           {corePhases.map(phase => (
             <PhaseCard 
               key={phase} 
