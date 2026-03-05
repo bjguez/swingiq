@@ -1,10 +1,23 @@
-import { Activity, Zap, Target, BarChart, ChevronRight, Info, ExternalLink, Box } from "lucide-react";
+import { Zap, Target, BarChart, Info, ExternalLink, Box } from "lucide-react";
 import sprayChartImg from "@/assets/images/savant-spray.png";
 import heatmapImg from "@/assets/images/savant-heatmap.png";
 import swingPathImg from "@/assets/images/swing-path.png";
 import { Button } from "./ui/button";
+import type { MlbPlayer } from "@shared/schema";
 
-export default function DataDashboard() {
+interface DataDashboardProps {
+  player: MlbPlayer | null;
+}
+
+export default function DataDashboard({ player }: DataDashboardProps) {
+  if (!player) {
+    return (
+      <div className="bg-card border border-border rounded-xl p-12 text-center text-muted-foreground">
+        Select an MLB player to view their Savant profile and swing data.
+      </div>
+    );
+  }
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       
@@ -13,19 +26,24 @@ export default function DataDashboard() {
         <div className="flex items-center justify-between">
           <h3 className="font-display font-bold text-xl uppercase text-muted-foreground flex items-center gap-2">
             <BarChart className="w-5 h-5 text-primary" />
-            Pro Profile: Mike Trout
+            Pro Profile: {player.name}
           </h3>
-          <span className="text-[10px] uppercase tracking-wider text-muted-foreground bg-secondary px-2 py-0.5 rounded flex items-center gap-1">
+          <a 
+            href={`https://baseballsavant.mlb.com/savant-player/${player.savantId}`}
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-[10px] uppercase tracking-wider text-muted-foreground bg-secondary px-2 py-0.5 rounded flex items-center gap-1 hover:text-foreground transition-colors"
+          >
             Savant Data
             <ExternalLink className="w-3 h-3" />
-          </span>
+          </a>
         </div>
         
         <div className="grid grid-cols-2 gap-3">
-          <SavantMetricCard title="Avg Exit Velo" value="91.9" unit="mph" percentile={94} />
-          <SavantMetricCard title="Max Exit Velo" value="114.4" unit="mph" percentile={96} />
-          <SavantMetricCard title="Barrel %" value="15.3" unit="%" percentile={98} />
-          <SavantMetricCard title="Hard Hit %" value="51.0" unit="%" percentile={92} />
+          <SavantMetricCard title="Avg Exit Velo" value={player.avgExitVelo?.toFixed(1) ?? "—"} unit="mph" percentile={player.avgExitVeloPercentile ?? 50} />
+          <SavantMetricCard title="Max Exit Velo" value={player.maxExitVelo?.toFixed(1) ?? "—"} unit="mph" percentile={player.maxExitVeloPercentile ?? 50} />
+          <SavantMetricCard title="Barrel %" value={player.barrelPct?.toFixed(1) ?? "—"} unit="%" percentile={player.barrelPctPercentile ?? 50} />
+          <SavantMetricCard title="Hard Hit %" value={player.hardHitPct?.toFixed(1) ?? "—"} unit="%" percentile={player.hardHitPctPercentile ?? 50} />
         </div>
         
         <div className="bg-card border border-border rounded-xl p-5 mt-2 shadow-sm flex-1 flex flex-col">
@@ -38,19 +56,19 @@ export default function DataDashboard() {
           <div className="space-y-3">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Attack Angle</span>
-              <span className="font-mono text-foreground">12.5°</span>
+              <span className="font-mono text-foreground">{player.attackAngle?.toFixed(1) ?? "—"}°</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Bat Speed</span>
-              <span className="font-mono text-foreground">76.2 mph</span>
+              <span className="font-mono text-foreground">{player.batSpeed?.toFixed(1) ?? "—"} mph</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Rotational Accel</span>
-              <span className="font-mono text-foreground">18.4 g</span>
+              <span className="font-mono text-foreground">{player.rotationalAccel?.toFixed(1) ?? "—"} g</span>
             </div>
           </div>
           <p className="text-xs text-muted-foreground mt-auto leading-relaxed pt-4 border-t border-border/50">
-            Trout generates elite bat speed with a steep attack angle, optimized for elevating the ball in the lower third of the zone.
+            {player.name} ({player.height}, {player.weight}lbs) bats {player.bats === "R" ? "right-handed" : "left-handed"} for the {player.team}.
           </p>
         </div>
       </div>
@@ -65,14 +83,16 @@ export default function DataDashboard() {
               <Target className="w-4 h-4 text-primary" />
               Savant Spray Chart
             </h3>
-            <Button variant="ghost" size="icon" className="h-6 w-6">
-              <ExternalLink className="w-4 h-4 text-muted-foreground" />
-            </Button>
+            <a href={`https://baseballsavant.mlb.com/savant-player/${player.savantId}`} target="_blank" rel="noopener noreferrer">
+              <Button variant="ghost" size="icon" className="h-6 w-6">
+                <ExternalLink className="w-4 h-4 text-muted-foreground" />
+              </Button>
+            </a>
           </div>
           <div className="relative flex-1 bg-[#1A1C20] min-h-[250px] flex items-center justify-center p-4 pt-16">
              <img src={sprayChartImg} alt="Baseball Savant Spray Chart" className="w-full h-full object-contain mix-blend-screen opacity-90" />
              <div className="absolute bottom-4 left-4 right-4 flex justify-between text-[10px] font-mono text-white/50 px-2">
-               <span>*Filtered by Fastballs, 2023 Season</span>
+               <span>*{player.name}, 2024 Season</span>
                <span>via baseballsavant.mlb.com</span>
              </div>
           </div>
@@ -83,11 +103,13 @@ export default function DataDashboard() {
           <div className="p-4 border-b border-border bg-card/80 backdrop-blur z-10 flex justify-between items-center absolute top-0 left-0 right-0">
             <h3 className="font-display font-bold text-lg flex items-center gap-2">
               <Zap className="w-4 h-4 text-primary" />
-              SLG Heatmap (RHP)
+              SLG Heatmap ({player.bats === "R" ? "vs RHP" : "vs LHP"})
             </h3>
-            <Button variant="ghost" size="icon" className="h-6 w-6">
-              <ExternalLink className="w-4 h-4 text-muted-foreground" />
-            </Button>
+            <a href={`https://baseballsavant.mlb.com/savant-player/${player.savantId}`} target="_blank" rel="noopener noreferrer">
+              <Button variant="ghost" size="icon" className="h-6 w-6">
+                <ExternalLink className="w-4 h-4 text-muted-foreground" />
+              </Button>
+            </a>
           </div>
           <div className="relative flex-1 bg-[#1A1C20] min-h-[250px] flex items-center justify-center p-4 pt-16">
              <img src={heatmapImg} alt="Baseball Savant Damage Zone Heatmap" className="w-full h-full object-contain mix-blend-screen opacity-90" />
@@ -106,15 +128,17 @@ export default function DataDashboard() {
               <Box className="w-4 h-4 text-primary" />
               3D Swing Path & Attack Angle
             </h3>
-            <Button variant="ghost" size="icon" className="h-6 w-6">
-              <ExternalLink className="w-4 h-4 text-muted-foreground" />
-            </Button>
+            <a href="https://baseballsavant.mlb.com/leaderboard/bat-tracking/swing-path-attack-angle" target="_blank" rel="noopener noreferrer">
+              <Button variant="ghost" size="icon" className="h-6 w-6">
+                <ExternalLink className="w-4 h-4 text-muted-foreground" />
+              </Button>
+            </a>
           </div>
           <div className="relative flex-1 bg-[#1A1C20] min-h-[250px] md:min-h-[300px] flex items-center justify-center p-4 pt-16">
              <img src={swingPathImg} alt="Baseball Savant 3D Swing Path" className="w-full h-full object-cover mix-blend-screen opacity-90" />
              
              <div className="absolute bottom-4 left-4 right-4 flex justify-between text-[10px] font-mono text-white/50 px-2">
-               <span>*Attack Angle: 12.5°</span>
+               <span>*Attack Angle: {player.attackAngle?.toFixed(1) ?? "—"}°</span>
                <span>via baseballsavant.mlb.com</span>
              </div>
           </div>
@@ -127,13 +151,12 @@ export default function DataDashboard() {
 }
 
 function SavantMetricCard({ title, value, unit, percentile }: any) {
-  // Color based on percentile (Savant red/blue scale)
   const getPercentileColor = (p: number) => {
-    if (p >= 90) return 'bg-[#d73027]'; // Savant Red
-    if (p >= 75) return 'bg-[#fc8d59]'; // Savant Light Red/Orange
-    if (p >= 50) return 'bg-[#fee090]'; // Savant Yellow/Neutral
-    if (p >= 25) return 'bg-[#91bfdb]'; // Savant Light Blue
-    return 'bg-[#4575b4]'; // Savant Blue
+    if (p >= 90) return 'bg-[#d73027]';
+    if (p >= 75) return 'bg-[#fc8d59]';
+    if (p >= 50) return 'bg-[#fee090]';
+    if (p >= 25) return 'bg-[#91bfdb]';
+    return 'bg-[#4575b4]';
   };
 
   const pColor = getPercentileColor(percentile);
