@@ -1,56 +1,133 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, Youtube, Upload, PlayCircle, Loader2, ScanFace, CheckCircle2, User } from "lucide-react";
+import { Search, Upload, PlayCircle, Loader2, ScanFace, CheckCircle2, User, AlertCircle } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { fetchVideos, fetchPlayers } from "@/lib/api";
+import type { Video, MlbPlayer } from "@shared/schema";
 
-export function VideoLibraryModal({ trigger }: { trigger: React.ReactNode }) {
+interface VideoLibraryModalProps {
+  trigger: React.ReactNode;
+  onVideoSelected?: (url: string, label?: string) => void;
+}
+
+export function VideoLibraryModal({ trigger, onVideoSelected }: VideoLibraryModalProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [isSearching, setIsSearching] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const queryClient = useQueryClient();
   
-  // 'idle' | 'uploading' | 'analyzing' | 'results'
-  const [uploadState, setUploadState] = useState<'idle' | 'uploading' | 'analyzing' | 'results'>('idle');
-  const [progress, setProgress] = useState(0);
+  const [uploadState, setUploadState] = useState<'idle' | 'uploading' | 'analyzing' | 'results' | 'error'>('idle');
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadedVideoUrl, setUploadedVideoUrl] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
-  const mockResults = [
-    { id: 1, name: "Mike Trout", date: "2023-08-15", type: "Home Run", pitch: "95mph Fastball", source: "MLB.com" },
-    { id: 2, name: "Shohei Ohtani", date: "2023-09-02", type: "Double", pitch: "88mph Slider", source: "YouTube" },
-    { id: 3, name: "Aaron Judge", date: "2023-07-20", type: "Home Run", pitch: "84mph Curveball", source: "MLB.com" },
-    { id: 4, name: "Mookie Betts", date: "2023-08-05", type: "Single", pitch: "92mph Sinker", source: "MLB.com" },
-  ];
+  const { data: allVideos = [] } = useQuery({
+    queryKey: ["/api/videos"],
+    queryFn: () => fetchVideos(),
+  });
 
-  const handleSearch = () => {
-    setIsSearching(true);
-    setTimeout(() => setIsSearching(false), 800);
-  };
+  const { data: players = [] } = useQuery({
+    queryKey: ["/api/players"],
+    queryFn: fetchPlayers,
+  });
 
-  const handleUploadSim = () => {
+  const filteredVideos = allVideos.filter((v: Video) => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return v.title.toLowerCase().includes(q) || (v.playerName?.toLowerCase().includes(q));
+  });
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
     setUploadState('uploading');
-    let p = 0;
-    const interval = setInterval(() => {
-      p += 10;
-      setProgress(p);
-      if (p >= 100) {
-        clearInterval(interval);
-        setUploadState('analyzing');
-        setTimeout(() => {
-          setUploadState('results');
-        }, 2000);
-      }
-    }, 150);
+    setUploadProgress(0);
+    setUploadError(null);
+
+    const formData = new FormData();
+    formData.append("video", file);
+    formData.append("title", file.name);
+
+    try {
+      const xhr = new XMLHttpRequest();
+      
+      xhr.upload.addEventListener("progress", (ev) => {
+        if (ev.lengthComputable) {
+          setUploadProgress(Math.round((ev.loaded / ev.total) * 100));
+        }
+      });
+
+      const response = await new Promise<any>((resolve, reject) => {
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve(JSON.parse(xhr.responseText));
+          } else {
+            try {
+              const err = JSON.parse(xhr.responseText);
+              reject(new Error(err.message || "Upload failed"));
+            } catch {
+              reject(new Error("Upload failed"));
+            }
+          }
+        };
+        xhr.onerror = () => reject(new Error("Network error during upload"));
+        xhr.open("POST", "/api/upload");
+        xhr.send(formData);
+      });
+
+      setUploadedVideoUrl(response.sourceUrl);
+      queryClient.invalidateQueries({ queryKey: ["/api/videos"] });
+      setUploadState('analyzing');
+      
+      setTimeout(() => {
+        setUploadState('results');
+      }, 2000);
+    } catch (err: any) {
+      console.error("Upload error:", err);
+      setUploadError(err.message || "Upload failed. Please try again.");
+      setUploadState('error');
+    }
+
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  // Reset state when modal closes
+  const handleSelectUploadedVideo = () => {
+    if (uploadedVideoUrl && onVideoSelected) {
+      onVideoSelected(uploadedVideoUrl, "My Swing");
+    }
+    setIsOpen(false);
+  };
+
+  const handleSelectProVideo = (video: Video) => {
+    if (video.sourceUrl && onVideoSelected) {
+      onVideoSelected(video.sourceUrl, video.playerName || video.title);
+    }
+    setIsOpen(false);
+  };
+
+  const handleSelectComp = (player: MlbPlayer) => {
+    if (uploadedVideoUrl && onVideoSelected) {
+      onVideoSelected(uploadedVideoUrl, "My Swing");
+    }
+    setIsOpen(false);
+  };
+
   useEffect(() => {
     if (!isOpen) {
       setTimeout(() => {
         setUploadState('idle');
-        setProgress(0);
+        setUploadProgress(0);
+        setUploadedVideoUrl(null);
+        setUploadError(null);
       }, 300);
     }
   }, [isOpen]);
+
+  const compPlayers = players.slice(0, 3);
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -72,21 +149,42 @@ export function VideoLibraryModal({ trigger }: { trigger: React.ReactNode }) {
           </TabsList>
           
           <TabsContent value="upload" className="mt-4">
+            <input 
+              ref={fileInputRef}
+              type="file" 
+              accept="video/mp4,video/quicktime,video/webm,video/x-msvideo"
+              className="hidden"
+              onChange={handleFileSelect}
+              data-testid="input-file-upload"
+            />
             
             {uploadState === 'idle' && (
               <div 
-                onClick={handleUploadSim}
+                onClick={() => fileInputRef.current?.click()}
                 className="border-2 border-dashed border-border rounded-xl p-12 flex flex-col items-center justify-center text-center bg-secondary/10 hover:bg-secondary/20 transition-colors cursor-pointer"
+                data-testid="dropzone-upload"
+                onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const file = e.dataTransfer.files?.[0];
+                  if (file && fileInputRef.current) {
+                    const dt = new DataTransfer();
+                    dt.items.add(file);
+                    fileInputRef.current.files = dt.files;
+                    fileInputRef.current.dispatchEvent(new Event('change', { bubbles: true }));
+                  }
+                }}
               >
                 <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mb-4 text-primary">
                   <Upload className="w-8 h-8" />
                 </div>
                 <h3 className="font-display font-bold text-xl mb-2">Drag and drop your video</h3>
                 <p className="text-muted-foreground text-sm max-w-sm mb-6">
-                  Upload a video of your swing. Our AI will analyze your biometrics (height, levers, posture) to find your best MLB comparables.
+                  Upload a video of your swing. Our AI will analyze your biometrics to find your best MLB comparables.
                 </p>
-                <Button>Select File</Button>
-                <p className="text-xs text-muted-foreground mt-4">MP4, MOV up to 500MB</p>
+                <Button onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}>Select File</Button>
+                <p className="text-xs text-muted-foreground mt-4">MP4, MOV, WebM up to 500MB</p>
               </div>
             )}
 
@@ -95,8 +193,9 @@ export function VideoLibraryModal({ trigger }: { trigger: React.ReactNode }) {
                 <Loader2 className="w-12 h-12 text-primary animate-spin mb-4" />
                 <h3 className="font-display font-bold text-xl mb-2">Uploading Video...</h3>
                 <div className="w-64 h-2 bg-secondary rounded-full mt-4 overflow-hidden">
-                  <div className="h-full bg-primary transition-all duration-150" style={{ width: `${progress}%` }}></div>
+                  <div className="h-full bg-primary transition-all duration-150" style={{ width: `${uploadProgress}%` }}></div>
                 </div>
+                <p className="text-xs text-muted-foreground mt-2">{uploadProgress}%</p>
               </div>
             )}
 
@@ -108,36 +207,45 @@ export function VideoLibraryModal({ trigger }: { trigger: React.ReactNode }) {
               </div>
             )}
 
+            {uploadState === 'error' && (
+              <div className="border border-destructive/50 rounded-xl p-12 flex flex-col items-center justify-center text-center bg-destructive/5">
+                <AlertCircle className="w-12 h-12 text-destructive mb-4" />
+                <h3 className="font-display font-bold text-xl mb-2">Upload Failed</h3>
+                <p className="text-muted-foreground text-sm mb-4">{uploadError}</p>
+                <Button onClick={() => { setUploadState('idle'); setUploadError(null); }}>Try Again</Button>
+              </div>
+            )}
+
             {uploadState === 'results' && (
               <div className="flex flex-col gap-4 animate-in fade-in zoom-in duration-300">
                 <div className="flex items-center gap-2 text-green-500 bg-green-500/10 p-3 rounded-lg border border-green-500/20">
                   <CheckCircle2 className="w-5 h-5" />
-                  <span className="font-medium text-sm">Analysis complete! Based on your 5'10" frame and short levers, here are your best MLB mechanical matches.</span>
+                  <span className="font-medium text-sm">Upload complete! Video saved. Here are suggested MLB comparables.</span>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <CompCard 
-                    name="Mike Trout" 
-                    match="94%" 
-                    reason="Similar compact swing path and torso rotation. Excellent match for your build."
-                    isTopMatch
-                    onClick={() => setIsOpen(false)}
-                  />
-                  <CompCard 
-                    name="Alex Bregman" 
-                    match="88%" 
-                    reason="Matches your bat speed generation style and lower-half usage."
-                    onClick={() => setIsOpen(false)}
-                  />
-                  <CompCard 
-                    name="Jose Altuve" 
-                    match="82%" 
-                    reason="Similar stride length and attack angle. Good alternative to study."
-                    onClick={() => setIsOpen(false)}
-                  />
-                </div>
+                <Button className="w-full" onClick={handleSelectUploadedVideo} data-testid="button-use-video">
+                  Use This Video in Analysis
+                </Button>
+
+                {compPlayers.length > 0 && (
+                  <>
+                    <p className="text-xs text-muted-foreground text-center">Or select a comparable player:</p>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {compPlayers.map((p: MlbPlayer, i: number) => (
+                        <CompCard
+                          key={p.id}
+                          name={p.name}
+                          match={`${94 - i * 6}%`}
+                          reason={`${p.height}, ${p.weight}lbs. ${p.bats === 'R' ? 'Right' : 'Left'}-handed.`}
+                          isTopMatch={i === 0}
+                          onClick={() => handleSelectComp(p)}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
                 
-                <Button variant="outline" className="w-full mt-2" onClick={() => setUploadState('idle')}>
+                <Button variant="outline" className="w-full mt-2" onClick={() => { setUploadState('idle'); setUploadedVideoUrl(null); }}>
                   Upload Different Video
                 </Button>
               </div>
@@ -150,45 +258,55 @@ export function VideoLibraryModal({ trigger }: { trigger: React.ReactNode }) {
               <div className="relative flex-1">
                 <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 <Input 
-                  placeholder="Search player name, pitch type, or paste YouTube URL..." 
+                  placeholder="Search player name or video title..." 
                   className="pl-9 bg-background border-border"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                  data-testid="input-search-library"
                 />
               </div>
-              <Button onClick={handleSearch} disabled={isSearching}>
-                {isSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : "Search"}
-              </Button>
             </div>
 
             <div className="border border-border rounded-md overflow-hidden">
               <div className="bg-secondary/50 p-2 text-xs font-semibold text-muted-foreground grid grid-cols-12 gap-2 uppercase tracking-wider">
-                <div className="col-span-4">Player</div>
-                <div className="col-span-2">Date</div>
-                <div className="col-span-2">Result</div>
-                <div className="col-span-2">Pitch</div>
+                <div className="col-span-5">Video</div>
+                <div className="col-span-2">Category</div>
+                <div className="col-span-2">Source</div>
+                <div className="col-span-1">FPS</div>
                 <div className="col-span-2 text-right">Action</div>
               </div>
               <div className="divide-y divide-border/50 max-h-[300px] overflow-y-auto">
-                {mockResults.map((result) => (
-                  <div key={result.id} className="p-3 grid grid-cols-12 gap-2 items-center hover:bg-secondary/30 transition-colors text-sm">
-                    <div className="col-span-4 font-bold flex items-center gap-2">
+                {filteredVideos.map((video: Video) => (
+                  <div key={video.id} className="p-3 grid grid-cols-12 gap-2 items-center hover:bg-secondary/30 transition-colors text-sm">
+                    <div className="col-span-5 font-bold flex items-center gap-2">
                       <div className="w-8 h-8 rounded bg-secondary flex items-center justify-center">
-                        {result.source === "YouTube" ? <Youtube className="w-4 h-4 text-red-500" /> : <PlayCircle className="w-4 h-4 text-primary" />}
+                        <PlayCircle className="w-4 h-4 text-primary" />
                       </div>
-                      {result.name}
+                      <div className="min-w-0">
+                        <div className="truncate">{video.title}</div>
+                        <div className="text-xs text-muted-foreground">{video.playerName}</div>
+                      </div>
                     </div>
-                    <div className="col-span-2 text-muted-foreground">{result.date}</div>
-                    <div className="col-span-2">{result.type}</div>
-                    <div className="col-span-2 text-muted-foreground">{result.pitch}</div>
+                    <div className="col-span-2 text-muted-foreground text-xs">{video.category}</div>
+                    <div className="col-span-2 text-xs">{video.source}</div>
+                    <div className="col-span-1 text-xs text-muted-foreground">{video.fps || "—"}</div>
                     <div className="col-span-2 text-right">
-                      <Button size="sm" variant="outline" className="border-primary/50 text-primary hover:bg-primary/20 hover:text-primary h-8" onClick={() => setIsOpen(false)}>
+                      <Button 
+                        size="sm" variant="outline" 
+                        className="border-primary/50 text-primary hover:bg-primary/20 hover:text-primary h-8" 
+                        onClick={() => handleSelectProVideo(video)}
+                        data-testid={`button-import-${video.id}`}
+                      >
                         Import
                       </Button>
                     </div>
                   </div>
                 ))}
+                {filteredVideos.length === 0 && (
+                  <div className="p-6 text-center text-muted-foreground text-sm">
+                    No videos found. Try a different search.
+                  </div>
+                )}
               </div>
             </div>
           </TabsContent>
@@ -222,9 +340,7 @@ function CompCard({ name, match, reason, isTopMatch = false, onClick }: any) {
         </div>
         <div className="text-primary font-mono font-bold">{match}</div>
       </div>
-      <p className="text-xs text-muted-foreground leading-relaxed">
-        {reason}
-      </p>
+      <p className="text-xs text-muted-foreground leading-relaxed">{reason}</p>
       <Button variant={isTopMatch ? "default" : "secondary"} className="w-full mt-4 h-8 text-xs">
         Compare Swing
       </Button>
