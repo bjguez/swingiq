@@ -136,6 +136,26 @@ export async function registerRoutes(
     }
   });
 
+  app.patch("/api/videos/:id", async (req, res) => {
+    try {
+      const video = await storage.updateVideo(req.params.id, req.body);
+      if (!video) return res.status(404).json({ message: "Video not found" });
+      res.json(video);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to update video" });
+    }
+  });
+
+  app.delete("/api/videos/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteVideo(req.params.id);
+      if (!deleted) return res.status(404).json({ message: "Video not found" });
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to delete video" });
+    }
+  });
+
   app.get("/api/drills", async (req, res) => {
     try {
       const { phase } = req.query;

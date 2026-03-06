@@ -23,6 +23,8 @@ export interface IStorage {
   getVideosByPlayer(playerId: string): Promise<Video[]>;
   getVideo(id: string): Promise<Video | undefined>;
   createVideo(video: InsertVideo): Promise<Video>;
+  updateVideo(id: string, data: Partial<InsertVideo>): Promise<Video | undefined>;
+  deleteVideo(id: string): Promise<boolean>;
 
   getAllDrills(): Promise<Drill[]>;
   getDrillsByPhase(phase: string): Promise<Drill[]>;
@@ -85,6 +87,16 @@ export class DatabaseStorage implements IStorage {
   async createVideo(video: InsertVideo): Promise<Video> {
     const [created] = await db.insert(videos).values(video).returning();
     return created;
+  }
+
+  async updateVideo(id: string, data: Partial<InsertVideo>): Promise<Video | undefined> {
+    const [updated] = await db.update(videos).set(data).where(eq(videos.id, id)).returning();
+    return updated;
+  }
+
+  async deleteVideo(id: string): Promise<boolean> {
+    const result = await db.delete(videos).where(eq(videos.id, id)).returning();
+    return result.length > 0;
   }
 
   async getAllDrills(): Promise<Drill[]> {

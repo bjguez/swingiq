@@ -15,6 +15,7 @@ SwingIQ allows baseball players (ages 10+) to upload videos of their swings and 
 - **Library Tab**: Filterable/searchable video database of pro swing clips by category
 - **Video Upload**: Real file upload via multer → `/uploads/` directory, stored in `videos` table
 - **Drawing Canvas**: HTML5 Canvas overlay on each video panel for annotations
+- **Admin Portal**: Video management — upload files, set metadata (title, player, category/phase tag, source, FPS, duration, pro/amateur), inline edit, delete
 
 ## Database Schema (PostgreSQL)
 - `users` - user accounts
@@ -31,7 +32,7 @@ SwingIQ allows baseball players (ages 10+) to upload videos of their swings and 
 - `GET/POST/PATCH /api/sessions` - analysis session persistence
 
 ## File Structure
-- `client/src/pages/` - Home (Analysis), Development, Library
+- `client/src/pages/` - Home (Analysis), Development, Library, Admin
 - `client/src/components/` - VideoComparison, VideoPlayer, DrawingCanvas, DataDashboard, VideoLibraryModal, Layout
 - `server/` - Express routes, storage, database connection, seed script
 - `shared/schema.ts` - Drizzle schema + Zod validation
