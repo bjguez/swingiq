@@ -2,7 +2,7 @@ import { useState, useRef, useCallback } from "react";
 import { 
   Play, Pause, SkipBack, SkipForward, 
   MousePointer2, PenTool, Circle, Square, Type, 
-  Undo, Trash2, Link2, Youtube, Upload
+  Undo, Trash2, Link2, Youtube, Upload, Minus, Crosshair
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -133,9 +133,11 @@ export default function VideoComparison() {
       {/* Left Toolbar */}
       <div className="lg:col-span-1 flex lg:flex-col gap-2 items-center justify-start py-2 border-b lg:border-b-0 lg:border-r border-border pr-0 lg:pr-4 overflow-x-auto lg:overflow-x-visible">
         <ToolButton icon={<MousePointer2 className="w-5 h-5" />} active={activeTool === "select"} tooltip="Select" onClick={() => setActiveTool("select")} />
-        <ToolButton icon={<PenTool className="w-5 h-5" />} active={activeTool === "pen"} tooltip="Draw Lines" onClick={() => setActiveTool("pen")} />
-        <ToolButton icon={<Circle className="w-5 h-5" />} active={activeTool === "circle"} tooltip="Angles/Circles" onClick={() => setActiveTool("circle")} />
-        <ToolButton icon={<Square className="w-5 h-5" />} active={activeTool === "rect"} tooltip="Zones" onClick={() => setActiveTool("rect")} />
+        <ToolButton icon={<PenTool className="w-5 h-5" />} active={activeTool === "pen"} tooltip="Freehand" onClick={() => setActiveTool("pen")} />
+        <ToolButton icon={<Minus className="w-5 h-5" />} active={activeTool === "line"} tooltip="Straight Line" onClick={() => setActiveTool("line")} />
+        <ToolButton icon={<Crosshair className="w-5 h-5" />} active={activeTool === "angle"} tooltip="Measure Angle" onClick={() => setActiveTool("angle")} />
+        <ToolButton icon={<Circle className="w-5 h-5" />} active={activeTool === "circle"} tooltip="Circle" onClick={() => setActiveTool("circle")} />
+        <ToolButton icon={<Square className="w-5 h-5" />} active={activeTool === "rect"} tooltip="Rectangle" onClick={() => setActiveTool("rect")} />
         <ToolButton icon={<Type className="w-5 h-5" />} active={activeTool === "text"} tooltip="Text Notes" onClick={() => setActiveTool("text")} />
         
         <div className="w-px h-6 lg:w-6 lg:h-px bg-border my-2 flex-shrink-0" />
