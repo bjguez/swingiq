@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { 
   Play, Pause, SkipBack, SkipForward, 
   MousePointer2, PenTool, Circle, Square, Type, 
-  Undo, Trash2, Link2, Youtube, Upload, Maximize, Minimize
+  Undo, Trash2, Link2, Youtube, Upload, Maximize, Minimize, Timer
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -29,6 +29,8 @@ export default function VideoComparison() {
 
   const [leftAnnotations, setLeftAnnotations] = useState<DrawAction[]>([]);
   const [rightAnnotations, setRightAnnotations] = useState<DrawAction[]>([]);
+  const [timerStart, setTimerStart] = useState<number | null>(null);
+  const [timerEnd, setTimerEnd] = useState<number | null>(null);
 
   const leftVideoRef = useRef<VideoPlayerHandle>(null);
   const rightVideoRef = useRef<VideoPlayerHandle>(null);
@@ -131,11 +133,28 @@ export default function VideoComparison() {
     setRightAnnotations([]);
   }, []);
 
+  const handleTimerClick = useCallback(() => {
+    if (timerStart === null) {
+      setTimerStart(currentTime);
+      setTimerEnd(null);
+    } else if (timerEnd === null) {
+      setTimerEnd(currentTime);
+    } else {
+      setTimerStart(currentTime);
+      setTimerEnd(null);
+    }
+  }, [currentTime, timerStart, timerEnd]);
+
+  const clearTimer = useCallback(() => {
+    setTimerStart(null);
+    setTimerEnd(null);
+  }, []);
+
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
     const s = Math.floor(seconds % 60);
-    const ms = Math.floor((seconds % 1) * 100);
-    return `${m}:${s.toString().padStart(2, "0")}.${ms.toString().padStart(2, "0")}`;
+    const ms = Math.floor((seconds % 1) * 1000);
+    return `${m}:${s.toString().padStart(2, "0")}.${ms.toString().padStart(3, "0")}`;
   };
 
   const colors = [
@@ -192,6 +211,7 @@ export default function VideoComparison() {
             color={activeColor}
             annotations={leftAnnotations}
             onAnnotationsChange={setLeftAnnotations}
+            onTimerClick={handleTimerClick}
           />
         </div>
 
@@ -233,12 +253,13 @@ export default function VideoComparison() {
             color={activeColor}
             annotations={rightAnnotations}
             onAnnotationsChange={setRightAnnotations}
+            onTimerClick={handleTimerClick}
           />
         </div>
       </div>
 
-      {/* Drawing Toolbar — horizontal, below videos */}
-      <div className="flex items-center gap-2 py-2 px-1 border border-border rounded-lg bg-secondary/20 overflow-x-auto">
+      {/* Drawing Toolbar — horizontal, centered, below videos */}
+      <div className="flex items-center justify-center gap-2 py-2 px-3 border border-border rounded-lg bg-secondary/20 overflow-x-auto">
         <ToolButton icon={<MousePointer2 className="w-4 h-4" />} active={activeTool === "select"} tooltip="Select" onClick={() => setActiveTool("select")} />
         <ToolButton icon={<PenTool className="w-4 h-4" />} active={activeTool === "pen"} tooltip="Freehand" onClick={() => setActiveTool("pen")} />
         <ToolButton icon={<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="12" y1="4" x2="12" y2="20" /></svg>} active={activeTool === "line"} tooltip="Straight Line" onClick={() => setActiveTool("line")} />
@@ -247,6 +268,28 @@ export default function VideoComparison() {
         <ToolButton icon={<Square className="w-4 h-4" />} active={activeTool === "rect"} tooltip="Rectangle" onClick={() => setActiveTool("rect")} />
         <ToolButton icon={<Type className="w-4 h-4" />} active={activeTool === "text"} tooltip="Text Notes" onClick={() => setActiveTool("text")} />
         
+        <div className="w-px h-6 bg-border mx-1 flex-shrink-0" />
+
+        <ToolButton icon={<Timer className="w-4 h-4" />} active={activeTool === "timer"} tooltip="Frame Timer" onClick={() => { setActiveTool("timer"); }} />
+
+        {timerStart !== null && (
+          <div data-testid="timer-display" className="flex items-center gap-2 px-2 py-1 rounded bg-black/40 border border-border text-xs font-mono shrink-0">
+            <span className="text-muted-foreground">A:</span>
+            <span className="text-primary">{formatTime(timerStart)}</span>
+            {timerEnd !== null && (
+              <>
+                <span className="text-muted-foreground">B:</span>
+                <span className="text-primary">{formatTime(timerEnd)}</span>
+                <span className="text-muted-foreground mx-1">|</span>
+                <span className="text-yellow-400 font-bold">{formatTime(Math.abs(timerEnd - timerStart))}</span>
+              </>
+            )}
+            <button onClick={clearTimer} className="text-muted-foreground hover:text-foreground ml-1">
+              <Trash2 className="w-3 h-3" />
+            </button>
+          </div>
+        )}
+
         <div className="w-px h-6 bg-border mx-1 flex-shrink-0" />
         
         {colors.map(c => (

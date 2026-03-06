@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 
-type Tool = "select" | "pen" | "line" | "circle" | "rect" | "text" | "angle";
+type Tool = "select" | "pen" | "line" | "circle" | "rect" | "text" | "angle" | "timer";
 type DrawAction = {
   type: Tool;
   color: string;
@@ -16,9 +16,10 @@ interface DrawingCanvasProps {
   color: string;
   annotations: DrawAction[];
   onAnnotationsChange: (annotations: DrawAction[]) => void;
+  onTimerClick?: () => void;
 }
 
-export default function DrawingCanvas({ tool, color, annotations, onAnnotationsChange }: DrawingCanvasProps) {
+export default function DrawingCanvas({ tool, color, annotations, onAnnotationsChange, onTimerClick }: DrawingCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -213,6 +214,11 @@ export default function DrawingCanvas({ tool, color, annotations, onAnnotationsC
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!isInteractive) return;
     const pos = getPos(e);
+
+    if (tool === "timer") {
+      onTimerClick?.();
+      return;
+    }
 
     if (tool === "text") {
       const text = prompt("Enter text annotation:");
