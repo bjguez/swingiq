@@ -64,16 +64,6 @@ export default function DrawingCanvas({ tool, color, annotations, onAnnotationsC
     return Math.round(angle);
   }
 
-  function drawArrowhead(ctx: CanvasRenderingContext2D, from: { x: number; y: number }, to: { x: number; y: number }, size: number) {
-    const angle = Math.atan2(to.y - from.y, to.x - from.x);
-    ctx.beginPath();
-    ctx.moveTo(to.x, to.y);
-    ctx.lineTo(to.x - size * Math.cos(angle - Math.PI / 6), to.y - size * Math.sin(angle - Math.PI / 6));
-    ctx.moveTo(to.x, to.y);
-    ctx.lineTo(to.x - size * Math.cos(angle + Math.PI / 6), to.y - size * Math.sin(angle + Math.PI / 6));
-    ctx.stroke();
-  }
-
   const redraw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -109,7 +99,6 @@ export default function DrawingCanvas({ tool, color, annotations, onAnnotationsC
             ctx.moveTo(action.start.x, action.start.y);
             ctx.lineTo(action.end.x, action.end.y);
             ctx.stroke();
-            drawArrowhead(ctx, action.start, action.end, 10);
           }
           break;
 

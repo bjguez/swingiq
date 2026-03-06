@@ -2,7 +2,7 @@ import { useState, useRef, useCallback } from "react";
 import { 
   Play, Pause, SkipBack, SkipForward, 
   MousePointer2, PenTool, Circle, Square, Type, 
-  Undo, Trash2, Link2, Youtube, Upload, Minus, Crosshair
+  Undo, Trash2, Link2, Youtube, Upload
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -134,8 +134,8 @@ export default function VideoComparison() {
       <div className="lg:col-span-1 flex lg:flex-col gap-2 items-center justify-start py-2 border-b lg:border-b-0 lg:border-r border-border pr-0 lg:pr-4 overflow-x-auto lg:overflow-x-visible">
         <ToolButton icon={<MousePointer2 className="w-5 h-5" />} active={activeTool === "select"} tooltip="Select" onClick={() => setActiveTool("select")} />
         <ToolButton icon={<PenTool className="w-5 h-5" />} active={activeTool === "pen"} tooltip="Freehand" onClick={() => setActiveTool("pen")} />
-        <ToolButton icon={<Minus className="w-5 h-5" />} active={activeTool === "line"} tooltip="Straight Line" onClick={() => setActiveTool("line")} />
-        <ToolButton icon={<Crosshair className="w-5 h-5" />} active={activeTool === "angle"} tooltip="Measure Angle" onClick={() => setActiveTool("angle")} />
+        <ToolButton icon={<svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="12" y1="4" x2="12" y2="20" /></svg>} active={activeTool === "line"} tooltip="Straight Line" onClick={() => setActiveTool("line")} />
+        <ToolButton icon={<svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 20 12 20 20 6" /><path d="M14.5 17 A3.5 3.5 0 0 1 15.2 13.5" fill="none" /></svg>} active={activeTool === "angle"} tooltip="Measure Angle" onClick={() => setActiveTool("angle")} />
         <ToolButton icon={<Circle className="w-5 h-5" />} active={activeTool === "circle"} tooltip="Circle" onClick={() => setActiveTool("circle")} />
         <ToolButton icon={<Square className="w-5 h-5" />} active={activeTool === "rect"} tooltip="Rectangle" onClick={() => setActiveTool("rect")} />
         <ToolButton icon={<Type className="w-5 h-5" />} active={activeTool === "text"} tooltip="Text Notes" onClick={() => setActiveTool("text")} />
