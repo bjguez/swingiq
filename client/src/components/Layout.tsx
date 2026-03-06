@@ -1,4 +1,4 @@
-import { Home as HomeIcon, Video, BarChart2, Search, Bell, Menu, User, Upload, Library, Settings } from "lucide-react";
+import { Home as HomeIcon, Video, BarChart2, Search, Bell, Menu, User, Upload, Library } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { VideoLibraryModal } from "@/components/VideoLibraryModal";
 import { Link, useLocation } from "wouter";
@@ -36,12 +36,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 <Button variant="ghost" size="sm" className={`font-medium ${location === '/library' ? 'bg-secondary/50 text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
                   <Library className="w-4 h-4 mr-2" />
                   Library
-                </Button>
-              </Link>
-              <Link href="/admin">
-                <Button variant="ghost" size="sm" className={`font-medium ${location === '/admin' ? 'bg-secondary/50 text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
-                  <Settings className="w-4 h-4 mr-2" />
-                  Admin
                 </Button>
               </Link>
             </nav>
