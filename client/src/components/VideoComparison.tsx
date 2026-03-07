@@ -10,7 +10,12 @@ import { VideoLibraryModal } from "./VideoLibraryModal";
 import VideoPlayer, { type VideoPlayerHandle } from "./VideoPlayer";
 import DrawingCanvas, { type Tool, type DrawAction } from "./DrawingCanvas";
 
-export default function VideoComparison() {
+interface VideoComparisonProps {
+  externalLeftSrc?: string | null;
+  externalLeftLabel?: string;
+}
+
+export default function VideoComparison({ externalLeftSrc, externalLeftLabel }: VideoComparisonProps = {}) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState([0]);
   const [synced, setSynced] = useState(true);
@@ -26,6 +31,13 @@ export default function VideoComparison() {
   const [rightVideoSrc, setRightVideoSrc] = useState<string | null>(null);
   const [leftLabel, setLeftLabel] = useState("Amateur Swing");
   const [rightLabel, setRightLabel] = useState("Pro Swing");
+
+  useEffect(() => {
+    if (externalLeftSrc) {
+      setLeftVideoSrc(externalLeftSrc);
+      setLeftLabel(externalLeftLabel ?? "My Swing");
+    }
+  }, [externalLeftSrc, externalLeftLabel]);
 
   const [leftAnnotations, setLeftAnnotations] = useState<DrawAction[]>([]);
   const [rightAnnotations, setRightAnnotations] = useState<DrawAction[]>([]);

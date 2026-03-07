@@ -1,24 +1,39 @@
-import { Zap, Target, BarChart, Info, ExternalLink, Box } from "lucide-react";
+import { Zap, Target, BarChart, Info, ExternalLink, Box, Upload, Play, Film } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import sprayChartImg from "@/assets/images/savant-spray.png";
 import heatmapImg from "@/assets/images/savant-heatmap.png";
 import swingPathImg from "@/assets/images/swing-path.png";
 import { Button } from "./ui/button";
-import type { MlbPlayer } from "@shared/schema";
+import type { MlbPlayer, Video } from "@shared/schema";
 
 interface DataDashboardProps {
   player: MlbPlayer | null;
+  onSelectVideo?: (videoUrl: string, label: string) => void;
 }
 
-export default function DataDashboard({ player }: DataDashboardProps) {
+export default function DataDashboard({ player, onSelectVideo }: DataDashboardProps) {
+  const { data: allVideos = [] } = useQuery<Video[]>({
+    queryKey: ["/api/videos"],
+    queryFn: () => fetch("/api/videos").then(r => r.json()),
+  });
+
+  const userVideos = allVideos.filter(v => !v.isProVideo && v.sourceUrl);
+
   if (!player) {
     return (
-      <div className="bg-card border border-border rounded-xl p-12 text-center text-muted-foreground">
-        Select an MLB player to view their Savant profile and swing data.
+      <div className="space-y-6">
+        <div className="bg-card border border-border rounded-xl p-12 text-center text-muted-foreground">
+          Select an MLB player to view their Savant profile and swing data.
+        </div>
+        {userVideos.length > 0 && (
+          <UserVideosSection videos={userVideos} onSelectVideo={onSelectVideo} />
+        )}
       </div>
     );
   }
 
   return (
+    <div className="space-y-6">
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       
       {/* Key Metrics - Savant Style */}
@@ -146,6 +161,70 @@ export default function DataDashboard({ player }: DataDashboardProps) {
         
       </div>
 
+    </div>
+
+    {userVideos.length > 0 && (
+      <UserVideosSection videos={userVideos} onSelectVideo={onSelectVideo} />
+    )}
+    </div>
+  );
+}
+
+function UserVideosSection({ videos, onSelectVideo }: { videos: Video[], onSelectVideo?: (videoUrl: string, label: string) => void }) {
+  return (
+    <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
+      <div className="flex items-center gap-2 mb-4">
+        <Upload className="w-5 h-5 text-primary" />
+        <h3 className="font-display font-bold text-xl uppercase text-muted-foreground">
+          My Uploaded Swings
+        </h3>
+        <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full font-mono">
+          {videos.length}
+        </span>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+        {videos.map(video => (
+          <div
+            key={video.id}
+            data-testid={`user-video-card-${video.id}`}
+            className="bg-secondary/30 border border-border rounded-lg overflow-hidden hover:border-primary/50 transition-colors group"
+          >
+            <div className="aspect-video bg-black relative flex items-center justify-center">
+              <video
+                src={video.sourceUrl ?? undefined}
+                className="w-full h-full object-cover"
+                muted
+                preload="metadata"
+                onLoadedMetadata={(e) => {
+                  const v = e.currentTarget;
+                  v.currentTime = 0.5;
+                }}
+              />
+              {onSelectVideo && video.sourceUrl && (
+                <button
+                  data-testid={`load-user-video-${video.id}`}
+                  onClick={() => onSelectVideo(video.sourceUrl!, video.title)}
+                  className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <div className="bg-primary rounded-full p-2">
+                    <Play className="w-5 h-5 text-primary-foreground fill-current" />
+                  </div>
+                </button>
+              )}
+            </div>
+            <div className="p-3">
+              <p className="text-sm font-medium truncate" data-testid={`user-video-title-${video.id}`}>
+                {video.title}
+              </p>
+              <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                <Film className="w-3 h-3" />
+                <span>{video.category}</span>
+                {video.duration && <span>· {video.duration}</span>}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

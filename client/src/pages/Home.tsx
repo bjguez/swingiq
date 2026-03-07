@@ -4,16 +4,23 @@ import VideoComparison from "@/components/VideoComparison";
 import DataDashboard from "@/components/DataDashboard";
 import { useQuery } from "@tanstack/react-query";
 import { fetchPlayers } from "@/lib/api";
-import { useState } from "react";
+import { useState, useCallback, useRef } from "react";
 import type { MlbPlayer } from "@shared/schema";
 
 export default function Home() {
   const { data: players = [] } = useQuery({ queryKey: ["/api/players"], queryFn: fetchPlayers });
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
+  const [externalVideo, setExternalVideo] = useState<{ src: string; label: string } | null>(null);
+  const comparisonRef = useRef<HTMLDivElement>(null);
 
   const selectedPlayer = selectedPlayerId 
     ? players.find((p: MlbPlayer) => p.id === selectedPlayerId) ?? null 
     : players[0] ?? null;
+
+  const handleSelectUserVideo = useCallback((videoUrl: string, label: string) => {
+    setExternalVideo({ src: videoUrl, label });
+    comparisonRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, []);
 
   return (
     <Layout>
@@ -48,9 +55,14 @@ export default function Home() {
         </div>
       </div>
 
-      <VideoComparison />
+      <div ref={comparisonRef}>
+        <VideoComparison
+          externalLeftSrc={externalVideo?.src}
+          externalLeftLabel={externalVideo?.label}
+        />
+      </div>
 
-      <DataDashboard player={selectedPlayer} />
+      <DataDashboard player={selectedPlayer} onSelectVideo={handleSelectUserVideo} />
     </Layout>
   );
 }
