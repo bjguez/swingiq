@@ -214,7 +214,7 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel }: 
     if (poseEnabled && leftVideoSrc) {
       runPoseDetection(true);
     }
-  }, [currentTime, poseEnabled, leftVideoSrc, runPoseDetection]);
+  }, [currentTime, poseEnabled, leftVideoSrc, runPoseDetection, isFullscreen]);
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -237,10 +237,10 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel }: 
       }`}
     >
       {/* Videos Container */}
-      <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${isFullscreen ? 'flex-1' : ''}`}>
+      <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${isFullscreen ? 'flex-1 min-h-0 grid-rows-[1fr]' : ''}`}>
         
         {/* Left (Amateur) Video */}
-        <div className={`relative rounded-lg overflow-hidden border border-border bg-black ${isFullscreen ? 'h-full' : 'aspect-video'}`}>
+        <div className={`relative rounded-lg overflow-hidden border border-border bg-black ${isFullscreen ? 'h-full min-h-0' : 'aspect-video'}`}>
           <div className="absolute top-0 left-0 right-0 p-3 bg-gradient-to-b from-black/80 to-transparent z-30 flex justify-between items-start pointer-events-none">
             <div>
               <div className="text-white font-bold font-display text-lg drop-shadow-md">{leftLabel}</div>
@@ -272,7 +272,7 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel }: 
             }
           />
 
-          <PoseOverlay poseResult={poseResult} visible={poseEnabled} videoElement={leftVideoRef.current?.getVideoElement()} />
+          <PoseOverlay poseResult={poseResult} visible={poseEnabled} videoElement={leftVideoRef.current?.getVideoElement()} isFullscreen={isFullscreen} />
 
           <DrawingCanvas
             tool={activeTool}
@@ -314,7 +314,7 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel }: 
         </div>
 
         {/* Right (Pro) Video */}
-        <div className={`relative rounded-lg overflow-hidden border border-border bg-black ${isFullscreen ? 'h-full' : 'aspect-video'}`}>
+        <div className={`relative rounded-lg overflow-hidden border border-border bg-black ${isFullscreen ? 'h-full min-h-0' : 'aspect-video'}`}>
           <div className="absolute top-0 left-0 right-0 p-3 bg-gradient-to-b from-black/80 to-transparent z-30 flex justify-between items-start pointer-events-none">
             <div>
               <div className="text-white font-bold font-display text-lg drop-shadow-md">{rightLabel}</div>

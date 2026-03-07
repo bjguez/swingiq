@@ -6,6 +6,7 @@ interface PoseOverlayProps {
   poseResult: PoseResult | null;
   visible: boolean;
   videoElement?: HTMLVideoElement | null;
+  isFullscreen?: boolean;
 }
 
 const UPPER_COLOR = "#22c55e";
@@ -47,7 +48,7 @@ function computeVideoRect(containerW: number, containerH: number, videoEl?: HTML
   return { offsetX, offsetY, drawW, drawH };
 }
 
-export default function PoseOverlay({ poseResult, visible, videoElement }: PoseOverlayProps) {
+export default function PoseOverlay({ poseResult, visible, videoElement, isFullscreen }: PoseOverlayProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [canvasSize, setCanvasSize] = useState({ width: 640, height: 360 });
@@ -69,6 +70,20 @@ export default function PoseOverlay({ poseResult, visible, videoElement }: PoseO
     observer.observe(container);
     return () => observer.disconnect();
   }, []);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const w = container.clientWidth;
+    const h = container.clientHeight;
+    if (w > 0 && h > 0) {
+      setCanvasSize({ width: w, height: h });
+      if (canvasRef.current) {
+        canvasRef.current.width = w;
+        canvasRef.current.height = h;
+      }
+    }
+  }, [isFullscreen]);
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
