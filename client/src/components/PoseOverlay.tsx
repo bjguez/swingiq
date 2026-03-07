@@ -87,8 +87,8 @@ export default function PoseOverlay({ poseResult, visible, videoElement, isFulls
 
     const { width, height } = canvasSize;
     if (width === 0 || height === 0) return;
-    canvas.width = width;
-    canvas.height = height;
+    if (canvas.width !== width) canvas.width = width;
+    if (canvas.height !== height) canvas.height = height;
     ctx.clearRect(0, 0, width, height);
 
     if (!poseResult || !visible) return;
@@ -158,7 +158,7 @@ export default function PoseOverlay({ poseResult, visible, videoElement, isFulls
   if (!visible) return null;
 
   return (
-    <div ref={containerRef} className="absolute inset-0 z-15 pointer-events-none">
+    <div ref={containerRef} className="absolute inset-0 z-20 pointer-events-none">
       <canvas
         ref={canvasRef}
         width={canvasSize.width}

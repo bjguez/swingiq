@@ -82,6 +82,9 @@ export async function registerRoutes(
       }
 
       const inputPath = path.join(uploadDir, path.basename(video.sourceUrl));
+      if (!inputPath.startsWith(uploadDir + path.sep)) {
+        return res.status(400).json({ message: "Invalid video path" });
+      }
       if (!fs.existsSync(inputPath)) {
         return res.status(404).json({ message: "Video file not found on disk" });
       }
@@ -202,8 +205,10 @@ export async function registerRoutes(
   });
 
   app.patch("/api/videos/:id", async (req, res) => {
+    const parsed = insertVideoSchema.partial().safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
     try {
-      const video = await storage.updateVideo(req.params.id, req.body);
+      const video = await storage.updateVideo(req.params.id, parsed.data);
       if (!video) return res.status(404).json({ message: "Video not found" });
       res.json(video);
     } catch (err) {
@@ -278,8 +283,10 @@ export async function registerRoutes(
   });
 
   app.patch("/api/sessions/:id", async (req, res) => {
+    const parsed = insertSessionSchema.partial().safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
     try {
-      const session = await storage.updateSession(req.params.id, req.body);
+      const session = await storage.updateSession(req.params.id, parsed.data);
       if (!session) return res.status(404).json({ message: "Session not found" });
       res.json(session);
     } catch (err) {

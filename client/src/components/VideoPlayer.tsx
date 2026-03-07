@@ -1,4 +1,4 @@
-import { useRef, useEffect, useImperativeHandle, forwardRef, useState } from "react";
+import { useRef, useEffect, useImperativeHandle, forwardRef } from "react";
 
 export interface VideoPlayerHandle {
   play: () => void;
@@ -22,7 +22,6 @@ interface VideoPlayerProps {
 const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
   ({ src, onTimeUpdate, onLoadedMetadata, className, placeholder }, ref) => {
     const videoRef = useRef<HTMLVideoElement>(null);
-    const [hasLoaded, setHasLoaded] = useState(false);
 
     useImperativeHandle(ref, () => ({
       play: () => videoRef.current?.play(),
@@ -77,7 +76,6 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
         }}
         onLoadedMetadata={() => {
           if (videoRef.current) {
-            setHasLoaded(true);
             onLoadedMetadata?.(videoRef.current.duration);
           }
         }}

@@ -130,6 +130,9 @@ export function computeJointAngles(lm: PoseLandmark[]): JointAngles {
   return { leftElbow, rightElbow, leftShoulder, rightShoulder, leftHip, rightHip, leftKnee, rightKnee, trunkAngle, shoulderRotation };
 }
 
+// Phase conditions are evaluated in priority order: Gather → Touchdown → Thrust → Contact → Post-Contact.
+// Thrust and Contact share similar heuristics; Thrust requires stricter hip bend (< 155) vs Contact (< 165)
+// and higher trunk lean (> 15 vs > 10). If the order changes, frames at Contact may be misclassified as Thrust.
 export function detectSwingPhase(lm: PoseLandmark[], angles: JointAngles): SwingPhase {
   if (lm.length < 33) return "Unknown";
 
@@ -173,6 +176,11 @@ export function detectSwingPhase(lm: PoseLandmark[], angles: JointAngles): Swing
 
 let detecting = false;
 let lastTimestamp = -1;
+
+export function resetPoseDetector() {
+  detecting = false;
+  lastTimestamp = -1;
+}
 
 export async function detectPose(video: HTMLVideoElement, timestampMs: number): Promise<PoseResult | null> {
   if (detecting) return null;

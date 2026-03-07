@@ -10,7 +10,7 @@ import { VideoLibraryModal } from "./VideoLibraryModal";
 import VideoPlayer, { type VideoPlayerHandle } from "./VideoPlayer";
 import DrawingCanvas, { type Tool, type DrawAction } from "./DrawingCanvas";
 import PoseOverlay from "./PoseOverlay";
-import { detectPose, type PoseResult } from "@/lib/poseDetector";
+import { detectPose, resetPoseDetector, type PoseResult } from "@/lib/poseDetector";
 
 interface VideoComparisonProps {
   externalLeftSrc?: string | null;
@@ -41,6 +41,10 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel }: 
     }
   }, [externalLeftSrc, externalLeftLabel]);
 
+  useEffect(() => {
+    resetPoseDetector();
+  }, [leftVideoSrc]);
+
   const [leftAnnotations, setLeftAnnotations] = useState<DrawAction[]>([]);
   const [rightAnnotations, setRightAnnotations] = useState<DrawAction[]>([]);
   const [timerStart, setTimerStart] = useState<number | null>(null);
@@ -55,6 +59,7 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel }: 
   const leftVideoRef = useRef<VideoPlayerHandle>(null);
   const rightVideoRef = useRef<VideoPlayerHandle>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const annotationHistoryRef = useRef<Array<"left" | "right">>([]);
 
   useEffect(() => {
     const handleChange = () => {
@@ -131,26 +136,40 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel }: 
     setIsPlaying(false);
   }, [synced, leftVideoSrc, rightVideoSrc]);
 
+  const handleLeftAnnotationsChange = useCallback((annotations: DrawAction[]) => {
+    annotationHistoryRef.current.push("left");
+    setLeftAnnotations(annotations);
+  }, []);
+
+  const handleRightAnnotationsChange = useCallback((annotations: DrawAction[]) => {
+    annotationHistoryRef.current.push("right");
+    setRightAnnotations(annotations);
+  }, []);
+
   const handleLeftUpload = useCallback((url: string, label?: string) => {
     setLeftVideoSrc(url);
     if (label) setLeftLabel(label);
     setLeftAnnotations([]);
+    annotationHistoryRef.current = [];
   }, []);
 
   const handleRightUpload = useCallback((url: string, label?: string) => {
     setRightVideoSrc(url);
     if (label) setRightLabel(label);
     setRightAnnotations([]);
+    annotationHistoryRef.current = [];
   }, []);
 
   const undoAnnotation = useCallback(() => {
-    setLeftAnnotations(prev => prev.slice(0, -1));
-    setRightAnnotations(prev => prev.slice(0, -1));
+    const last = annotationHistoryRef.current.pop();
+    if (last === "left") setLeftAnnotations(prev => prev.slice(0, -1));
+    else if (last === "right") setRightAnnotations(prev => prev.slice(0, -1));
   }, []);
 
   const clearAnnotations = useCallback(() => {
     setLeftAnnotations([]);
     setRightAnnotations([]);
+    annotationHistoryRef.current = [];
   }, []);
 
   const handleTimerClick = useCallback(() => {
@@ -217,7 +236,10 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel }: 
 
   useEffect(() => {
     if (poseEnabled && leftVideoSrc) {
-      runPoseDetection(true);
+      const videoEl = leftVideoRef.current?.getVideoElement();
+      if (videoEl && videoEl.paused) {
+        runPoseDetection(true);
+      }
     }
   }, [currentTime, poseEnabled, leftVideoSrc, runPoseDetection, isFullscreen]);
 
@@ -283,7 +305,7 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel }: 
             tool={activeTool}
             color={activeColor}
             annotations={leftAnnotations}
-            onAnnotationsChange={setLeftAnnotations}
+            onAnnotationsChange={handleLeftAnnotationsChange}
             onTimerClick={handleTimerClick}
           />
 
@@ -355,7 +377,7 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel }: 
             tool={activeTool}
             color={activeColor}
             annotations={rightAnnotations}
-            onAnnotationsChange={setRightAnnotations}
+            onAnnotationsChange={handleRightAnnotationsChange}
             onTimerClick={handleTimerClick}
           />
         </div>
