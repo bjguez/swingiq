@@ -151,8 +151,8 @@ export default function PoseOverlay({ poseResult, visible, videoElement }: PoseO
     <div ref={containerRef} className="absolute inset-0 z-15 pointer-events-none">
       <canvas
         ref={canvasRef}
-        width={sizeRef.current.width}
-        height={sizeRef.current.height}
+        width={canvasSize.width}
+        height={canvasSize.height}
         className="w-full h-full"
       />
     </div>
