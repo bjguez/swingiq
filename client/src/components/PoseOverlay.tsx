@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback } from "react";
+import { useRef, useState, useEffect, useCallback } from "react";
 import type { PoseResult, PoseLandmark } from "@/lib/poseDetector";
 import { SKELETON_CONNECTIONS, UPPER_BODY_INDICES } from "@/lib/poseDetector";
 
@@ -50,17 +50,19 @@ function computeVideoRect(containerW: number, containerH: number, videoEl?: HTML
 export default function PoseOverlay({ poseResult, visible, videoElement }: PoseOverlayProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const sizeRef = useRef({ width: 640, height: 360 });
+  const [canvasSize, setCanvasSize] = useState({ width: 640, height: 360 });
 
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
     const observer = new ResizeObserver(entries => {
       for (const entry of entries) {
-        sizeRef.current = { width: entry.contentRect.width, height: entry.contentRect.height };
+        const w = entry.contentRect.width;
+        const h = entry.contentRect.height;
+        setCanvasSize({ width: w, height: h });
         if (canvasRef.current) {
-          canvasRef.current.width = entry.contentRect.width;
-          canvasRef.current.height = entry.contentRect.height;
+          canvasRef.current.width = w;
+          canvasRef.current.height = h;
         }
       }
     });
@@ -74,7 +76,9 @@ export default function PoseOverlay({ poseResult, visible, videoElement }: PoseO
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const { width, height } = sizeRef.current;
+    const { width, height } = canvasSize;
+    canvas.width = width;
+    canvas.height = height;
     ctx.clearRect(0, 0, width, height);
 
     if (!poseResult || !visible) return;
@@ -135,7 +139,7 @@ export default function PoseOverlay({ poseResult, visible, videoElement }: PoseO
       ctx.fillStyle = ANGLE_LABEL_COLOR;
       ctx.fillText(text, cp.x + 8 + pad, cp.y + 2);
     }
-  }, [poseResult, visible, videoElement]);
+  }, [poseResult, visible, videoElement, canvasSize]);
 
   useEffect(() => {
     draw();
