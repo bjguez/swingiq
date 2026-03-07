@@ -1,4 +1,4 @@
-import { useRef, useEffect, useImperativeHandle, forwardRef } from "react";
+import { useRef, useImperativeHandle, forwardRef } from "react";
 
 export interface VideoPlayerHandle {
   play: () => void;
@@ -49,10 +49,6 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
         }
       },
     }));
-
-    useEffect(() => {
-      setHasLoaded(false);
-    }, [src]);
 
     if (!src) {
       return (
