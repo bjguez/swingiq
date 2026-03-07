@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, Redirect } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -8,14 +8,36 @@ import Home from "@/pages/Home";
 import Development from "@/pages/Development";
 import Library from "@/pages/Library";
 import Admin from "@/pages/Admin";
+import AuthPage from "@/pages/AuthPage";
+import { useAuth } from "@/hooks/use-auth";
+
+function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
+  const { user, isLoading } = useAuth();
+  if (isLoading) return null;
+  if (!user) return <Redirect to="/auth" />;
+  return <Component />;
+}
 
 function Router() {
+  const { user, isLoading } = useAuth();
+
   return (
     <Switch>
-      <Route path="/" component={Home}/>
-      <Route path="/development" component={Development}/>
-      <Route path="/library" component={Library}/>
-      <Route path="/admin" component={Admin}/>
+      <Route path="/auth">
+        {!isLoading && user ? <Redirect to="/" /> : <AuthPage />}
+      </Route>
+      <Route path="/">
+        <ProtectedRoute component={Home} />
+      </Route>
+      <Route path="/development">
+        <ProtectedRoute component={Development} />
+      </Route>
+      <Route path="/library">
+        <ProtectedRoute component={Library} />
+      </Route>
+      <Route path="/admin">
+        <ProtectedRoute component={Admin} />
+      </Route>
       <Route component={NotFound} />
     </Switch>
   );

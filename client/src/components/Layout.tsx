@@ -1,10 +1,13 @@
-import { Home as HomeIcon, Video, BarChart2, Search, Bell, Menu, User, Upload, Library } from "lucide-react";
+import { Video, BarChart2, Search, Bell, Menu, User, Upload, Library, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { VideoLibraryModal } from "@/components/VideoLibraryModal";
 import { Link, useLocation } from "wouter";
+import { useAuth } from "@/hooks/use-auth";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
+  const { user, logout } = useAuth();
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
@@ -62,9 +65,24 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <Button variant="ghost" size="icon" className="md:hidden">
               <Menu className="w-5 h-5" />
             </Button>
-            <div className="w-8 h-8 rounded-full bg-secondary border border-border flex items-center justify-center overflow-hidden ml-2 cursor-pointer">
-              <User className="w-5 h-5 text-muted-foreground" />
-            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <div className="w-8 h-8 rounded-full bg-secondary border border-border flex items-center justify-center overflow-hidden ml-2 cursor-pointer">
+                  <User className="w-5 h-5 text-muted-foreground" />
+                </div>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {user && (
+                  <DropdownMenuItem disabled className="font-medium text-foreground">
+                    {user.username}
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem onClick={() => logout()} className="text-destructive focus:text-destructive">
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Sign Out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </header>
