@@ -8,6 +8,7 @@ export interface VideoPlayerHandle {
   getDuration: () => number;
   stepForward: () => void;
   stepBackward: () => void;
+  getVideoElement: () => HTMLVideoElement | null;
 }
 
 interface VideoPlayerProps {
@@ -39,6 +40,7 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
           );
         }
       },
+      getVideoElement: () => videoRef.current,
       stepBackward: () => {
         if (videoRef.current) {
           videoRef.current.currentTime = Math.max(

@@ -2,13 +2,15 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { 
   Play, Pause, SkipBack, SkipForward, 
   MousePointer2, PenTool, Circle, Square, Type, 
-  Undo, Trash2, Link2, Youtube, Upload, Maximize, Minimize, Timer
+  Undo, Trash2, Link2, Youtube, Upload, Maximize, Minimize, Timer, PersonStanding
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { VideoLibraryModal } from "./VideoLibraryModal";
 import VideoPlayer, { type VideoPlayerHandle } from "./VideoPlayer";
 import DrawingCanvas, { type Tool, type DrawAction } from "./DrawingCanvas";
+import PoseOverlay from "./PoseOverlay";
+import { detectPose, type PoseResult } from "@/lib/poseDetector";
 
 interface VideoComparisonProps {
   externalLeftSrc?: string | null;
@@ -43,6 +45,12 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel }: 
   const [rightAnnotations, setRightAnnotations] = useState<DrawAction[]>([]);
   const [timerStart, setTimerStart] = useState<number | null>(null);
   const [timerEnd, setTimerEnd] = useState<number | null>(null);
+
+  const [poseEnabled, setPoseEnabled] = useState(false);
+  const [poseResult, setPoseResult] = useState<PoseResult | null>(null);
+  const [poseLoading, setPoseLoading] = useState(false);
+  const poseRafRef = useRef<number>(0);
+  const lastPoseTimeRef = useRef<number>(-1);
 
   const leftVideoRef = useRef<VideoPlayerHandle>(null);
   const rightVideoRef = useRef<VideoPlayerHandle>(null);
@@ -162,6 +170,52 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel }: 
     setTimerEnd(null);
   }, []);
 
+  const runPoseDetection = useCallback(async (force = false) => {
+    if (!poseEnabled || !leftVideoSrc) return;
+    const videoEl = leftVideoRef.current?.getVideoElement();
+    if (!videoEl) return;
+
+    const ct = videoEl.currentTime;
+    if (!force && Math.abs(ct - lastPoseTimeRef.current) < 0.01) return;
+    lastPoseTimeRef.current = ct;
+
+    const result = await detectPose(videoEl, performance.now());
+    if (result) setPoseResult(result);
+  }, [poseEnabled, leftVideoSrc]);
+
+  useEffect(() => {
+    if (!poseEnabled) {
+      setPoseResult(null);
+      cancelAnimationFrame(poseRafRef.current);
+      return;
+    }
+
+    setPoseLoading(true);
+    runPoseDetection(true).then(() => setPoseLoading(false));
+
+    let active = true;
+    const loop = () => {
+      if (!active) return;
+      const videoEl = leftVideoRef.current?.getVideoElement();
+      if (videoEl && !videoEl.paused) {
+        runPoseDetection();
+      }
+      if (active) poseRafRef.current = requestAnimationFrame(loop);
+    };
+    poseRafRef.current = requestAnimationFrame(loop);
+
+    return () => {
+      active = false;
+      cancelAnimationFrame(poseRafRef.current);
+    };
+  }, [poseEnabled, runPoseDetection]);
+
+  useEffect(() => {
+    if (poseEnabled && leftVideoSrc) {
+      runPoseDetection(true);
+    }
+  }, [currentTime, poseEnabled, leftVideoSrc, runPoseDetection]);
+
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
     const s = Math.floor(seconds % 60);
@@ -218,6 +272,8 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel }: 
             }
           />
 
+          <PoseOverlay poseResult={poseResult} visible={poseEnabled} videoElement={leftVideoRef.current?.getVideoElement()} />
+
           <DrawingCanvas
             tool={activeTool}
             color={activeColor}
@@ -225,6 +281,36 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel }: 
             onAnnotationsChange={setLeftAnnotations}
             onTimerClick={handleTimerClick}
           />
+
+          {poseEnabled && poseResult && (
+            <div data-testid="pose-hud" className="absolute bottom-2 left-2 z-30 bg-black/80 border border-border rounded-lg p-2 text-xs font-mono space-y-1 pointer-events-none">
+              <div className="flex items-center gap-2 mb-1">
+                <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${
+                  poseResult.phase === "Unknown" ? "bg-muted text-muted-foreground" : "bg-primary/30 text-primary"
+                }`} data-testid="pose-phase-badge">
+                  {poseResult.phase}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-[10px]">
+                <span className="text-green-400">L Elbow: {poseResult.jointAngles.leftElbow}°</span>
+                <span className="text-green-400">R Elbow: {poseResult.jointAngles.rightElbow}°</span>
+                <span className="text-blue-400">L Hip: {poseResult.jointAngles.leftHip}°</span>
+                <span className="text-blue-400">R Hip: {poseResult.jointAngles.rightHip}°</span>
+                <span className="text-blue-400">L Knee: {poseResult.jointAngles.leftKnee}°</span>
+                <span className="text-blue-400">R Knee: {poseResult.jointAngles.rightKnee}°</span>
+                <span className="text-yellow-400">Trunk: {poseResult.jointAngles.trunkAngle}°</span>
+                <span className="text-yellow-400">Shld Rot: {poseResult.jointAngles.shoulderRotation}°</span>
+              </div>
+            </div>
+          )}
+
+          {poseLoading && poseEnabled && (
+            <div className="absolute inset-0 flex items-center justify-center z-25 pointer-events-none">
+              <div className="bg-black/60 rounded-lg px-4 py-2 text-sm text-white animate-pulse">
+                Loading pose model...
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Right (Pro) Video */}
@@ -283,6 +369,15 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel }: 
         <div className="w-px h-6 bg-border mx-1 flex-shrink-0" />
 
         <ToolButton icon={<Timer className="w-4 h-4" />} active={activeTool === "timer"} tooltip="Frame Timer" onClick={() => { setActiveTool("timer"); }} />
+        
+        <div className="w-px h-6 bg-border mx-1 flex-shrink-0" />
+
+        <ToolButton
+          icon={<PersonStanding className="w-4 h-4" />}
+          active={poseEnabled}
+          tooltip="Pose Detection"
+          onClick={() => setPoseEnabled(prev => !prev)}
+        />
 
         {timerStart !== null && (
           <div data-testid="timer-display" className="flex items-center gap-2 px-2 py-1 rounded bg-black/40 border border-border text-xs font-mono shrink-0">
