@@ -1,4 +1,5 @@
-import { Zap, Target, BarChart, Info, ExternalLink, Box, Upload, Play, Film } from "lucide-react";
+import { Zap, Target, BarChart, Info, ExternalLink, Box, Upload, Play, Film, Scissors } from "lucide-react";
+import VideoTrimmer from "./VideoTrimmer";
 import { useQuery } from "@tanstack/react-query";
 import sprayChartImg from "@/assets/images/savant-spray.png";
 import heatmapImg from "@/assets/images/savant-heatmap.png";
@@ -213,9 +214,27 @@ function UserVideosSection({ videos, onSelectVideo }: { videos: Video[], onSelec
               )}
             </div>
             <div className="p-3">
-              <p className="text-sm font-medium truncate" data-testid={`user-video-title-${video.id}`}>
-                {video.title}
-              </p>
+              <div className="flex items-center justify-between gap-1">
+                <p className="text-sm font-medium truncate flex-1" data-testid={`user-video-title-${video.id}`}>
+                  {video.title}
+                </p>
+                {video.sourceUrl && (
+                  <VideoTrimmer
+                    videoId={video.id}
+                    videoUrl={video.sourceUrl}
+                    videoTitle={video.title}
+                    trigger={
+                      <button
+                        data-testid={`trim-video-${video.id}`}
+                        className="shrink-0 p-1 rounded hover:bg-primary/20 text-muted-foreground hover:text-primary transition-colors"
+                        title="Trim video"
+                      >
+                        <Scissors className="w-3.5 h-3.5" />
+                      </button>
+                    }
+                  />
+                )}
+              </div>
               <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
                 <Film className="w-3 h-3" />
                 <span>{video.category}</span>

@@ -28,6 +28,7 @@ SwingIQ allows baseball players (ages 10+) to upload videos of their swings and 
 
 ## API Routes
 - `POST /api/upload` - video file upload (multer)
+- `POST /api/videos/:id/trim` - trim video with ffmpeg (startTime/endTime in seconds), replaces original file
 - `GET/POST /api/players` - MLB player CRUD
 - `GET/POST /api/videos` - video CRUD with category/player filtering
 - `GET/POST /api/drills` - drill CRUD with phase filtering
@@ -35,7 +36,7 @@ SwingIQ allows baseball players (ages 10+) to upload videos of their swings and 
 
 ## File Structure
 - `client/src/pages/` - Home (Analysis), Development, Library, Admin
-- `client/src/components/` - VideoComparison, VideoPlayer, DrawingCanvas, PoseOverlay, DataDashboard, VideoLibraryModal, Layout
+- `client/src/components/` - VideoComparison, VideoPlayer, DrawingCanvas, PoseOverlay, DataDashboard, VideoTrimmer, VideoLibraryModal, Layout
 - `client/src/lib/poseDetector.ts` - MediaPipe pose detection, joint angle computation, swing phase classification
 - `server/` - Express routes, storage, database connection, seed script
 - `shared/schema.ts` - Drizzle schema + Zod validation

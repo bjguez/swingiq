@@ -6,6 +6,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import express from "express";
+import { execFile } from "child_process";
 
 const uploadDir = path.resolve("uploads");
 if (!fs.existsSync(uploadDir)) {
@@ -64,6 +65,70 @@ export async function registerRoutes(
     } catch (err: any) {
       console.error("Upload error:", err);
       res.status(500).json({ message: "Failed to save uploaded video" });
+    }
+  });
+
+  app.post("/api/videos/:id/trim", async (req, res) => {
+    try {
+      const { startTime, endTime } = req.body;
+      if (typeof startTime !== "number" || typeof endTime !== "number" ||
+          startTime < 0 || endTime <= startTime || !isFinite(startTime) || !isFinite(endTime)) {
+        return res.status(400).json({ message: "Invalid start/end times. startTime must be >= 0 and endTime must be > startTime." });
+      }
+
+      const video = await storage.getVideo(req.params.id);
+      if (!video || !video.sourceUrl) {
+        return res.status(404).json({ message: "Video not found or has no file" });
+      }
+
+      const inputPath = path.join(uploadDir, path.basename(video.sourceUrl));
+      if (!fs.existsSync(inputPath)) {
+        return res.status(404).json({ message: "Video file not found on disk" });
+      }
+
+      const ext = path.extname(inputPath);
+      const outputFilename = `${Date.now()}-${Math.round(Math.random() * 1e9)}-trimmed${ext}`;
+      const outputPath = path.join(uploadDir, outputFilename);
+      const clipDuration = endTime - startTime;
+
+      await new Promise<void>((resolve, reject) => {
+        execFile("ffmpeg", [
+          "-i", inputPath,
+          "-ss", startTime.toString(),
+          "-t", clipDuration.toString(),
+          "-c", "copy",
+          "-avoid_negative_ts", "make_zero",
+          "-y",
+          outputPath,
+        ], (error, _stdout, stderr) => {
+          if (error) {
+            console.error("FFmpeg error:", stderr);
+            reject(new Error("FFmpeg trimming failed"));
+          } else {
+            resolve();
+          }
+        });
+      });
+
+      if (!fs.existsSync(outputPath)) {
+        return res.status(500).json({ message: "Trimmed file was not created" });
+      }
+
+      const newUrl = `/uploads/${outputFilename}`;
+      const mins = Math.floor(clipDuration / 60);
+      const secs = Math.floor(clipDuration % 60);
+      const durationStr = `${mins}:${secs.toString().padStart(2, "0")}`;
+      const updated = await storage.updateVideo(req.params.id, {
+        sourceUrl: newUrl,
+        duration: durationStr,
+      });
+
+      try { fs.unlinkSync(inputPath); } catch {}
+
+      res.json(updated);
+    } catch (err: any) {
+      console.error("Trim error:", err);
+      res.status(500).json({ message: err.message || "Failed to trim video" });
     }
   });
 
