@@ -3,32 +3,38 @@ import { PoseLandmarker, FilesetResolver, DrawingUtils } from "@mediapipe/tasks-
 let poseLandmarker: PoseLandmarker | null = null;
 let initPromise: Promise<PoseLandmarker> | null = null;
 
-const MEDIAPIPE_CDN = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm";
+const MEDIAPIPE_CDN = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.32/wasm";
+const MODEL_URL = "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task";
 
 export async function initPoseDetector(): Promise<PoseLandmarker> {
   if (poseLandmarker) return poseLandmarker;
   if (initPromise) return initPromise;
 
   initPromise = (async () => {
+    console.log("[PoseDetector] Loading WASM from CDN...");
     const vision = await FilesetResolver.forVisionTasks(MEDIAPIPE_CDN);
+    console.log("[PoseDetector] WASM loaded, creating PoseLandmarker...");
     try {
       poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
         baseOptions: {
-          modelAssetPath: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task",
+          modelAssetPath: MODEL_URL,
           delegate: "GPU",
         },
         runningMode: "VIDEO",
         numPoses: 1,
       });
-    } catch {
+      console.log("[PoseDetector] Created with GPU delegate");
+    } catch (gpuErr) {
+      console.warn("[PoseDetector] GPU failed, falling back to CPU:", gpuErr);
       poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
         baseOptions: {
-          modelAssetPath: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task",
+          modelAssetPath: MODEL_URL,
           delegate: "CPU",
         },
         runningMode: "VIDEO",
         numPoses: 1,
       });
+      console.log("[PoseDetector] Created with CPU delegate");
     }
     return poseLandmarker;
   })();
@@ -165,10 +171,20 @@ export function detectSwingPhase(lm: PoseLandmark[], angles: JointAngles): Swing
   return "Unknown";
 }
 
+let detecting = false;
+let lastTimestamp = -1;
+
 export async function detectPose(video: HTMLVideoElement, timestampMs: number): Promise<PoseResult | null> {
+  if (detecting) return null;
+  if (video.readyState < 2) return null;
+
+  const ts = Math.max(timestampMs, lastTimestamp + 1);
+  lastTimestamp = ts;
+
   try {
+    detecting = true;
     const detector = await initPoseDetector();
-    const result = detector.detectForVideo(video, timestampMs);
+    const result = detector.detectForVideo(video, ts);
 
     if (!result.landmarks || result.landmarks.length === 0) return null;
 
@@ -183,8 +199,11 @@ export async function detectPose(video: HTMLVideoElement, timestampMs: number): 
     const phase = detectSwingPhase(landmarks, jointAngles);
 
     return { landmarks, jointAngles, phase };
-  } catch {
+  } catch (e) {
+    console.warn("[PoseDetector] Detection error:", e);
     return null;
+  } finally {
+    detecting = false;
   }
 }
 

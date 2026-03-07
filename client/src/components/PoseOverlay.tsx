@@ -51,39 +51,33 @@ function computeVideoRect(containerW: number, containerH: number, videoEl?: HTML
 export default function PoseOverlay({ poseResult, visible, videoElement, isFullscreen }: PoseOverlayProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [canvasSize, setCanvasSize] = useState({ width: 640, height: 360 });
+  const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
 
   useEffect(() => {
+    if (!visible) return;
     const container = containerRef.current;
     if (!container) return;
-    const observer = new ResizeObserver(entries => {
-      for (const entry of entries) {
-        const w = entry.contentRect.width;
-        const h = entry.contentRect.height;
+
+    const updateSize = (w: number, h: number) => {
+      if (w > 0 && h > 0) {
         setCanvasSize({ width: w, height: h });
         if (canvasRef.current) {
           canvasRef.current.width = w;
           canvasRef.current.height = h;
         }
       }
+    };
+
+    updateSize(container.clientWidth, container.clientHeight);
+
+    const observer = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        updateSize(entry.contentRect.width, entry.contentRect.height);
+      }
     });
     observer.observe(container);
     return () => observer.disconnect();
-  }, []);
-
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    const w = container.clientWidth;
-    const h = container.clientHeight;
-    if (w > 0 && h > 0) {
-      setCanvasSize({ width: w, height: h });
-      if (canvasRef.current) {
-        canvasRef.current.width = w;
-        canvasRef.current.height = h;
-      }
-    }
-  }, [isFullscreen]);
+  }, [visible, isFullscreen]);
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
@@ -92,6 +86,7 @@ export default function PoseOverlay({ poseResult, visible, videoElement, isFulls
     if (!ctx) return;
 
     const { width, height } = canvasSize;
+    if (width === 0 || height === 0) return;
     canvas.width = width;
     canvas.height = height;
     ctx.clearRect(0, 0, width, height);

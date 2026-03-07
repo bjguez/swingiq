@@ -173,14 +173,19 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel }: 
   const runPoseDetection = useCallback(async (force = false) => {
     if (!poseEnabled || !leftVideoSrc) return;
     const videoEl = leftVideoRef.current?.getVideoElement();
-    if (!videoEl) return;
+    if (!videoEl) {
+      console.warn("[Pose] No video element available");
+      return;
+    }
 
     const ct = videoEl.currentTime;
     if (!force && Math.abs(ct - lastPoseTimeRef.current) < 0.01) return;
     lastPoseTimeRef.current = ct;
 
     const result = await detectPose(videoEl, performance.now());
-    if (result) setPoseResult(result);
+    if (result) {
+      setPoseResult(result);
+    }
   }, [poseEnabled, leftVideoSrc]);
 
   useEffect(() => {
