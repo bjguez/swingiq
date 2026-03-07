@@ -11,10 +11,11 @@ import Admin from "@/pages/Admin";
 import AuthPage from "@/pages/AuthPage";
 import { useAuth } from "@/hooks/use-auth";
 
-function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
+function ProtectedRoute({ component: Component, adminOnly = false }: { component: React.ComponentType; adminOnly?: boolean }) {
   const { user, isLoading } = useAuth();
   if (isLoading) return null;
   if (!user) return <Redirect to="/auth" />;
+  if (adminOnly && !user.isAdmin) return <Redirect to="/" />;
   return <Component />;
 }
 
@@ -36,7 +37,7 @@ function Router() {
         <ProtectedRoute component={Library} />
       </Route>
       <Route path="/admin">
-        <ProtectedRoute component={Admin} />
+        <ProtectedRoute component={Admin} adminOnly />
       </Route>
       <Route component={NotFound} />
     </Switch>

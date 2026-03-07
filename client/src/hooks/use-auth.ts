@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
-export type AuthUser = { id: string; username: string };
+export type AuthUser = { id: string; username: string; isAdmin: boolean };
 
 async function fetchCurrentUser(): Promise<AuthUser | null> {
   const res = await fetch("/api/auth/me");

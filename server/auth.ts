@@ -121,6 +121,8 @@ export function setupAuth(app: Express) {
   app.get("/api/auth/me", (req, res) => {
     if (!req.user) return res.status(401).json({ message: "Not authenticated" });
     const user = req.user as User;
-    res.json({ id: user.id, username: user.username });
+    const adminUsername = process.env.ADMIN_USERNAME;
+    const isAdmin = adminUsername ? user.username === adminUsername : false;
+    res.json({ id: user.id, username: user.username, isAdmin });
   });
 }
