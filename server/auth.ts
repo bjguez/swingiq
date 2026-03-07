@@ -123,6 +123,6 @@ export function setupAuth(app: Express) {
     const user = req.user as User;
     const adminUsername = process.env.ADMIN_USERNAME;
     const isAdmin = adminUsername ? user.username === adminUsername : false;
-    res.json({ id: user.id, username: user.username, isAdmin });
+    res.json({ id: user.id, username: user.username, isAdmin, _debug_adminUsername: adminUsername ?? "NOT SET" });
   });
 }
