@@ -49,19 +49,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: "No video file provided" });
       }
       const fileUrl = `/uploads/${req.file.filename}`;
-      const video = await storage.createVideo({
-        title: req.body.title || req.file.originalname,
-        category: req.body.category || "Full Swings",
-        playerName: req.body.playerName || "Amateur",
-        source: "Upload",
-        sourceUrl: fileUrl,
-        duration: req.body.duration || null,
-        fps: req.body.fps ? parseInt(req.body.fps) : null,
-        isProVideo: false,
-        playerId: null,
-        thumbnailUrl: null,
-      });
-      res.status(201).json(video);
+      res.status(201).json({ sourceUrl: fileUrl });
     } catch (err: any) {
       console.error("Upload error:", err);
       res.status(500).json({ message: "Failed to save uploaded video" });
