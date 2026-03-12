@@ -21,6 +21,7 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel }: 
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState([0]);
   const [synced, setSynced] = useState(true);
+  const [activePanel, setActivePanel] = useState<"left" | "right" | null>(null);
   const [leftDuration, setLeftDuration] = useState(1);
   const [rightDuration, setRightDuration] = useState(1);
   const [currentTime, setCurrentTime] = useState(0);
@@ -82,61 +83,65 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel }: 
 
   const handleLeftTimeUpdate = useCallback((time: number, dur: number) => {
     if (dur > 0) {
-      setCurrentTime(time);
       setLeftDuration(dur);
-      setProgress([(time / dur) * 100]);
+      if (synced || activePanel === "left" || activePanel === null) {
+        setCurrentTime(time);
+        setProgress([(time / dur) * 100]);
+      }
     }
-  }, []);
+  }, [synced, activePanel]);
 
   const handleRightTimeUpdate = useCallback((time: number, dur: number) => {
-    if (dur > 0 && !leftVideoSrc) {
-      setCurrentTime(time);
+    if (dur > 0) {
       setRightDuration(dur);
-      setProgress([(time / dur) * 100]);
-    } else if (dur > 0) {
-      setRightDuration(dur);
+      if (!synced && activePanel === "right") {
+        setCurrentTime(time);
+        setProgress([(time / dur) * 100]);
+      }
     }
-  }, [leftVideoSrc]);
+  }, [synced, activePanel]);
+
+  const affectsLeft = synced || activePanel === "left" || activePanel === null;
+  const affectsRight = synced || activePanel === "right" || activePanel === null;
 
   const handleSeek = useCallback((values: number[]) => {
     const pct = values[0];
     setProgress(values);
-    
-    if (leftVideoSrc) {
-      const leftTime = (pct / 100) * leftDuration;
-      setCurrentTime(leftTime);
-      leftVideoRef.current?.seek(leftTime);
+    if (affectsLeft && leftVideoSrc) {
+      const t = (pct / 100) * leftDuration;
+      setCurrentTime(t);
+      leftVideoRef.current?.seek(t);
     }
-    if (rightVideoSrc && (synced || !leftVideoSrc)) {
-      const rightTime = (pct / 100) * rightDuration;
-      if (!leftVideoSrc) setCurrentTime(rightTime);
-      rightVideoRef.current?.seek(rightTime);
+    if (affectsRight && rightVideoSrc) {
+      const t = (pct / 100) * rightDuration;
+      if (!affectsLeft) setCurrentTime(t);
+      rightVideoRef.current?.seek(t);
     }
-  }, [leftDuration, rightDuration, synced, leftVideoSrc, rightVideoSrc]);
+  }, [leftDuration, rightDuration, affectsLeft, affectsRight, leftVideoSrc, rightVideoSrc]);
 
   const togglePlay = useCallback(() => {
     if (isPlaying) {
-      if (leftVideoSrc) leftVideoRef.current?.pause();
-      if (rightVideoSrc) rightVideoRef.current?.pause();
+      if (affectsLeft && leftVideoSrc) leftVideoRef.current?.pause();
+      if (affectsRight && rightVideoSrc) rightVideoRef.current?.pause();
       setIsPlaying(false);
     } else {
-      if (leftVideoSrc) leftVideoRef.current?.play();
-      if (rightVideoSrc && (synced || !leftVideoSrc)) rightVideoRef.current?.play();
+      if (affectsLeft && leftVideoSrc) leftVideoRef.current?.play();
+      if (affectsRight && rightVideoSrc) rightVideoRef.current?.play();
       setIsPlaying(true);
     }
-  }, [isPlaying, synced, leftVideoSrc, rightVideoSrc]);
+  }, [isPlaying, affectsLeft, affectsRight, leftVideoSrc, rightVideoSrc]);
 
   const stepForward = useCallback(() => {
-    if (leftVideoSrc) { leftVideoRef.current?.pause(); leftVideoRef.current?.stepForward(); }
-    if (rightVideoSrc && (synced || !leftVideoSrc)) { rightVideoRef.current?.pause(); rightVideoRef.current?.stepForward(); }
+    if (affectsLeft && leftVideoSrc) { leftVideoRef.current?.pause(); leftVideoRef.current?.stepForward(); }
+    if (affectsRight && rightVideoSrc) { rightVideoRef.current?.pause(); rightVideoRef.current?.stepForward(); }
     setIsPlaying(false);
-  }, [synced, leftVideoSrc, rightVideoSrc]);
+  }, [affectsLeft, affectsRight, leftVideoSrc, rightVideoSrc]);
 
   const stepBackward = useCallback(() => {
-    if (leftVideoSrc) { leftVideoRef.current?.pause(); leftVideoRef.current?.stepBackward(); }
-    if (rightVideoSrc && (synced || !leftVideoSrc)) { rightVideoRef.current?.pause(); rightVideoRef.current?.stepBackward(); }
+    if (affectsLeft && leftVideoSrc) { leftVideoRef.current?.pause(); leftVideoRef.current?.stepBackward(); }
+    if (affectsRight && rightVideoSrc) { rightVideoRef.current?.pause(); rightVideoRef.current?.stepBackward(); }
     setIsPlaying(false);
-  }, [synced, leftVideoSrc, rightVideoSrc]);
+  }, [affectsLeft, affectsRight, leftVideoSrc, rightVideoSrc]);
 
   const handleLeftAnnotationsChange = useCallback((annotations: DrawAction[]) => {
     annotationHistoryRef.current.push("left");
@@ -269,7 +274,14 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel }: 
       <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${isFullscreen ? 'flex-1 min-h-0 grid-rows-[1fr]' : ''}`}>
         
         {/* Left (Amateur) Video */}
-        <div className={`relative rounded-lg overflow-hidden border border-border bg-black ${isFullscreen ? 'h-full min-h-0' : 'aspect-video'}`}>
+        <div
+          className={`relative rounded-lg overflow-hidden bg-black cursor-pointer transition-shadow ${isFullscreen ? 'h-full min-h-0' : 'aspect-video'} ${
+            synced ? 'ring-2 ring-blue-400/60 border border-blue-400/30' :
+            activePanel === 'left' ? 'ring-2 ring-primary border border-primary/50' :
+            'border border-border'
+          }`}
+          onClick={() => { setActivePanel("left"); setSynced(false); }}
+        >
           <div className="absolute top-0 left-0 right-0 p-3 bg-gradient-to-b from-black/80 to-transparent z-30 flex justify-between items-start pointer-events-none">
             <div>
               <div className="text-white font-bold font-display text-lg drop-shadow-md">{leftLabel}</div>
@@ -349,7 +361,14 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel }: 
         </div>
 
         {/* Right (Pro) Video */}
-        <div className={`relative rounded-lg overflow-hidden border border-border bg-black ${isFullscreen ? 'h-full min-h-0' : 'aspect-video'}`}>
+        <div
+          className={`relative rounded-lg overflow-hidden bg-black cursor-pointer transition-shadow ${isFullscreen ? 'h-full min-h-0' : 'aspect-video'} ${
+            synced ? 'ring-2 ring-blue-400/60 border border-blue-400/30' :
+            activePanel === 'right' ? 'ring-2 ring-primary border border-primary/50' :
+            'border border-border'
+          }`}
+          onClick={() => { setActivePanel("right"); setSynced(false); }}
+        >
           <div className="absolute top-0 left-0 right-0 p-3 bg-gradient-to-b from-black/80 to-transparent z-30 flex justify-between items-start pointer-events-none">
             <div>
               <div className="text-white font-bold font-display text-lg drop-shadow-md">{rightLabel}</div>
@@ -465,7 +484,7 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel }: 
             variant="outline" 
             size="icon" 
             className={`h-10 w-10 shrink-0 ${synced ? 'bg-primary/20 text-primary border-primary/50' : 'text-muted-foreground'}`}
-            onClick={() => setSynced(!synced)}
+            onClick={() => { setSynced(s => !s); setActivePanel(null); }}
             title={synced ? "Videos synced — click to unsync" : "Videos unsynced — click to sync"}
             data-testid="button-sync"
           >
