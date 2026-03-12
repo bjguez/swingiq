@@ -350,7 +350,6 @@ export async function registerRoutes(
       if (!r.ok) return res.status(502).json({ message: "MLB API error" });
       const data = await r.json() as any;
       const results = (data.people ?? [])
-        .filter((p: any) => p.active)
         .map((p: any) => ({
           mlbId:    String(p.id),
           name:     p.fullName,
