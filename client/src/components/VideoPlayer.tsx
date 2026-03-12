@@ -1,4 +1,4 @@
-import { useRef, useImperativeHandle, forwardRef } from "react";
+import { useRef, useImperativeHandle, forwardRef, useState } from "react";
 
 export interface VideoPlayerHandle {
   play: () => void;
@@ -23,6 +23,12 @@ interface VideoPlayerProps {
 const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
   ({ src, onTimeUpdate, onLoadedMetadata, className, placeholder, rotation = 0 }, ref) => {
     const videoRef = useRef<HTMLVideoElement>(null);
+    const [loadError, setLoadError] = useState(false);
+    const prevSrcRef = useRef(src);
+    if (prevSrcRef.current !== src) {
+      prevSrcRef.current = src;
+      setLoadError(false);
+    }
 
     useImperativeHandle(ref, () => ({
       play: () => videoRef.current?.play(),
@@ -59,6 +65,15 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
       );
     }
 
+    if (loadError) {
+      return (
+        <div className={`flex flex-col items-center justify-center gap-2 bg-black/50 ${className}`}>
+          <span className="text-destructive text-sm font-medium">Failed to load video</span>
+          <span className="text-muted-foreground text-xs">The file may be missing or unavailable</span>
+        </div>
+      );
+    }
+
     const rotationStyle: React.CSSProperties = rotation !== 0 ? {
       transform: `rotate(${rotation}deg)`,
       ...(rotation === 90 || rotation === 270 ? { width: "100%", height: "100%", maxWidth: "unset" } : {}),
@@ -72,6 +87,7 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
         style={rotationStyle}
         playsInline
         preload="auto"
+        onError={() => setLoadError(true)}
         onTimeUpdate={() => {
           if (videoRef.current) {
             onTimeUpdate?.(videoRef.current.currentTime, videoRef.current.duration);
