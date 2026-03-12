@@ -207,19 +207,29 @@ export async function registerRoutes(
     }
   });
 
+  async function resolveVideoUrls(vids: any[]) {
+    return Promise.all(
+      vids.map(async (v) => {
+        if (v.sourceUrl && isR2Key(v.sourceUrl)) {
+          return { ...v, sourceUrl: await getPresignedUrl(v.sourceUrl) };
+        }
+        return v;
+      })
+    );
+  }
+
   app.get("/api/videos", async (req, res) => {
     try {
       const { category, playerId } = req.query;
+      let vids;
       if (category) {
-        const vids = await storage.getVideosByCategory(category as string);
-        return res.json(vids);
+        vids = await storage.getVideosByCategory(category as string);
+      } else if (playerId) {
+        vids = await storage.getVideosByPlayer(playerId as string);
+      } else {
+        vids = await storage.getAllVideos();
       }
-      if (playerId) {
-        const vids = await storage.getVideosByPlayer(playerId as string);
-        return res.json(vids);
-      }
-      const vids = await storage.getAllVideos();
-      res.json(vids);
+      res.json(await resolveVideoUrls(vids));
     } catch (err) {
       res.status(500).json({ message: "Failed to fetch videos" });
     }
@@ -229,7 +239,8 @@ export async function registerRoutes(
     try {
       const video = await storage.getVideo(req.params.id);
       if (!video) return res.status(404).json({ message: "Video not found" });
-      res.json(video);
+      const [resolved] = await resolveVideoUrls([video]);
+      res.json(resolved);
     } catch (err) {
       res.status(500).json({ message: "Failed to fetch video" });
     }
