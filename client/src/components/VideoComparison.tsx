@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import {
   Play, Pause, SkipBack, SkipForward,
   MousePointer2, PenTool, Circle, Square, Type,
-  Undo, Trash2, Link2, Youtube, Upload, Maximize, Minimize, Timer, PersonStanding, RotateCw
+  Undo, Trash2, Link2, Upload, Maximize, Minimize, Timer, PersonStanding, RotateCw
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -15,9 +15,10 @@ import { detectPose, resetPoseDetector, type PoseResult } from "@/lib/poseDetect
 interface VideoComparisonProps {
   externalLeftSrc?: string | null;
   externalLeftLabel?: string;
+  onRightVideoSelected?: (label: string) => void;
 }
 
-export default function VideoComparison({ externalLeftSrc, externalLeftLabel }: VideoComparisonProps = {}) {
+export default function VideoComparison({ externalLeftSrc, externalLeftLabel, onRightVideoSelected }: VideoComparisonProps = {}) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState([0]);
   const [synced, setSynced] = useState(true);
@@ -162,10 +163,13 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel }: 
 
   const handleRightUpload = useCallback((url: string, label?: string) => {
     setRightVideoSrc(url);
-    if (label) setRightLabel(label);
+    if (label) {
+      setRightLabel(label);
+      onRightVideoSelected?.(label);
+    }
     setRightAnnotations([]);
     annotationHistoryRef.current = [];
-  }, []);
+  }, [onRightVideoSelected]);
 
   const undoAnnotation = useCallback(() => {
     const last = annotationHistoryRef.current.pop();
@@ -196,23 +200,21 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel }: 
     setTimerEnd(null);
   }, []);
 
+  const activePoseVideoSrc = activePanel === "right" ? rightVideoSrc : leftVideoSrc;
+  const activePoseRef = activePanel === "right" ? rightVideoRef : leftVideoRef;
+
   const runPoseDetection = useCallback(async (force = false) => {
-    if (!poseEnabled || !leftVideoSrc) return;
-    const videoEl = leftVideoRef.current?.getVideoElement();
-    if (!videoEl) {
-      console.warn("[Pose] No video element available");
-      return;
-    }
+    if (!poseEnabled || !activePoseVideoSrc) return;
+    const videoEl = activePoseRef.current?.getVideoElement();
+    if (!videoEl) return;
 
     const ct = videoEl.currentTime;
     if (!force && Math.abs(ct - lastPoseTimeRef.current) < 0.01) return;
     lastPoseTimeRef.current = ct;
 
     const result = await detectPose(videoEl, performance.now());
-    if (result) {
-      setPoseResult(result);
-    }
-  }, [poseEnabled, leftVideoSrc]);
+    if (result) setPoseResult(result);
+  }, [poseEnabled, activePoseVideoSrc, activePoseRef]);
 
   useEffect(() => {
     if (!poseEnabled) {
@@ -227,10 +229,8 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel }: 
     let active = true;
     const loop = () => {
       if (!active) return;
-      const videoEl = leftVideoRef.current?.getVideoElement();
-      if (videoEl && !videoEl.paused) {
-        runPoseDetection();
-      }
+      const videoEl = activePoseRef.current?.getVideoElement();
+      if (videoEl && !videoEl.paused) runPoseDetection();
       if (active) poseRafRef.current = requestAnimationFrame(loop);
     };
     poseRafRef.current = requestAnimationFrame(loop);
@@ -242,13 +242,11 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel }: 
   }, [poseEnabled, runPoseDetection]);
 
   useEffect(() => {
-    if (poseEnabled && leftVideoSrc) {
-      const videoEl = leftVideoRef.current?.getVideoElement();
-      if (videoEl && videoEl.paused) {
-        runPoseDetection(true);
-      }
+    if (poseEnabled && activePoseVideoSrc) {
+      const videoEl = activePoseRef.current?.getVideoElement();
+      if (videoEl && videoEl.paused) runPoseDetection(true);
     }
-  }, [currentTime, poseEnabled, leftVideoSrc, runPoseDetection, isFullscreen]);
+  }, [currentTime, poseEnabled, activePoseVideoSrc, activePoseRef, runPoseDetection, isFullscreen]);
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -294,7 +292,9 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel }: 
                 </Button>
               )}
               <VideoLibraryModal
+                mode="user"
                 onVideoSelected={handleLeftUpload}
+                onCompSelected={handleRightUpload}
                 trigger={
                   <Button variant="ghost" size="icon" className="h-8 w-8 text-white/70 hover:text-white bg-black/20 hover:bg-black/40" data-testid="button-upload-left">
                     <Upload className="w-4 h-4" />
@@ -312,14 +312,23 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel }: 
             rotation={leftRotation}
             className="w-full h-full object-contain"
             placeholder={
-              <div className="flex flex-col items-center gap-2 text-center p-4">
-                <Upload className="w-8 h-8 text-muted-foreground/50" />
-                <span className="text-muted-foreground text-xs">Upload your swing video</span>
-              </div>
+              <VideoLibraryModal
+                mode="user"
+                onVideoSelected={handleLeftUpload}
+                onCompSelected={handleRightUpload}
+                trigger={
+                  <div className="flex flex-col items-center gap-2 text-center p-4 cursor-pointer hover:opacity-80 transition-opacity">
+                    <Upload className="w-8 h-8 text-muted-foreground/50" />
+                    <span className="text-muted-foreground text-xs">Upload your swing video</span>
+                  </div>
+                }
+              />
             }
           />
 
-          <PoseOverlay poseResult={poseResult} visible={poseEnabled} videoElement={leftVideoRef.current?.getVideoElement()} isFullscreen={isFullscreen} />
+          {activePanel !== "right" && (
+            <PoseOverlay poseResult={poseResult} visible={poseEnabled} videoElement={leftVideoRef.current?.getVideoElement()} isFullscreen={isFullscreen} />
+          )}
 
           <DrawingCanvas
             tool={activeTool}
@@ -329,7 +338,7 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel }: 
             onTimerClick={handleTimerClick}
           />
 
-          {poseEnabled && poseResult && (
+          {activePanel !== "right" && poseEnabled && poseResult && (
             <div data-testid="pose-hud" className="absolute bottom-2 left-2 z-30 bg-black/80 border border-border rounded-lg p-2 text-xs font-mono space-y-1 pointer-events-none">
               <div className="flex items-center gap-2 mb-1">
                 <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${
@@ -351,7 +360,7 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel }: 
             </div>
           )}
 
-          {poseLoading && poseEnabled && (
+          {activePanel !== "right" && poseLoading && poseEnabled && (
             <div className="absolute inset-0 flex items-center justify-center z-25 pointer-events-none">
               <div className="bg-black/60 rounded-lg px-4 py-2 text-sm text-white animate-pulse">
                 Loading pose model...
@@ -381,6 +390,7 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel }: 
                 </Button>
               )}
               <VideoLibraryModal
+                mode="pro"
                 onVideoSelected={handleRightUpload}
                 trigger={
                   <Button variant="ghost" size="icon" className="h-8 w-8 text-white/70 hover:text-white bg-black/20 hover:bg-black/40" data-testid="button-upload-right">
@@ -399,12 +409,22 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel }: 
             rotation={rightRotation}
             className="w-full h-full object-contain"
             placeholder={
-              <div className="flex flex-col items-center gap-2 text-center p-4">
-                <Upload className="w-8 h-8 text-muted-foreground/50" />
-                <span className="text-muted-foreground text-xs">Import a pro swing to compare</span>
-              </div>
+              <VideoLibraryModal
+                mode="pro"
+                onVideoSelected={handleRightUpload}
+                trigger={
+                  <div className="flex flex-col items-center gap-2 text-center p-4 cursor-pointer hover:opacity-80 transition-opacity">
+                    <Upload className="w-8 h-8 text-muted-foreground/50" />
+                    <span className="text-muted-foreground text-xs">Import a pro swing to compare</span>
+                  </div>
+                }
+              />
             }
           />
+
+          {activePanel === "right" && (
+            <PoseOverlay poseResult={poseResult} visible={poseEnabled} videoElement={rightVideoRef.current?.getVideoElement()} isFullscreen={isFullscreen} />
+          )}
 
           <DrawingCanvas
             tool={activeTool}
@@ -413,6 +433,36 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel }: 
             onAnnotationsChange={handleRightAnnotationsChange}
             onTimerClick={handleTimerClick}
           />
+
+          {activePanel === "right" && poseEnabled && poseResult && (
+            <div data-testid="pose-hud" className="absolute bottom-2 left-2 z-30 bg-black/80 border border-border rounded-lg p-2 text-xs font-mono space-y-1 pointer-events-none">
+              <div className="flex items-center gap-2 mb-1">
+                <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${
+                  poseResult.phase === "Unknown" ? "bg-muted text-muted-foreground" : "bg-primary/30 text-primary"
+                }`}>
+                  {poseResult.phase}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-[10px]">
+                <span className="text-green-400">L Elbow: {poseResult.jointAngles.leftElbow}°</span>
+                <span className="text-green-400">R Elbow: {poseResult.jointAngles.rightElbow}°</span>
+                <span className="text-blue-400">L Hip: {poseResult.jointAngles.leftHip}°</span>
+                <span className="text-blue-400">R Hip: {poseResult.jointAngles.rightHip}°</span>
+                <span className="text-blue-400">L Knee: {poseResult.jointAngles.leftKnee}°</span>
+                <span className="text-blue-400">R Knee: {poseResult.jointAngles.rightKnee}°</span>
+                <span className="text-yellow-400">Trunk: {poseResult.jointAngles.trunkAngle}°</span>
+                <span className="text-yellow-400">Shld Rot: {poseResult.jointAngles.shoulderRotation}°</span>
+              </div>
+            </div>
+          )}
+
+          {activePanel === "right" && poseLoading && poseEnabled && (
+            <div className="absolute inset-0 flex items-center justify-center z-25 pointer-events-none">
+              <div className="bg-black/60 rounded-lg px-4 py-2 text-sm text-white animate-pulse">
+                Loading pose model...
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -526,15 +576,6 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel }: 
           </div>
           
           <div className="flex items-center gap-2">
-            <VideoLibraryModal 
-              onVideoSelected={handleRightUpload}
-              trigger={
-                <Button variant="outline" size="sm" className="hidden sm:flex border-border bg-secondary/50" data-testid="button-import-mlb">
-                  <Youtube className="w-4 h-4 mr-2 text-red-500" />
-                  Import MLB clip
-                </Button>
-              } 
-            />
             <Button
               variant="outline"
               size="icon"
