@@ -36,7 +36,7 @@ export async function uploadToR2(
   return key;
 }
 
-export async function getPresignedUrl(key: string, expiresIn = 3600): Promise<string> {
+export async function getPresignedUrl(key: string, expiresIn = 604800): Promise<string> {
   return getSignedUrl(r2, new GetObjectCommand({ Bucket: bucket, Key: key }), { expiresIn });
 }
 

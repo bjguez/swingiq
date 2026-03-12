@@ -90,12 +90,21 @@ export default function Library() {
             <div key={item.id} className="group bg-card border border-border rounded-xl overflow-hidden hover:border-primary/50 transition-all hover:shadow-[0_0_20px_rgba(20,184,102,0.1)]" data-testid={`card-video-${item.id}`}>
               {/* Thumbnail */}
               <div className="relative aspect-video bg-black overflow-hidden cursor-pointer">
-                <div className="w-full h-full bg-gradient-to-br from-secondary/80 to-background flex items-center justify-center">
-                  <PlayCircle className="w-16 h-16 text-muted-foreground/30" />
-                </div>
-                
+                {item.sourceUrl ? (
+                  <video
+                    src={item.sourceUrl}
+                    className="w-full h-full object-cover"
+                    muted
+                    preload="metadata"
+                    onLoadedMetadata={(e) => { e.currentTarget.currentTime = 0.5; }}
+                  />
+                ) : (
+                  <div className="w-full h-full bg-linear-to-br from-secondary/80 to-background flex items-center justify-center">
+                    <PlayCircle className="w-16 h-16 text-muted-foreground/30" />
+                  </div>
+                )}
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-12 h-12 rounded-full bg-black/50 backdrop-blur-sm text-white flex items-center justify-center border border-white/20 group-hover:bg-primary group-hover:text-primary-foreground group-hover:border-primary transition-all group-hover:scale-110">
+                  <div className="w-12 h-12 rounded-full bg-black/50 backdrop-blur-sm text-white flex items-center justify-center border border-white/20 group-hover:bg-primary group-hover:text-primary-foreground group-hover:border-primary transition-all group-hover:scale-110 opacity-0 group-hover:opacity-100">
                     <PlayCircle className="w-6 h-6 ml-0.5" />
                   </div>
                 </div>
