@@ -207,6 +207,24 @@ export async function registerRoutes(
     }
   });
 
+  // MLB Stats API proxy — avoids CORS and keeps API calls server-side
+  app.get("/api/mlb/players/:mlbId/stats", async (req, res) => {
+    const { mlbId } = req.params;
+    try {
+      const [yearByYearRes, careerRes] = await Promise.all([
+        fetch(`https://statsapi.mlb.com/api/v1/people/${mlbId}/stats?stats=yearByYear&group=hitting`),
+        fetch(`https://statsapi.mlb.com/api/v1/people/${mlbId}/stats?stats=career&group=hitting`),
+      ]);
+      const [yearByYear, career] = await Promise.all([yearByYearRes.json(), careerRes.json()]) as any[];
+      res.json({
+        seasons: (yearByYear.stats?.[0]?.splits ?? []).filter((s: any) => s.stat?.atBats > 0),
+        career: career.stats?.[0]?.splits?.[0]?.stat ?? null,
+      });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch MLB stats" });
+    }
+  });
+
   async function resolveVideoUrls(vids: any[]) {
     return Promise.all(
       vids.map(async (v) => {

@@ -44,6 +44,7 @@ export const videos = pgTable("videos", {
   fps: integer("fps"),
   thumbnailUrl: text("thumbnail_url"),
   isProVideo: boolean("is_pro_video").default(false),
+  season: integer("season"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
