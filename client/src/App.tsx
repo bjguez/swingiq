@@ -7,6 +7,7 @@ import NotFound from "@/pages/not-found";
 import Home from "@/pages/Home";
 import Development from "@/pages/Development";
 import Library from "@/pages/Library";
+import MySwings from "@/pages/MySwings";
 import Admin from "@/pages/Admin";
 import AuthPage from "@/pages/AuthPage";
 import { useAuth } from "@/hooks/use-auth";
@@ -35,6 +36,9 @@ function Router() {
       </Route>
       <Route path="/library">
         <ProtectedRoute component={Library} />
+      </Route>
+      <Route path="/my-swings">
+        <ProtectedRoute component={MySwings} />
       </Route>
       <Route path="/admin">
         <ProtectedRoute component={Admin} adminOnly />

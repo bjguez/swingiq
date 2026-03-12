@@ -1,4 +1,4 @@
-import { Video, BarChart2, Search, Bell, Menu, User, Upload, Library, LogOut } from "lucide-react";
+import { Video, BarChart2, Search, Bell, Menu, User, Upload, Library, Film, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { VideoLibraryModal } from "@/components/VideoLibraryModal";
 import { Link, useLocation } from "wouter";
@@ -38,7 +38,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <Link href="/library">
                 <Button variant="ghost" size="sm" className={`font-medium ${location === '/library' ? 'bg-secondary/50 text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
                   <Library className="w-4 h-4 mr-2" />
-                  Library
+                  Pro Library
+                </Button>
+              </Link>
+              <Link href="/my-swings">
+                <Button variant="ghost" size="sm" className={`font-medium ${location === '/my-swings' ? 'bg-secondary/50 text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
+                  <Film className="w-4 h-4 mr-2" />
+                  My Swings
                 </Button>
               </Link>
             </nav>
@@ -53,12 +59,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 className="bg-secondary/50 border border-border rounded-full pl-9 pr-4 py-1.5 text-sm focus:outline-none focus:border-primary transition-colors w-64"
               />
             </div>
-            <VideoLibraryModal trigger={
-              <Button size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold hidden sm:flex">
-                <Upload className="w-4 h-4 mr-2" />
-                Upload Swing
-              </Button>
-            } />
+            <VideoLibraryModal
+              mode="user"
+              trigger={
+                <Button size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold hidden sm:flex">
+                  <Upload className="w-4 h-4 mr-2" />
+                  Upload Swing
+                </Button>
+              }
+            />
             <Button variant="ghost" size="icon" className="text-muted-foreground">
               <Bell className="w-5 h-5" />
             </Button>

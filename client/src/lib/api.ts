@@ -32,3 +32,8 @@ export async function fetchVideoPresignedUrl(videoId: string): Promise<string> {
   const data = await res.json();
   return data.url;
 }
+
+export async function deleteVideo(videoId: string): Promise<void> {
+  const res = await fetch(`/api/videos/${videoId}`, { method: "DELETE" });
+  if (!res.ok) throw new Error("Failed to delete video");
+}

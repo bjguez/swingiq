@@ -18,8 +18,9 @@ export default function Library() {
   });
 
   const filtered = allVideos.filter((v: Video) => {
+    if (!v.isProVideo) return false;
     const matchCategory = activeCategory === "All" || v.category === activeCategory;
-    const matchSearch = !searchQuery || 
+    const matchSearch = !searchQuery ||
       v.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (v.playerName?.toLowerCase().includes(searchQuery.toLowerCase()));
     return matchCategory && matchSearch;

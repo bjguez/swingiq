@@ -1,4 +1,5 @@
-import { Zap, Target, BarChart, Info, ExternalLink, Box, Upload, Play, Film, Scissors } from "lucide-react";
+import { Zap, Target, BarChart, Info, ExternalLink, Box, Upload, Play, Film, Scissors, ChevronRight } from "lucide-react";
+import { Link } from "wouter";
 import VideoTrimmer from "./VideoTrimmer";
 import { useQuery } from "@tanstack/react-query";
 import sprayChartImg from "@/assets/images/savant-spray.png";
@@ -172,19 +173,27 @@ export default function DataDashboard({ player, onSelectVideo }: DataDashboardPr
 }
 
 function UserVideosSection({ videos, onSelectVideo }: { videos: Video[], onSelectVideo?: (videoUrl: string, label: string) => void }) {
+  const recent = videos.slice(0, 4);
   return (
     <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
-      <div className="flex items-center gap-2 mb-4">
-        <Upload className="w-5 h-5 text-primary" />
-        <h3 className="font-display font-bold text-xl uppercase text-muted-foreground">
-          My Uploaded Swings
-        </h3>
-        <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full font-mono">
-          {videos.length}
-        </span>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Upload className="w-5 h-5 text-primary" />
+          <h3 className="font-display font-bold text-xl uppercase text-muted-foreground">
+            Recent Swings
+          </h3>
+          <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full font-mono">
+            {videos.length}
+          </span>
+        </div>
+        <Link href="/my-swings">
+          <button className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors">
+            View All <ChevronRight className="w-3 h-3" />
+          </button>
+        </Link>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-        {videos.map(video => (
+        {recent.map(video => (
           <div
             key={video.id}
             data-testid={`user-video-card-${video.id}`}

@@ -49,7 +49,15 @@ export async function registerRoutes(
       }
       const key = await uploadToR2(req.file.buffer, req.file.originalname, req.file.mimetype);
       const presignedUrl = await getPresignedUrl(key);
-      res.status(201).json({ sourceUrl: key, presignedUrl });
+      const title = (req.body.title || req.file.originalname).replace(/\.[^.]+$/, "");
+      const video = await storage.createVideo({
+        title,
+        category: "Upload",
+        source: "User Upload",
+        sourceUrl: key,
+        isProVideo: false,
+      });
+      res.status(201).json({ sourceUrl: key, presignedUrl, videoId: video.id });
     } catch (err: any) {
       console.error("Upload error:", err);
       res.status(500).json({ message: "Failed to upload video" });
