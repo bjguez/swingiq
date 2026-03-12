@@ -25,3 +25,10 @@ export async function fetchDrills(phase?: string): Promise<Drill[]> {
   if (!res.ok) throw new Error("Failed to fetch drills");
   return res.json();
 }
+
+export async function fetchVideoPresignedUrl(videoId: string): Promise<string> {
+  const res = await fetch(`/api/videos/${videoId}/presigned-url`);
+  if (!res.ok) throw new Error("Failed to get video URL");
+  const data = await res.json();
+  return data.url;
+}

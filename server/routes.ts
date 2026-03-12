@@ -7,20 +7,16 @@ import path from "path";
 import fs from "fs";
 import express from "express";
 import { execFile } from "child_process";
+import { uploadToR2, getPresignedUrl, deleteFromR2, isR2Key, r2Configured } from "./r2";
 
 const uploadDir = path.resolve("uploads");
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
+// Memory storage — buffer goes straight to R2, no local disk write
 const upload = multer({
-  storage: multer.diskStorage({
-    destination: (_req, _file, cb) => cb(null, uploadDir),
-    filename: (_req, file, cb) => {
-      const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-      cb(null, `${unique}${path.extname(file.originalname)}`);
-    },
-  }),
+  storage: multer.memoryStorage(),
   limits: { fileSize: 500 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     const allowed = [".mp4", ".mov", ".webm", ".avi"];
@@ -48,11 +44,33 @@ export async function registerRoutes(
       if (!req.file) {
         return res.status(400).json({ message: "No video file provided" });
       }
-      const fileUrl = `/uploads/${req.file.filename}`;
-      res.status(201).json({ sourceUrl: fileUrl });
+      if (!r2Configured()) {
+        return res.status(503).json({ message: "Storage not configured. Set R2 environment variables." });
+      }
+      const key = await uploadToR2(req.file.buffer, req.file.originalname, req.file.mimetype);
+      const presignedUrl = await getPresignedUrl(key);
+      res.status(201).json({ sourceUrl: key, presignedUrl });
     } catch (err: any) {
       console.error("Upload error:", err);
-      res.status(500).json({ message: "Failed to save uploaded video" });
+      res.status(500).json({ message: "Failed to upload video" });
+    }
+  });
+
+  app.get("/api/videos/:id/presigned-url", async (req, res) => {
+    try {
+      const video = await storage.getVideo(req.params.id);
+      if (!video || !video.sourceUrl) {
+        return res.status(404).json({ message: "Video not found" });
+      }
+      if (!isR2Key(video.sourceUrl)) {
+        // Legacy local file — return as-is
+        return res.json({ url: video.sourceUrl });
+      }
+      const url = await getPresignedUrl(video.sourceUrl);
+      res.json({ url });
+    } catch (err: any) {
+      console.error("Presigned URL error:", err);
+      res.status(500).json({ message: "Failed to generate video URL" });
     }
   });
 
@@ -69,52 +87,70 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Video not found or has no file" });
       }
 
-      const inputPath = path.join(uploadDir, path.basename(video.sourceUrl));
-      if (!inputPath.startsWith(uploadDir + path.sep)) {
-        return res.status(400).json({ message: "Invalid video path" });
-      }
-      if (!fs.existsSync(inputPath)) {
-        return res.status(404).json({ message: "Video file not found on disk" });
-      }
-
-      const ext = path.extname(inputPath);
-      const outputFilename = `${Date.now()}-${Math.round(Math.random() * 1e9)}-trimmed${ext}`;
-      const outputPath = path.join(uploadDir, outputFilename);
       const clipDuration = endTime - startTime;
+      const ext = path.extname(video.sourceUrl) || ".mp4";
+      const tmpInput = path.join(uploadDir, `trim-in-${Date.now()}${ext}`);
+      const tmpOutput = path.join(uploadDir, `trim-out-${Date.now()}${ext}`);
+
+      // Download from R2 to temp file
+      if (isR2Key(video.sourceUrl)) {
+        const { GetObjectCommand } = await import("@aws-sdk/client-s3");
+        const { r2 } = await import("./r2");
+        const obj = await r2.send(new GetObjectCommand({
+          Bucket: process.env.R2_BUCKET_NAME!,
+          Key: video.sourceUrl,
+        }));
+        const chunks: Buffer[] = [];
+        for await (const chunk of obj.Body as AsyncIterable<Uint8Array>) {
+          chunks.push(Buffer.from(chunk));
+        }
+        fs.writeFileSync(tmpInput, Buffer.concat(chunks));
+      } else {
+        const localPath = path.join(uploadDir, path.basename(video.sourceUrl));
+        if (!fs.existsSync(localPath)) {
+          return res.status(404).json({ message: "Video file not found" });
+        }
+        fs.copyFileSync(localPath, tmpInput);
+      }
 
       await new Promise<void>((resolve, reject) => {
         execFile("ffmpeg", [
-          "-i", inputPath,
+          "-i", tmpInput,
           "-ss", startTime.toString(),
           "-t", clipDuration.toString(),
           "-c", "copy",
           "-avoid_negative_ts", "make_zero",
           "-y",
-          outputPath,
+          tmpOutput,
         ], (error, _stdout, stderr) => {
-          if (error) {
-            console.error("FFmpeg error:", stderr);
-            reject(new Error("FFmpeg trimming failed"));
-          } else {
-            resolve();
-          }
+          if (error) { console.error("FFmpeg error:", stderr); reject(new Error("FFmpeg trimming failed")); }
+          else resolve();
         });
       });
 
-      if (!fs.existsSync(outputPath)) {
+      if (!fs.existsSync(tmpOutput)) {
         return res.status(500).json({ message: "Trimmed file was not created" });
       }
 
-      const newUrl = `/uploads/${outputFilename}`;
+      // Upload trimmed file to R2
+      const trimBuffer = fs.readFileSync(tmpOutput);
+      const newKey = await uploadToR2(trimBuffer, `trimmed${ext}`, "video/mp4");
+
+      // Delete old R2 object if applicable
+      if (isR2Key(video.sourceUrl)) {
+        try { await deleteFromR2(video.sourceUrl); } catch {}
+      }
+
+      // Clean up temp files
+      try { fs.unlinkSync(tmpInput); fs.unlinkSync(tmpOutput); } catch {}
+
       const mins = Math.floor(clipDuration / 60);
       const secs = Math.floor(clipDuration % 60);
       const durationStr = `${mins}:${secs.toString().padStart(2, "0")}`;
       const updated = await storage.updateVideo(req.params.id, {
-        sourceUrl: newUrl,
+        sourceUrl: newKey,
         duration: durationStr,
       });
-
-      try { fs.unlinkSync(inputPath); } catch {}
 
       res.json(updated);
     } catch (err: any) {

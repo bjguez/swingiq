@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Search, Upload, PlayCircle, Loader2, ScanFace, CheckCircle2, User, AlertCircle } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { fetchVideos, fetchPlayers } from "@/lib/api";
+import { fetchVideos, fetchPlayers, fetchVideoPresignedUrl } from "@/lib/api";
 import type { Video, MlbPlayer } from "@shared/schema";
 
 interface VideoLibraryModalProps {
@@ -79,7 +79,8 @@ export function VideoLibraryModal({ trigger, onVideoSelected }: VideoLibraryModa
         xhr.send(formData);
       });
 
-      setUploadedVideoUrl(response.sourceUrl);
+      // Use the presigned URL for immediate playback; store the key (sourceUrl) for DB records
+      setUploadedVideoUrl(response.presignedUrl ?? response.sourceUrl);
       queryClient.invalidateQueries({ queryKey: ["/api/videos"] });
       setUploadState('analyzing');
       
@@ -102,8 +103,13 @@ export function VideoLibraryModal({ trigger, onVideoSelected }: VideoLibraryModa
     setIsOpen(false);
   };
 
-  const handleSelectProVideo = (video: Video) => {
-    if (video.sourceUrl && onVideoSelected) {
+  const handleSelectProVideo = async (video: Video) => {
+    if (!video.sourceUrl || !onVideoSelected) { setIsOpen(false); return; }
+    try {
+      const url = await fetchVideoPresignedUrl(video.id);
+      onVideoSelected(url, video.playerName || video.title);
+    } catch {
+      // fallback for legacy /uploads/ paths
       onVideoSelected(video.sourceUrl, video.playerName || video.title);
     }
     setIsOpen(false);
