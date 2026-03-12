@@ -3,11 +3,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchVideos, fetchPlayers } from "@/lib/api";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import type { Video, MlbPlayer } from "@shared/schema";
 import {
   Upload, Trash2, Pencil, Save, X, Plus, PlayCircle,
-  Film, Loader2, CheckCircle2, AlertCircle, Search, Filter
+  Film, Loader2, CheckCircle2, AlertCircle, Search, Filter,
+  Users, UserPlus,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -18,14 +19,51 @@ const allCategories = [
 
 const sourceOptions = ["MLB.com", "YouTube", "Upload", "Baseball Savant", "Other"];
 
+interface MlbSearchResult {
+  mlbId: string;
+  name: string;
+  team: string;
+  position: string;
+  bats: string;
+}
+
+interface MlbLookupResult {
+  savantId: string;
+  name: string;
+  team: string;
+  position: string;
+  bats: string;
+  height: string | null;
+  weight: number | null;
+  imageUrl: string;
+  avgExitVelo: number | null;
+  maxExitVelo: number | null;
+  barrelPct: number | null;
+  hardHitPct: number | null;
+  avgExitVeloPercentile: number | null;
+  maxExitVeloPercentile: number | null;
+  barrelPctPercentile: number | null;
+  hardHitPctPercentile: number | null;
+  batSpeed: number | null;
+  attackAngle: number | null;
+  rotationalAccel: number | null;
+  savantAvailable: boolean;
+}
+
 export default function Admin() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = useState<"videos" | "players">("videos");
+
+  // Video state
   const [filterCategory, setFilterCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editData, setEditData] = useState<Partial<Video>>({});
-  const [showAddForm, setShowAddForm] = useState(false);
+  const [showAddVideoForm, setShowAddVideoForm] = useState(false);
+
+  // Player state
+  const [showAddPlayerForm, setShowAddPlayerForm] = useState(false);
 
   const { data: allVideos = [], isLoading } = useQuery({
     queryKey: ["/api/videos"],
@@ -49,6 +87,21 @@ export default function Admin() {
     },
     onError: () => {
       toast({ title: "Failed to delete video", variant: "destructive" });
+    },
+  });
+
+  const deletePlayerMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/players/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Delete failed");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/players"] });
+      toast({ title: "Player removed" });
+    },
+    onError: () => {
+      toast({ title: "Failed to remove player", variant: "destructive" });
     },
   });
 
@@ -110,113 +163,209 @@ export default function Admin() {
           <h1 className="text-3xl md:text-4xl font-bold font-display uppercase">Video Management</h1>
           <p className="text-muted-foreground">Upload, tag, and manage the SwingIQ video library.</p>
         </div>
-        <Button
-          onClick={() => setShowAddForm(!showAddForm)}
-          className="bg-primary text-primary-foreground hover:bg-primary/90"
-          data-testid="button-add-video"
+      </div>
+
+      {/* Tab Bar */}
+      <div className="flex border-b border-border mb-6">
+        <button
+          onClick={() => setActiveTab("videos")}
+          className={`px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors ${
+            activeTab === "videos"
+              ? "border-primary text-primary"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
         >
-          <Plus className="w-4 h-4 mr-2" />
-          Add New Video
-        </Button>
+          <Film className="w-4 h-4 inline mr-2" />
+          Videos
+        </button>
+        <button
+          onClick={() => setActiveTab("players")}
+          className={`px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors ${
+            activeTab === "players"
+              ? "border-primary text-primary"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <Users className="w-4 h-4 inline mr-2" />
+          Players
+        </button>
       </div>
 
-      {/* Stats Bar */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <StatCard label="Total Videos" value={allVideos.length} />
-        <StatCard label="Pro Clips" value={proCount} />
-        <StatCard label="User Uploads" value={uploadCount} />
-        <StatCard label="With Files" value={withFileCount} />
-      </div>
-
-      {/* Add Video Form */}
-      {showAddForm && (
-        <AddVideoForm
-          players={players}
-          onClose={() => setShowAddForm(false)}
-          onSuccess={() => {
-            queryClient.invalidateQueries({ queryKey: ["/api/videos"] });
-            setShowAddForm(false);
-          }}
-        />
-      )}
-
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-4">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search videos..."
-            className="pl-9 bg-secondary/30 border-border"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            data-testid="input-admin-search"
-          />
-        </div>
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          <FilterPill label="All" active={filterCategory === "All"} onClick={() => setFilterCategory("All")} count={allVideos.length} />
-          {allCategories.map(cat => {
-            const count = allVideos.filter((v: Video) => v.category === cat).length;
-            return <FilterPill key={cat} label={cat} active={filterCategory === cat} onClick={() => setFilterCategory(cat)} count={count} />;
-          })}
-        </div>
-      </div>
-
-      {/* Videos Table */}
-      <div className="border border-border rounded-xl overflow-hidden">
-        <div className="bg-secondary/50 p-3 text-xs font-semibold text-muted-foreground grid grid-cols-12 gap-2 uppercase tracking-wider items-center">
-          <div className="col-span-3">Title</div>
-          <div className="col-span-2">Player</div>
-          <div className="col-span-1">Category</div>
-          <div className="col-span-1">Source</div>
-          <div className="col-span-1">FPS</div>
-          <div className="col-span-1">Duration</div>
-          <div className="col-span-1">File</div>
-          <div className="col-span-2 text-right">Actions</div>
-        </div>
-
-        {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-6 h-6 animate-spin text-primary" />
+      {/* ── VIDEOS TAB ── */}
+      {activeTab === "videos" && (
+        <>
+          <div className="flex justify-between items-center mb-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 flex-1 mr-4">
+              <StatCard label="Total Videos" value={allVideos.length} />
+              <StatCard label="Pro Clips" value={proCount} />
+              <StatCard label="User Uploads" value={uploadCount} />
+              <StatCard label="With Files" value={withFileCount} />
+            </div>
+            <Button
+              onClick={() => setShowAddVideoForm(!showAddVideoForm)}
+              className="bg-primary text-primary-foreground hover:bg-primary/90 shrink-0"
+              data-testid="button-add-video"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add New Video
+            </Button>
           </div>
-        ) : (
-          <div className="divide-y divide-border/50 max-h-[600px] overflow-y-auto">
-            {filtered.map((video: Video) => (
-              editingId === video.id ? (
-                <EditRow
-                  key={video.id}
-                  video={video}
-                  editData={editData}
-                  setEditData={setEditData}
-                  players={players}
-                  onSave={saveEdit}
-                  onCancel={cancelEdit}
-                  saving={updateMutation.isPending}
-                />
-              ) : (
-                <VideoRow
-                  key={video.id}
-                  video={video}
-                  onEdit={() => startEdit(video)}
-                  onDelete={() => {
-                    if (confirm(`Delete "${video.title}"?`)) {
-                      deleteMutation.mutate(video.id);
-                    }
-                  }}
-                  deleting={deleteMutation.isPending}
-                />
-              )
-            ))}
-            {filtered.length === 0 && (
-              <div className="p-8 text-center text-muted-foreground">
-                No videos match your filters.
+
+          {showAddVideoForm && (
+            <AddVideoForm
+              players={players}
+              onClose={() => setShowAddVideoForm(false)}
+              onSuccess={() => {
+                queryClient.invalidateQueries({ queryKey: ["/api/videos"] });
+                setShowAddVideoForm(false);
+              }}
+            />
+          )}
+
+          {/* Filters */}
+          <div className="flex flex-col sm:flex-row gap-3 mb-4">
+            <div className="relative flex-1 max-w-sm">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search videos..."
+                className="pl-9 bg-secondary/30 border-border"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                data-testid="input-admin-search"
+              />
+            </div>
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              <FilterPill label="All" active={filterCategory === "All"} onClick={() => setFilterCategory("All")} count={allVideos.length} />
+              {allCategories.map(cat => {
+                const count = allVideos.filter((v: Video) => v.category === cat).length;
+                return <FilterPill key={cat} label={cat} active={filterCategory === cat} onClick={() => setFilterCategory(cat)} count={count} />;
+              })}
+            </div>
+          </div>
+
+          {/* Videos Table */}
+          <div className="border border-border rounded-xl overflow-hidden">
+            <div className="bg-secondary/50 p-3 text-xs font-semibold text-muted-foreground grid grid-cols-12 gap-2 uppercase tracking-wider items-center">
+              <div className="col-span-3">Title</div>
+              <div className="col-span-2">Player</div>
+              <div className="col-span-1">Category</div>
+              <div className="col-span-1">Source</div>
+              <div className="col-span-1">FPS</div>
+              <div className="col-span-1">Duration</div>
+              <div className="col-span-1">File</div>
+              <div className="col-span-2 text-right">Actions</div>
+            </div>
+
+            {isLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-6 h-6 animate-spin text-primary" />
+              </div>
+            ) : (
+              <div className="divide-y divide-border/50 max-h-[600px] overflow-y-auto">
+                {filtered.map((video: Video) => (
+                  editingId === video.id ? (
+                    <EditRow
+                      key={video.id}
+                      video={video}
+                      editData={editData}
+                      setEditData={setEditData}
+                      players={players}
+                      onSave={saveEdit}
+                      onCancel={cancelEdit}
+                      saving={updateMutation.isPending}
+                    />
+                  ) : (
+                    <VideoRow
+                      key={video.id}
+                      video={video}
+                      onEdit={() => startEdit(video)}
+                      onDelete={() => {
+                        if (confirm(`Delete "${video.title}"?`)) {
+                          deleteMutation.mutate(video.id);
+                        }
+                      }}
+                      deleting={deleteMutation.isPending}
+                    />
+                  )
+                ))}
+                {filtered.length === 0 && (
+                  <div className="p-8 text-center text-muted-foreground">
+                    No videos match your filters.
+                  </div>
+                )}
               </div>
             )}
           </div>
-        )}
-      </div>
+        </>
+      )}
+
+      {/* ── PLAYERS TAB ── */}
+      {activeTab === "players" && (
+        <>
+          <div className="flex justify-between items-center mb-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 flex-1 mr-4">
+              <StatCard label="Total Players" value={players.length} />
+              <StatCard label="With Statcast" value={players.filter((p: MlbPlayer) => p.avgExitVelo != null).length} />
+              <StatCard label="With Bat Speed" value={players.filter((p: MlbPlayer) => p.batSpeed != null).length} />
+            </div>
+            <Button
+              onClick={() => setShowAddPlayerForm(!showAddPlayerForm)}
+              className="bg-primary text-primary-foreground hover:bg-primary/90 shrink-0"
+            >
+              <UserPlus className="w-4 h-4 mr-2" />
+              Add Player
+            </Button>
+          </div>
+
+          {showAddPlayerForm && (
+            <AddPlayerForm
+              onClose={() => setShowAddPlayerForm(false)}
+              onSuccess={() => {
+                queryClient.invalidateQueries({ queryKey: ["/api/players"] });
+                setShowAddPlayerForm(false);
+              }}
+            />
+          )}
+
+          {/* Players Table */}
+          <div className="border border-border rounded-xl overflow-hidden">
+            <div className="bg-secondary/50 p-3 text-xs font-semibold text-muted-foreground grid grid-cols-12 gap-2 uppercase tracking-wider items-center">
+              <div className="col-span-1"></div>
+              <div className="col-span-3">Name</div>
+              <div className="col-span-1">Team</div>
+              <div className="col-span-1">Pos</div>
+              <div className="col-span-1">Bats</div>
+              <div className="col-span-2">Avg EV</div>
+              <div className="col-span-1">Barrel%</div>
+              <div className="col-span-1">Bat Spd</div>
+              <div className="col-span-1 text-right">Del</div>
+            </div>
+            <div className="divide-y divide-border/50 max-h-[600px] overflow-y-auto">
+              {players.map((player: MlbPlayer) => (
+                <PlayerRow
+                  key={player.id}
+                  player={player}
+                  onDelete={() => {
+                    if (confirm(`Remove "${player.name}" from roster?`)) {
+                      deletePlayerMutation.mutate(player.id);
+                    }
+                  }}
+                />
+              ))}
+              {players.length === 0 && (
+                <div className="p-8 text-center text-muted-foreground">
+                  No players in roster yet. Add your first player above.
+                </div>
+              )}
+            </div>
+          </div>
+        </>
+      )}
     </Layout>
   );
 }
+
+// ── Shared small components ───────────────────────────────────────────────────
 
 function StatCard({ label, value }: { label: string; value: number }) {
   return (
@@ -242,6 +391,8 @@ function FilterPill({ label, active, onClick, count }: { label: string; active: 
     </button>
   );
 }
+
+// ── Video components ──────────────────────────────────────────────────────────
 
 function VideoRow({ video, onEdit, onDelete, deleting }: { video: Video; onEdit: () => void; onDelete: () => void; deleting: boolean }) {
   return (
@@ -382,9 +533,7 @@ function EditRow({ video, editData, setEditData, players, onSave, onCancel, savi
           />
         </div>
         <div>
-          <label className="text-xs text-muted-foreground block mb-1 flex items-center gap-1">
-            Pro Video
-          </label>
+          <label className="text-xs text-muted-foreground block mb-1">Pro Video</label>
           <select
             value={editData.isProVideo ? "true" : "false"}
             onChange={(e) => setEditData({ ...editData, isProVideo: e.target.value === "true" })}
@@ -515,7 +664,6 @@ function AddVideoForm({ players, onClose, onSuccess }: { players: MlbPlayer[]; o
         </Button>
       </div>
 
-      {/* File Upload */}
       <div>
         <label className="text-xs text-muted-foreground block mb-2">Video File</label>
         <input
@@ -547,7 +695,6 @@ function AddVideoForm({ players, onClose, onSuccess }: { players: MlbPlayer[]; o
         </div>
       </div>
 
-      {/* Meta Fields */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
           <label className="text-xs text-muted-foreground block mb-1">Title *</label>
@@ -669,6 +816,359 @@ function AddVideoForm({ players, onClose, onSuccess }: { players: MlbPlayer[]; o
         <Button variant="outline" onClick={onClose}>Cancel</Button>
         <Button onClick={handleSubmit} data-testid="button-submit-add">
           <Plus className="w-4 h-4 mr-2" /> Add to Library
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ── Player components ─────────────────────────────────────────────────────────
+
+function PlayerRow({ player, onDelete }: { player: MlbPlayer; onDelete: () => void }) {
+  return (
+    <div className="p-3 grid grid-cols-12 gap-2 items-center hover:bg-secondary/20 transition-colors text-sm">
+      <div className="col-span-1">
+        {player.imageUrl ? (
+          <img
+            src={player.imageUrl}
+            alt={player.name}
+            className="w-8 h-8 rounded-full object-cover bg-secondary"
+            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+          />
+        ) : (
+          <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center">
+            <Users className="w-4 h-4 text-muted-foreground/50" />
+          </div>
+        )}
+      </div>
+      <div className="col-span-3 font-medium truncate">{player.name}</div>
+      <div className="col-span-1 text-muted-foreground text-xs">{player.team}</div>
+      <div className="col-span-1">
+        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-primary/10 text-primary">{player.position}</span>
+      </div>
+      <div className="col-span-1 text-muted-foreground text-xs">{player.bats}</div>
+      <div className="col-span-2 text-muted-foreground font-mono text-xs">
+        {player.avgExitVelo != null ? `${player.avgExitVelo.toFixed(1)} mph` : "—"}
+      </div>
+      <div className="col-span-1 text-muted-foreground font-mono text-xs">
+        {player.barrelPct != null ? `${player.barrelPct.toFixed(1)}%` : "—"}
+      </div>
+      <div className="col-span-1 text-muted-foreground font-mono text-xs">
+        {player.batSpeed != null ? `${player.batSpeed.toFixed(1)}` : "—"}
+      </div>
+      <div className="col-span-1 flex justify-end">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 text-muted-foreground hover:text-red-500"
+          onClick={onDelete}
+        >
+          <Trash2 className="w-4 h-4" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function AddPlayerForm({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
+  const { toast } = useToast();
+  const searchRef = useRef<HTMLDivElement>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<MlbSearchResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [isLookingUp, setIsLookingUp] = useState(false);
+  const [savantAvailable, setSavantAvailable] = useState<boolean | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formData, setFormData] = useState({
+    name: "", team: "", position: "", bats: "",
+    height: "", weight: "", savantId: "", imageUrl: "",
+    avgExitVelo: "", maxExitVelo: "", barrelPct: "", hardHitPct: "",
+    avgExitVeloPercentile: "", maxExitVeloPercentile: "",
+    barrelPctPercentile: "", hardHitPctPercentile: "",
+    batSpeed: "", attackAngle: "", rotationalAccel: "",
+  });
+
+  // Debounced search
+  useEffect(() => {
+    if (searchQuery.length < 2) {
+      setSearchResults([]);
+      setShowDropdown(false);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const res = await fetch(`/api/mlb/search?q=${encodeURIComponent(searchQuery)}`);
+        if (res.ok) {
+          const data: MlbSearchResult[] = await res.json();
+          setSearchResults(data);
+          setShowDropdown(data.length > 0);
+        }
+      } finally {
+        setIsSearching(false);
+      }
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const handleSelect = async (result: MlbSearchResult) => {
+    setShowDropdown(false);
+    setSearchQuery(result.name);
+    setIsLookingUp(true);
+    setSavantAvailable(null);
+    try {
+      const res = await fetch(`/api/mlb/lookup/${result.mlbId}`);
+      if (!res.ok) throw new Error("Lookup failed");
+      const data: MlbLookupResult = await res.json();
+      setSavantAvailable(data.savantAvailable);
+      setFormData({
+        name:     data.name,
+        team:     data.team,
+        position: data.position,
+        bats:     data.bats,
+        height:   data.height ?? "",
+        weight:   data.weight != null ? String(data.weight) : "",
+        savantId: data.savantId,
+        imageUrl: data.imageUrl,
+        avgExitVelo:           data.avgExitVelo != null ? String(data.avgExitVelo) : "",
+        maxExitVelo:           data.maxExitVelo != null ? String(data.maxExitVelo) : "",
+        barrelPct:             data.barrelPct != null ? String(data.barrelPct) : "",
+        hardHitPct:            data.hardHitPct != null ? String(data.hardHitPct) : "",
+        avgExitVeloPercentile: "",
+        maxExitVeloPercentile: "",
+        barrelPctPercentile:   "",
+        hardHitPctPercentile:  "",
+        batSpeed:              data.batSpeed != null ? String(data.batSpeed) : "",
+        attackAngle:           "",
+        rotationalAccel:       "",
+      });
+    } catch {
+      toast({ title: "Failed to fetch player details", variant: "destructive" });
+    } finally {
+      setIsLookingUp(false);
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!formData.name || !formData.team || !formData.position || !formData.bats) {
+      toast({ title: "Name, team, position, and bats are required", variant: "destructive" });
+      return;
+    }
+    const toFloat = (v: string) => v.trim() !== "" ? parseFloat(v) : null;
+    const toInt   = (v: string) => v.trim() !== "" ? parseInt(v, 10) : null;
+    setIsSubmitting(true);
+    try {
+      const res = await fetch("/api/players", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name:     formData.name,
+          team:     formData.team,
+          position: formData.position,
+          bats:     formData.bats,
+          height:   formData.height || null,
+          weight:   toInt(formData.weight),
+          savantId: formData.savantId || null,
+          imageUrl: formData.imageUrl || null,
+          avgExitVelo:           toFloat(formData.avgExitVelo),
+          maxExitVelo:           toFloat(formData.maxExitVelo),
+          barrelPct:             toFloat(formData.barrelPct),
+          hardHitPct:            toFloat(formData.hardHitPct),
+          avgExitVeloPercentile: toInt(formData.avgExitVeloPercentile),
+          maxExitVeloPercentile: toInt(formData.maxExitVeloPercentile),
+          barrelPctPercentile:   toInt(formData.barrelPctPercentile),
+          hardHitPctPercentile:  toInt(formData.hardHitPctPercentile),
+          batSpeed:              toFloat(formData.batSpeed),
+          attackAngle:           toFloat(formData.attackAngle),
+          rotationalAccel:       toFloat(formData.rotationalAccel),
+        }),
+      });
+      if (!res.ok) throw new Error("Create failed");
+      toast({ title: `${formData.name} added to roster` });
+      onSuccess();
+    } catch {
+      toast({ title: "Failed to add player", variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const set = (field: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    setFormData(prev => ({ ...prev, [field]: e.target.value }));
+
+  return (
+    <div className="bg-card border border-primary/30 rounded-xl p-6 mb-6 space-y-5 shadow-[0_0_20px_rgba(20,184,102,0.05)]">
+      <div className="flex items-center justify-between">
+        <h3 className="font-display font-bold text-xl uppercase">Add Player</h3>
+        <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8">
+          <X className="w-4 h-4" />
+        </Button>
+      </div>
+
+      {/* MLB Search */}
+      <div ref={searchRef} className="relative">
+        <label className="text-xs text-muted-foreground block mb-1">Search MLB Roster</label>
+        <div className="relative">
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          {isSearching && <Loader2 className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-muted-foreground" />}
+          <Input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Type a player name (e.g. Aaron Judge)..."
+            className="pl-9 bg-background"
+          />
+        </div>
+        {showDropdown && searchResults.length > 0 && (
+          <div className="absolute z-50 w-full mt-1 bg-card border border-border rounded-lg shadow-xl overflow-hidden">
+            {searchResults.slice(0, 8).map((r) => (
+              <button
+                key={r.mlbId}
+                className="w-full px-4 py-2.5 text-left hover:bg-secondary/50 transition-colors flex items-center justify-between text-sm"
+                onClick={() => handleSelect(r)}
+              >
+                <span className="font-medium">{r.name}</span>
+                <span className="text-muted-foreground text-xs">{r.team} · {r.position} · Bats {r.bats}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Loading state */}
+      {isLookingUp && (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="w-4 h-4 animate-spin" />
+          Fetching stats from MLB & Baseball Savant...
+        </div>
+      )}
+
+      {/* Savant badge */}
+      {savantAvailable !== null && !isLookingUp && (
+        <div className={`flex items-center gap-2 text-xs px-3 py-2 rounded-lg border ${
+          savantAvailable
+            ? "bg-green-500/10 border-green-500/30 text-green-400"
+            : "bg-yellow-500/10 border-yellow-500/30 text-yellow-400"
+        }`}>
+          {savantAvailable ? (
+            <><CheckCircle2 className="w-3.5 h-3.5" /> Statcast data found — exit velocity &amp; bat speed auto-filled</>
+          ) : (
+            <><AlertCircle className="w-3.5 h-3.5" /> No Statcast data (player may be pre-2015 or below PA threshold) — enter stats manually</>
+          )}
+        </div>
+      )}
+
+      {/* Bio fields */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="md:col-span-2">
+          <label className="text-xs text-muted-foreground block mb-1">Name *</label>
+          <Input value={formData.name} onChange={set("name")} placeholder="Aaron Judge" className="bg-background" />
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground block mb-1">Team *</label>
+          <Input value={formData.team} onChange={set("team")} placeholder="NYY" className="bg-background" />
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground block mb-1">Position *</label>
+          <Input value={formData.position} onChange={set("position")} placeholder="RF" className="bg-background" />
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground block mb-1">Bats *</label>
+          <select value={formData.bats} onChange={set("bats")} className="w-full h-10 rounded-md bg-background border border-border px-3 text-sm">
+            <option value="">—</option>
+            <option value="R">Right</option>
+            <option value="L">Left</option>
+            <option value="S">Switch</option>
+          </select>
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground block mb-1">Height</label>
+          <Input value={formData.height} onChange={set("height")} placeholder="6'7&quot;" className="bg-background" />
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground block mb-1">Weight (lbs)</label>
+          <Input type="number" value={formData.weight} onChange={set("weight")} placeholder="282" className="bg-background" />
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground block mb-1">MLB / Savant ID</label>
+          <Input value={formData.savantId} onChange={set("savantId")} placeholder="592450" className="bg-background" />
+        </div>
+      </div>
+
+      {/* Statcast fields */}
+      <div>
+        <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Statcast Metrics (2015+)</div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div>
+            <label className="text-xs text-muted-foreground block mb-1">Avg Exit Velo</label>
+            <Input type="number" step="0.1" value={formData.avgExitVelo} onChange={set("avgExitVelo")} placeholder="91.9" className="bg-background" />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground block mb-1">Max Exit Velo</label>
+            <Input type="number" step="0.1" value={formData.maxExitVelo} onChange={set("maxExitVelo")} placeholder="114.4" className="bg-background" />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground block mb-1">Barrel %</label>
+            <Input type="number" step="0.1" value={formData.barrelPct} onChange={set("barrelPct")} placeholder="15.3" className="bg-background" />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground block mb-1">Hard Hit %</label>
+            <Input type="number" step="0.1" value={formData.hardHitPct} onChange={set("hardHitPct")} placeholder="51.0" className="bg-background" />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground block mb-1">Bat Speed (mph)</label>
+            <Input type="number" step="0.1" value={formData.batSpeed} onChange={set("batSpeed")} placeholder="76.2" className="bg-background" />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground block mb-1">Attack Angle (°)</label>
+            <Input type="number" step="0.1" value={formData.attackAngle} onChange={set("attackAngle")} placeholder="12.5" className="bg-background" />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground block mb-1">Rotational Accel</label>
+            <Input type="number" step="0.1" value={formData.rotationalAccel} onChange={set("rotationalAccel")} placeholder="22.1" className="bg-background" />
+          </div>
+        </div>
+      </div>
+
+      {/* Percentile fields */}
+      <div>
+        <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Percentile Rankings (enter manually from Savant)</div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div>
+            <label className="text-xs text-muted-foreground block mb-1">Avg EV %ile</label>
+            <Input type="number" min="0" max="100" value={formData.avgExitVeloPercentile} onChange={set("avgExitVeloPercentile")} placeholder="94" className="bg-background" />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground block mb-1">Max EV %ile</label>
+            <Input type="number" min="0" max="100" value={formData.maxExitVeloPercentile} onChange={set("maxExitVeloPercentile")} placeholder="96" className="bg-background" />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground block mb-1">Barrel %ile</label>
+            <Input type="number" min="0" max="100" value={formData.barrelPctPercentile} onChange={set("barrelPctPercentile")} placeholder="98" className="bg-background" />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground block mb-1">Hard Hit %ile</label>
+            <Input type="number" min="0" max="100" value={formData.hardHitPctPercentile} onChange={set("hardHitPctPercentile")} placeholder="92" className="bg-background" />
+          </div>
+        </div>
+      </div>
+
+      <div className="flex justify-end gap-2 pt-2">
+        <Button variant="outline" onClick={onClose} disabled={isSubmitting}>Cancel</Button>
+        <Button onClick={handleSubmit} disabled={isSubmitting || isLookingUp}>
+          {isSubmitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <UserPlus className="w-4 h-4 mr-2" />}
+          Add to Roster
         </Button>
       </div>
     </div>

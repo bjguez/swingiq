@@ -17,6 +17,7 @@ export interface IStorage {
   getAllPlayers(): Promise<MlbPlayer[]>;
   getPlayer(id: string): Promise<MlbPlayer | undefined>;
   createPlayer(player: InsertMlbPlayer): Promise<MlbPlayer>;
+  deletePlayer(id: string): Promise<boolean>;
 
   getAllVideos(): Promise<Video[]>;
   getVideosByCategory(category: string): Promise<Video[]>;
@@ -65,6 +66,11 @@ export class DatabaseStorage implements IStorage {
   async createPlayer(player: InsertMlbPlayer): Promise<MlbPlayer> {
     const [created] = await db.insert(mlbPlayers).values(player).returning();
     return created;
+  }
+
+  async deletePlayer(id: string): Promise<boolean> {
+    const result = await db.delete(mlbPlayers).where(eq(mlbPlayers.id, id)).returning();
+    return result.length > 0;
   }
 
   async getAllVideos(): Promise<Video[]> {

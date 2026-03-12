@@ -142,6 +142,16 @@ export async function registerRoutes(
     }
   });
 
+  app.delete("/api/players/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deletePlayer(req.params.id);
+      if (!deleted) return res.status(404).json({ message: "Player not found" });
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to delete player" });
+    }
+  });
+
   app.post("/api/players", async (req, res) => {
     const parsed = insertMlbPlayerSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
@@ -279,6 +289,145 @@ export async function registerRoutes(
       res.json(session);
     } catch (err) {
       res.status(500).json({ message: "Failed to update session" });
+    }
+  });
+
+  // ── MLB Stats API + Baseball Savant proxy ────────────────────────────────
+
+  const MLB_TEAM_ABBR: Record<number, string> = {
+    108: "LAA", 109: "AZ",  110: "BAL", 111: "BOS", 112: "CHC",
+    113: "CIN", 114: "CLE", 115: "COL", 116: "DET", 117: "HOU",
+    118: "KC",  119: "LAD", 120: "WSH", 121: "NYM", 133: "ATH",
+    134: "PIT", 135: "SD",  136: "SEA", 137: "SF",  138: "STL",
+    139: "TB",  140: "TEX", 141: "TOR", 142: "MIN", 143: "PHI",
+    144: "ATL", 145: "CWS", 146: "MIA", 147: "NYY", 158: "MIL",
+  };
+
+  function parseSimpleCSV(raw: string): Record<string, string>[] {
+    const text = raw.replace(/^\uFEFF/, "");
+    const lines = text.split("\n").filter(l => l.trim());
+    if (lines.length < 2) return [];
+    const headers = lines[0].split(",").map(h => h.replace(/^"|"$/g, "").trim());
+    const rows: Record<string, string>[] = [];
+    for (let i = 1; i < lines.length; i++) {
+      const vals: string[] = [];
+      let cur = "", inQ = false;
+      for (const ch of lines[i]) {
+        if (ch === '"') { inQ = !inQ; }
+        else if (ch === "," && !inQ) { vals.push(cur); cur = ""; }
+        else { cur += ch; }
+      }
+      vals.push(cur);
+      const row: Record<string, string> = {};
+      headers.forEach((h, idx) => { row[h] = (vals[idx] ?? "").trim(); });
+      rows.push(row);
+    }
+    return rows;
+  }
+
+  async function fetchSavantCSV(url: string): Promise<Record<string, string>[]> {
+    try {
+      const res = await fetch(url, {
+        headers: { "User-Agent": "Mozilla/5.0 (compatible; SwingIQ/1.0)" },
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!res.ok) return [];
+      return parseSimpleCSV(await res.text());
+    } catch {
+      return [];
+    }
+  }
+
+  // Search active MLB players by name
+  app.get("/api/mlb/search", async (req, res) => {
+    const q = String(req.query.q ?? "").trim();
+    if (q.length < 2) return res.status(400).json({ message: "Query too short" });
+    try {
+      const r = await fetch(
+        `https://statsapi.mlb.com/api/v1/people/search?names=${encodeURIComponent(q)}&sportId=1&hydrate=currentTeam`,
+        { signal: AbortSignal.timeout(6000) }
+      );
+      if (!r.ok) return res.status(502).json({ message: "MLB API error" });
+      const data = await r.json() as any;
+      const results = (data.people ?? [])
+        .filter((p: any) => p.active)
+        .map((p: any) => ({
+          mlbId:    String(p.id),
+          name:     p.fullName,
+          team:     MLB_TEAM_ABBR[p.currentTeam?.id] ?? p.currentTeam?.name ?? "—",
+          position: p.primaryPosition?.abbreviation ?? "—",
+          bats:     p.batSide?.code ?? "—",
+        }));
+      res.json(results);
+    } catch (err: any) {
+      res.status(500).json({ message: "Search failed" });
+    }
+  });
+
+  // Fetch bio from MLB Stats API + Statcast data from Baseball Savant
+  app.get("/api/mlb/lookup/:mlbId", async (req, res) => {
+    const { mlbId } = req.params;
+    if (!/^\d+$/.test(mlbId)) return res.status(400).json({ message: "Invalid mlbId" });
+    try {
+      const bioRes = await fetch(
+        `https://statsapi.mlb.com/api/v1/people/${mlbId}?hydrate=currentTeam`,
+        { signal: AbortSignal.timeout(6000) }
+      );
+      if (!bioRes.ok) return res.status(404).json({ message: "Player not found" });
+      const bioData = await bioRes.json() as any;
+      const p = bioData.people?.[0];
+      if (!p) return res.status(404).json({ message: "Player not found" });
+
+      const savantId = String(p.id);
+      const imageUrl = `https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_213,q_auto:best/v1/people/${savantId}/headshot/67/current`;
+      const height = (p.height as string | undefined)?.replace(/'\s+/, "'") ?? null;
+      const team = MLB_TEAM_ABBR[p.currentTeam?.id] ?? p.currentTeam?.name ?? "";
+      const year = new Date().getFullYear();
+
+      const statcastUrl = (y: number) =>
+        `https://baseballsavant.mlb.com/leaderboard/statcast?type=batter&year=${y}&position=&team=&min=q&csv=false`;
+      const batTrackUrl = (y: number) =>
+        `https://baseballsavant.mlb.com/leaderboard/bat-tracking?seasonStart=${y}&seasonEnd=${y}&minSwings=50&csv=false`;
+
+      let scRows = await fetchSavantCSV(statcastUrl(year));
+      let sc = scRows.find(r => r.player_id === savantId) ?? null;
+      if (!sc) {
+        scRows = await fetchSavantCSV(statcastUrl(year - 1));
+        sc = scRows.find(r => r.player_id === savantId) ?? null;
+      }
+
+      let btRows = await fetchSavantCSV(batTrackUrl(year));
+      let bt = btRows.find(r => r.id === savantId) ?? null;
+      if (!bt) {
+        btRows = await fetchSavantCSV(batTrackUrl(year - 1));
+        bt = btRows.find(r => r.id === savantId) ?? null;
+      }
+
+      res.json({
+        savantId,
+        name:     p.fullName,
+        team,
+        position: p.primaryPosition?.abbreviation ?? "",
+        bats:     p.batSide?.code ?? "",
+        height,
+        weight:   p.weight ?? null,
+        imageUrl,
+        avgExitVelo:           sc ? parseFloat(sc.avg_hit_speed) || null : null,
+        maxExitVelo:           sc ? parseFloat(sc.max_hit_speed) || null : null,
+        barrelPct:             sc ? parseFloat(sc.brl_percent)   || null : null,
+        hardHitPct:            sc ? parseFloat(sc.ev95percent)   || null : null,
+        avgExitVeloPercentile: null,
+        maxExitVeloPercentile: null,
+        barrelPctPercentile:   null,
+        hardHitPctPercentile:  null,
+        batSpeed:              bt ? parseFloat(bt.avg_bat_speed) || null : null,
+        attackAngle:           null,
+        rotationalAccel:       null,
+        savantAvailable:       !!(sc || bt),
+      });
+    } catch (err: any) {
+      console.error("MLB lookup error:", err);
+      res.status(500).json({ message: "Lookup failed" });
     }
   });
 
