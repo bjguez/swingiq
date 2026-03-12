@@ -1,8 +1,8 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { 
-  Play, Pause, SkipBack, SkipForward, 
-  MousePointer2, PenTool, Circle, Square, Type, 
-  Undo, Trash2, Link2, Youtube, Upload, Maximize, Minimize, Timer, PersonStanding
+import {
+  Play, Pause, SkipBack, SkipForward,
+  MousePointer2, PenTool, Circle, Square, Type,
+  Undo, Trash2, Link2, Youtube, Upload, Maximize, Minimize, Timer, PersonStanding, RotateCw
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -33,6 +33,8 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel }: 
   const [rightVideoSrc, setRightVideoSrc] = useState<string | null>(null);
   const [leftLabel, setLeftLabel] = useState("Amateur Swing");
   const [rightLabel, setRightLabel] = useState("Pro Swing");
+  const [leftRotation, setLeftRotation] = useState<0 | 90 | 180 | 270>(0);
+  const [rightRotation, setRightRotation] = useState<0 | 90 | 180 | 270>(0);
 
   useEffect(() => {
     if (externalLeftSrc) {
@@ -274,13 +276,18 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel }: 
               <div className="text-white/70 text-xs">{leftVideoSrc ? "Uploaded" : "No video"}</div>
             </div>
             <div className="flex items-center gap-2 pointer-events-auto">
-              <VideoLibraryModal 
+              {leftVideoSrc && (
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-white/70 hover:text-white bg-black/20 hover:bg-black/40" title="Rotate video" onClick={() => setLeftRotation((r: 0 | 90 | 180 | 270) => ((r + 90) % 360) as 0 | 90 | 180 | 270)}>
+                  <RotateCw className="w-4 h-4" />
+                </Button>
+              )}
+              <VideoLibraryModal
                 onVideoSelected={handleLeftUpload}
                 trigger={
                   <Button variant="ghost" size="icon" className="h-8 w-8 text-white/70 hover:text-white bg-black/20 hover:bg-black/40" data-testid="button-upload-left">
                     <Upload className="w-4 h-4" />
                   </Button>
-                } 
+                }
               />
             </div>
           </div>
@@ -290,6 +297,7 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel }: 
             src={leftVideoSrc}
             onTimeUpdate={handleLeftTimeUpdate}
             onLoadedMetadata={(d) => setLeftDuration(d)}
+            rotation={leftRotation}
             className="w-full h-full object-contain"
             placeholder={
               <div className="flex flex-col items-center gap-2 text-center p-4">
@@ -348,13 +356,18 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel }: 
               <div className="text-white/70 text-xs">{rightVideoSrc ? "Loaded" : "No video"}</div>
             </div>
             <div className="flex items-center gap-2 pointer-events-auto">
-              <VideoLibraryModal 
+              {rightVideoSrc && (
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-white/70 hover:text-white bg-black/20 hover:bg-black/40" title="Rotate video" onClick={() => setRightRotation((r: 0 | 90 | 180 | 270) => ((r + 90) % 360) as 0 | 90 | 180 | 270)}>
+                  <RotateCw className="w-4 h-4" />
+                </Button>
+              )}
+              <VideoLibraryModal
                 onVideoSelected={handleRightUpload}
                 trigger={
                   <Button variant="ghost" size="icon" className="h-8 w-8 text-white/70 hover:text-white bg-black/20 hover:bg-black/40" data-testid="button-upload-right">
                     <Upload className="w-4 h-4" />
                   </Button>
-                } 
+                }
               />
             </div>
           </div>
@@ -364,6 +377,7 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel }: 
             src={rightVideoSrc}
             onTimeUpdate={handleRightTimeUpdate}
             onLoadedMetadata={(d) => setRightDuration(d)}
+            rotation={rightRotation}
             className="w-full h-full object-contain"
             placeholder={
               <div className="flex flex-col items-center gap-2 text-center p-4">

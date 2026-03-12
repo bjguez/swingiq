@@ -17,10 +17,11 @@ interface VideoPlayerProps {
   onLoadedMetadata?: (duration: number) => void;
   className?: string;
   placeholder?: React.ReactNode;
+  rotation?: 0 | 90 | 180 | 270;
 }
 
 const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
-  ({ src, onTimeUpdate, onLoadedMetadata, className, placeholder }, ref) => {
+  ({ src, onTimeUpdate, onLoadedMetadata, className, placeholder, rotation = 0 }, ref) => {
     const videoRef = useRef<HTMLVideoElement>(null);
 
     useImperativeHandle(ref, () => ({
@@ -58,11 +59,17 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
       );
     }
 
+    const rotationStyle: React.CSSProperties = rotation !== 0 ? {
+      transform: `rotate(${rotation}deg)`,
+      ...(rotation === 90 || rotation === 270 ? { width: "100%", height: "100%", maxWidth: "unset" } : {}),
+    } : {};
+
     return (
       <video
         ref={videoRef}
         src={src}
         className={className}
+        style={rotationStyle}
         playsInline
         preload="auto"
         onTimeUpdate={() => {
