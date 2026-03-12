@@ -225,6 +225,50 @@ export async function registerRoutes(
     }
   });
 
+  // Baseball Savant spray chart proxy — parses statcast CSV, returns JSON batted ball points
+  app.get("/api/mlb/players/:mlbId/spray-chart", async (req, res) => {
+    const { mlbId } = req.params;
+    const year = (req.query.year as string) || "2024";
+    try {
+      const url = `https://baseballsavant.mlb.com/statcast_search/csv?all=true&hfGT=R%7C&hfSea=${year}%7C&player_type=batter&batters_lookup%5B%5D=${mlbId}&type=details`;
+      const response = await fetch(url, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+          "Accept": "text/csv,*/*",
+        },
+      });
+      if (!response.ok) return res.json({ points: [], year });
+      const csv = await response.text();
+      const lines = csv.trim().split("\n");
+      if (lines.length < 2) return res.json({ points: [], year });
+      const headers = lines[0].split(",").map(h => h.trim().replace(/^"|"$/g, ""));
+      const idx = {
+        hcX: headers.indexOf("hc_x"),
+        hcY: headers.indexOf("hc_y"),
+        events: headers.indexOf("events"),
+        exitVelo: headers.indexOf("launch_speed"),
+        distance: headers.indexOf("hit_distance_sc"),
+      };
+      if (idx.hcX === -1 || idx.hcY === -1) return res.json({ points: [], year });
+      const points = lines.slice(1).map(line => {
+        const cols = line.split(",");
+        const x = parseFloat(cols[idx.hcX]);
+        const y = parseFloat(cols[idx.hcY]);
+        if (!x || !y || isNaN(x) || isNaN(y)) return null;
+        return {
+          x,
+          y,
+          event: (cols[idx.events] ?? "").replace(/^"|"$/g, "").trim(),
+          exitVelo: idx.exitVelo !== -1 ? parseFloat(cols[idx.exitVelo]) || null : null,
+          distance: idx.distance !== -1 ? parseFloat(cols[idx.distance]) || null : null,
+        };
+      }).filter(Boolean);
+      res.json({ points, year, total: points.length });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch spray chart data" });
+    }
+  });
+
   async function resolveVideoUrls(vids: any[]) {
     return Promise.all(
       vids.map(async (v) => {
