@@ -37,3 +37,12 @@ export async function deleteVideo(videoId: string): Promise<void> {
   const res = await fetch(`/api/videos/${videoId}`, { method: "DELETE" });
   if (!res.ok) throw new Error("Failed to delete video");
 }
+
+export async function renameVideo(videoId: string, title: string): Promise<void> {
+  const res = await fetch(`/api/videos/${videoId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title }),
+  });
+  if (!res.ok) throw new Error("Failed to rename video");
+}

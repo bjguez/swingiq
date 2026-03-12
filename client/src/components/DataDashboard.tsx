@@ -1,12 +1,13 @@
-import { Zap, Target, BarChart, Info, ExternalLink, Box, Upload, Play, Film, Scissors, ChevronRight } from "lucide-react";
+import { Zap, Target, BarChart, Info, ExternalLink, Box, Upload, ChevronRight } from "lucide-react";
 import { Link } from "wouter";
-import VideoTrimmer from "./VideoTrimmer";
+import { UserVideoCard } from "./UserVideoCard";
 import { useQuery } from "@tanstack/react-query";
 import sprayChartImg from "@/assets/images/savant-spray.png";
 import heatmapImg from "@/assets/images/savant-heatmap.png";
 import swingPathImg from "@/assets/images/swing-path.png";
 import { Button } from "./ui/button";
 import type { MlbPlayer, Video } from "@shared/schema";
+import { fetchVideos } from "@/lib/api";
 
 interface DataDashboardProps {
   player: MlbPlayer | null;
@@ -16,7 +17,7 @@ interface DataDashboardProps {
 export default function DataDashboard({ player, onSelectVideo }: DataDashboardProps) {
   const { data: allVideos = [] } = useQuery<Video[]>({
     queryKey: ["/api/videos"],
-    queryFn: () => fetch("/api/videos").then(r => r.json()),
+    queryFn: fetchVideos,
   });
 
   const userVideos = allVideos.filter(v => !v.isProVideo && v.sourceUrl);
@@ -194,63 +195,13 @@ function UserVideosSection({ videos, onSelectVideo }: { videos: Video[], onSelec
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
         {recent.map(video => (
-          <div
+          <UserVideoCard
             key={video.id}
-            data-testid={`user-video-card-${video.id}`}
-            className="bg-secondary/30 border border-border rounded-lg overflow-hidden hover:border-primary/50 transition-colors group"
-          >
-            <div className="aspect-video bg-black relative flex items-center justify-center">
-              <video
-                src={video.sourceUrl ?? undefined}
-                className="w-full h-full object-cover"
-                muted
-                preload="metadata"
-                onLoadedMetadata={(e) => {
-                  const v = e.currentTarget;
-                  v.currentTime = 0.5;
-                }}
-              />
-              {onSelectVideo && video.sourceUrl && (
-                <button
-                  data-testid={`load-user-video-${video.id}`}
-                  onClick={() => onSelectVideo(video.sourceUrl!, video.title)}
-                  className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  <div className="bg-primary rounded-full p-2">
-                    <Play className="w-5 h-5 text-primary-foreground fill-current" />
-                  </div>
-                </button>
-              )}
-            </div>
-            <div className="p-3">
-              <div className="flex items-center justify-between gap-1">
-                <p className="text-sm font-medium truncate flex-1" data-testid={`user-video-title-${video.id}`}>
-                  {video.title}
-                </p>
-                {video.sourceUrl && (
-                  <VideoTrimmer
-                    videoId={video.id}
-                    videoUrl={video.sourceUrl}
-                    videoTitle={video.title}
-                    trigger={
-                      <button
-                        data-testid={`trim-video-${video.id}`}
-                        className="shrink-0 p-1 rounded hover:bg-primary/20 text-muted-foreground hover:text-primary transition-colors"
-                        title="Trim video"
-                      >
-                        <Scissors className="w-3.5 h-3.5" />
-                      </button>
-                    }
-                  />
-                )}
-              </div>
-              <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                <Film className="w-3 h-3" />
-                <span>{video.category}</span>
-                {video.duration && <span>· {video.duration}</span>}
-              </div>
-            </div>
-          </div>
+            video={video}
+            onSelect={onSelectVideo ? (v) => onSelectVideo(v.sourceUrl!, v.title) : undefined}
+            showDelete={false}
+            showTrim={true}
+          />
         ))}
       </div>
     </div>

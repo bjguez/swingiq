@@ -3,9 +3,9 @@ import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchVideos, deleteVideo } from "@/lib/api";
-import VideoTrimmer from "@/components/VideoTrimmer";
 import { VideoLibraryModal } from "@/components/VideoLibraryModal";
-import { Play, Trash2, Scissors, Upload, CheckSquare, Square, Film } from "lucide-react";
+import { UserVideoCard } from "@/components/UserVideoCard";
+import { Trash2, Upload, CheckSquare, Square, Film } from "lucide-react";
 import type { Video } from "@shared/schema";
 
 export default function MySwings() {
@@ -32,17 +32,14 @@ export default function MySwings() {
   const selectAll = () => setSelected(new Set(userVideos.map(v => v.id)));
   const clearSelection = () => setSelected(new Set());
 
-  const handleDelete = async (ids: string[]) => {
+  const handleBulkDelete = async () => {
+    if (selected.size === 0) return;
+    const ids = [...selected];
     setDeleting(new Set(ids));
     await Promise.allSettled(ids.map(id => deleteVideo(id)));
     queryClient.invalidateQueries({ queryKey: ["/api/videos"] });
     setSelected(new Set());
     setDeleting(new Set());
-  };
-
-  const handleBulkDelete = () => {
-    if (selected.size === 0) return;
-    handleDelete([...selected]);
   };
 
   return (
@@ -119,85 +116,23 @@ export default function MySwings() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mt-4">
-          {userVideos.map((video: Video) => {
-            const isSelected = selected.has(video.id);
-            const isDeleting = deleting.has(video.id);
-            return (
-              <div
-                key={video.id}
-                className={`relative bg-card border rounded-xl overflow-hidden transition-all group ${
-                  isSelected ? "border-primary ring-2 ring-primary/30" : "border-border hover:border-primary/50"
-                } ${isDeleting ? "opacity-40 pointer-events-none" : ""}`}
-              >
-                {/* Bulk select checkbox */}
-                {bulkMode && (
-                  <button
-                    onClick={() => toggleSelect(video.id)}
-                    className="absolute top-2 left-2 z-20 text-white drop-shadow"
-                  >
-                    {isSelected
-                      ? <CheckSquare className="w-5 h-5 text-primary" />
-                      : <Square className="w-5 h-5 text-white/70" />
-                    }
-                  </button>
-                )}
-
-                <div className="aspect-video bg-black relative flex items-center justify-center overflow-hidden">
-                  <video
-                    src={video.sourceUrl ?? undefined}
-                    className="w-full h-full object-cover"
-                    muted
-                    preload="metadata"
-                    onLoadedMetadata={(e) => { e.currentTarget.currentTime = 0.5; }}
-                  />
-                  {!bulkMode && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <div className="bg-primary rounded-full p-2">
-                        <Play className="w-5 h-5 text-primary-foreground fill-current" />
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div className="p-3">
-                  <p className="text-sm font-medium truncate">{video.title}</p>
-                  <div className="flex items-center justify-between mt-2">
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <Film className="w-3 h-3" />
-                      <span>{video.category}</span>
-                      {video.duration && <span>· {video.duration}</span>}
-                    </div>
-                    {!bulkMode && (
-                      <div className="flex items-center gap-1">
-                        {video.sourceUrl && (
-                          <VideoTrimmer
-                            videoId={video.id}
-                            videoUrl={video.sourceUrl}
-                            videoTitle={video.title}
-                            trigger={
-                              <button
-                                className="p-1.5 rounded hover:bg-primary/20 text-muted-foreground hover:text-primary transition-colors"
-                                title="Trim video"
-                              >
-                                <Scissors className="w-3.5 h-3.5" />
-                              </button>
-                            }
-                          />
-                        )}
-                        <button
-                          onClick={() => handleDelete([video.id])}
-                          className="p-1.5 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors"
-                          title="Delete video"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+          {bulkMode && (
+            <div className="col-span-full flex items-center gap-2 text-sm text-muted-foreground">
+              <CheckSquare className="w-4 h-4 text-primary" />
+              {selected.size} of {userVideos.length} selected
+            </div>
+          )}
+          {userVideos.map((video: Video) => (
+            <UserVideoCard
+              key={video.id}
+              video={video}
+              bulkMode={bulkMode}
+              selected={selected.has(video.id)}
+              onToggleSelect={toggleSelect}
+              showDelete={true}
+              showTrim={true}
+            />
+          ))}
         </div>
       )}
     </Layout>

@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, real, jsonb, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, real, jsonb, boolean, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -44,6 +44,7 @@ export const videos = pgTable("videos", {
   fps: integer("fps"),
   thumbnailUrl: text("thumbnail_url"),
   isProVideo: boolean("is_pro_video").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 export const drills = pgTable("drills", {
