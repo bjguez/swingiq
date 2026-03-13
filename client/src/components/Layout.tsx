@@ -1,4 +1,4 @@
-import { Video, BarChart2, Search, Bell, Menu, User, Upload, Library, Film, LogOut } from "lucide-react";
+import { Video, BarChart2, Search, Bell, Menu, User, Upload, Library, Film, LogOut, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { VideoLibraryModal } from "@/components/VideoLibraryModal";
 import { Link, useLocation } from "wouter";
@@ -29,12 +29,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   Analysis
                 </Button>
               </Link>
-              <Link href="/development">
-                <Button variant="ghost" size="sm" className={`font-medium ${location === '/development' ? 'bg-secondary/50 text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
-                  <BarChart2 className="w-4 h-4 mr-2" />
-                  Development
-                </Button>
-              </Link>
               <Link href="/library">
                 <Button variant="ghost" size="sm" className={`font-medium ${location === '/library' ? 'bg-secondary/50 text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
                   <Library className="w-4 h-4 mr-2" />
@@ -45,6 +39,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 <Button variant="ghost" size="sm" className={`font-medium ${location === '/my-swings' ? 'bg-secondary/50 text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
                   <Film className="w-4 h-4 mr-2" />
                   My Swings
+                </Button>
+              </Link>
+              <Link href="/development">
+                <Button variant="ghost" size="sm" className={`font-medium relative ${location === '/development' ? 'bg-secondary/50 text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
+                  <BarChart2 className="w-4 h-4 mr-2" />
+                  Development
+                  <Lock className="w-3 h-3 ml-1.5 text-yellow-500" />
                 </Button>
               </Link>
             </nav>
