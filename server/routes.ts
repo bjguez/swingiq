@@ -230,7 +230,10 @@ export async function registerRoutes(
   // MLB schedule/scores proxy — today's games across MLB + Spring Training
   app.get("/api/mlb/scores", async (_req, res) => {
     try {
-      const today = new Date().toISOString().split("T")[0];
+      // Use Eastern Time — MLB schedules are always expressed in ET
+      const etDate = new Date().toLocaleString("en-US", { timeZone: "America/New_York" });
+      const et = new Date(etDate);
+      const today = `${et.getFullYear()}-${String(et.getMonth() + 1).padStart(2, "0")}-${String(et.getDate()).padStart(2, "0")}`;
       const url = `https://statsapi.mlb.com/api/v1/schedule?sportId=1,17&date=${today}&hydrate=linescore,team`;
       const response = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
       if (!response.ok) return res.status(502).json({ message: "MLB API error" });
