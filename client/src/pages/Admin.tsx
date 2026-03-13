@@ -535,6 +535,7 @@ function EditRow({ video, editData, setEditData, players, onSave, onCancel, savi
           <Input
             value={editData.title || ""}
             onChange={(e) => setEditData({ ...editData, title: e.target.value })}
+            placeholder="Judge, Aaron – Full Swing – HR to RF 2024"
             className="h-9 bg-background"
             data-testid="edit-title"
           />
@@ -793,13 +794,21 @@ function AddVideoForm({ players, onClose, onSuccess }: { players: MlbPlayer[]; o
         </div>
       </div>
 
+      {/* Naming convention hint */}
+      <div className="bg-secondary/30 border border-border/50 rounded-lg px-4 py-3 text-xs text-muted-foreground space-y-1">
+        <p className="font-semibold text-foreground/70 uppercase tracking-wider">Title Convention</p>
+        <p><span className="text-foreground/60 font-mono">Last, First – Phase Tag – Brief Context Year</span></p>
+        <p className="text-muted-foreground/60">e.g. <span className="font-mono">Judge, Aaron – Full Swing – HR to RF 2024</span> &nbsp;·&nbsp; <span className="font-mono">Ohtani, Shohei – Gather &gt; Touchdown – vs LHP 2023</span></p>
+        <p className="text-muted-foreground/50">Context shorthand: <span className="font-mono">HR to [LF/CF/RF] · oppo gap · pull side · vs LHP/RHP · 2-strike · [mph] EV</span></p>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
           <label className="text-xs text-muted-foreground block mb-1">Title *</label>
           <Input
             value={formData.title}
             onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-            placeholder="Judge - Powerful Drive to RF"
+            placeholder="Judge, Aaron – Full Swing – HR to RF 2024"
             className="bg-background"
             data-testid="input-add-title"
           />
