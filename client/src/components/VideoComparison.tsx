@@ -12,6 +12,8 @@ import DrawingCanvas, { type Tool, type DrawAction } from "./DrawingCanvas";
 import PoseOverlay from "./PoseOverlay";
 import { detectPose, resetPoseDetector, type PoseResult } from "@/lib/poseDetector";
 
+const SPEEDS = [0.25, 0.5, 0.75, 1];
+
 interface VideoComparisonProps {
   externalLeftSrc?: string | null;
   externalLeftLabel?: string;
@@ -39,6 +41,13 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel, ex
   const [rightLabel, setRightLabel] = useState("Pro Swing");
   const [leftRotation, setLeftRotation] = useState<0 | 90 | 180 | 270>(0);
   const [rightRotation, setRightRotation] = useState<0 | 90 | 180 | 270>(0);
+  const [playbackRate, setPlaybackRate] = useState(1);
+
+  const applyRate = useCallback((rate: number) => {
+    setPlaybackRate(rate);
+    if (leftVideoSrc) leftVideoRef.current?.setRate(rate);
+    if (rightVideoSrc) rightVideoRef.current?.setRate(rate);
+  }, [leftVideoSrc, rightVideoSrc]);
 
   useEffect(() => {
     if (externalLeftSrc) {
@@ -154,6 +163,34 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel, ex
     if (affectsRight && rightVideoSrc) { rightVideoRef.current?.pause(); rightVideoRef.current?.stepBackward(); }
     setIsPlaying(false);
   }, [affectsLeft, affectsRight, leftVideoSrc, rightVideoSrc]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || (e.target as HTMLElement).isContentEditable) return;
+      if (e.key === " ") { e.preventDefault(); togglePlay(); }
+      else if (e.key === "ArrowRight") { e.preventDefault(); stepForward(); }
+      else if (e.key === "ArrowLeft") { e.preventDefault(); stepBackward(); }
+      else if (e.key === "[") {
+        setPlaybackRate(prev => {
+          const idx = SPEEDS.indexOf(prev);
+          const next = idx > 0 ? SPEEDS[idx - 1] : prev;
+          if (next !== prev) applyRate(next);
+          return next;
+        });
+      } else if (e.key === "]") {
+        setPlaybackRate(prev => {
+          const idx = SPEEDS.indexOf(prev);
+          const next = idx < SPEEDS.length - 1 ? SPEEDS[idx + 1] : prev;
+          if (next !== prev) applyRate(next);
+          return next;
+        });
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [togglePlay, stepForward, stepBackward, applyRate]);
 
   const handleLeftAnnotationsChange = useCallback((annotations: DrawAction[]) => {
     annotationHistoryRef.current.push("left");
@@ -586,7 +623,24 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel, ex
             </Button>
           </div>
           
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
+            {/* Speed controls */}
+            <div className="flex items-center gap-1 bg-secondary/50 border border-border rounded-md p-1">
+              {SPEEDS.map(s => (
+                <button
+                  key={s}
+                  onClick={() => applyRate(s)}
+                  className={`px-2 py-0.5 rounded text-xs font-mono font-semibold transition-colors ${
+                    playbackRate === s
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+                  }`}
+                  title={`${s}x speed ([/] to adjust)`}
+                >
+                  {s}x
+                </button>
+              ))}
+            </div>
             <Button
               variant="outline"
               size="icon"
