@@ -99,55 +99,69 @@ function PlayerCardGrid({ onPlayerSelected }: { onPlayerSelected?: (name: string
         </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-          {players.map((p) => {
-            const headshot = p.savantId
-              ? `https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_213,q_auto:best/v1/people/${p.savantId}/headshot/67/current`
-              : null;
-            return (
-              <div key={p.id} className="group bg-card border border-border rounded-xl p-4 flex flex-col gap-3 hover:border-primary/40 transition-colors">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-full bg-secondary border border-border overflow-hidden shrink-0 flex items-center justify-center">
-                    {headshot ? (
-                      <img src={headshot} alt={p.name} className="w-full h-full object-cover"
-                        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
-                    ) : (
-                      <span className="text-sm font-bold text-muted-foreground">
-                        {p.name.split(" ").map(n => n[0]).join("").slice(0, 2)}
-                      </span>
-                    )}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="font-bold text-sm leading-tight truncate">{p.name}</p>
-                    <p className="text-xs text-muted-foreground truncate">{p.team} · {p.position}</p>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-center">
-                  <div className="bg-secondary/50 rounded-lg p-2">
-                    <p className="text-xs text-muted-foreground">Exit Velo</p>
-                    <p className="text-sm font-bold text-primary">
-                      {p.avgExitVelo ? `${p.avgExitVelo.toFixed(1)}` : "—"}
-                    </p>
-                  </div>
-                  <div className="bg-secondary/50 rounded-lg p-2">
-                    <p className="text-xs text-muted-foreground">Barrel%</p>
-                    <p className="text-sm font-bold text-primary">
-                      {p.barrelPct != null ? `${p.barrelPct.toFixed(1)}%` : "—"}
-                    </p>
-                  </div>
-                </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="w-full group-hover:bg-primary/10 group-hover:border-primary/40 group-hover:text-primary transition-colors"
-                  onClick={() => onPlayerSelected?.(p.name)}
-                >
-                  View Profile
-                </Button>
-              </div>
-            );
-          })}
+          {players.map((p) => (
+            <PlayerCard key={p.id} player={p} onPlayerSelected={onPlayerSelected} />
+          ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Player Card ─────────────────────────────────────────────────────────────
+
+function PlayerCard({ player: p, onPlayerSelected }: { player: MlbPlayer; onPlayerSelected?: (name: string) => void }) {
+  const { data: mlbData } = useQuery<MlbStatsData>({
+    queryKey: ["/api/mlb/stats", p.savantId],
+    queryFn: () => fetch(`/api/mlb/players/${p.savantId}/stats`).then(r => r.json()),
+    enabled: !!p.savantId,
+  });
+
+  const career = mlbData?.career;
+  const headshot = p.savantId
+    ? `https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_213,q_auto:best/v1/people/${p.savantId}/headshot/67/current`
+    : null;
+
+  return (
+    <div className="group bg-card border border-border rounded-xl p-4 flex flex-col gap-3 hover:border-primary/40 transition-colors">
+      <div className="flex items-center gap-3">
+        <div className="w-12 h-12 rounded-full bg-secondary border border-border overflow-hidden shrink-0 flex items-center justify-center">
+          {headshot ? (
+            <img src={headshot} alt={p.name} className="w-full h-full object-cover"
+              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+          ) : (
+            <span className="text-sm font-bold text-muted-foreground">
+              {p.name.split(" ").map(n => n[0]).join("").slice(0, 2)}
+            </span>
+          )}
+        </div>
+        <div className="min-w-0">
+          <p className="font-bold text-sm leading-tight truncate">{p.name}</p>
+          <p className="text-xs text-muted-foreground truncate">{p.team} · {p.position}</p>
+        </div>
+      </div>
+      <div className="grid grid-cols-3 gap-1.5 text-center">
+        <div className="bg-secondary/50 rounded-lg p-2">
+          <p className="text-[10px] text-muted-foreground uppercase tracking-wide">AVG</p>
+          <p className="text-sm font-bold text-primary">{career?.avg ?? "—"}</p>
+        </div>
+        <div className="bg-secondary/50 rounded-lg p-2">
+          <p className="text-[10px] text-muted-foreground uppercase tracking-wide">HR</p>
+          <p className="text-sm font-bold text-primary">{career?.homeRuns ?? "—"}</p>
+        </div>
+        <div className="bg-secondary/50 rounded-lg p-2">
+          <p className="text-[10px] text-muted-foreground uppercase tracking-wide">OPS</p>
+          <p className="text-sm font-bold text-primary">{career?.ops ?? "—"}</p>
+        </div>
+      </div>
+      <Button
+        size="sm"
+        variant="outline"
+        className="w-full group-hover:bg-primary/10 group-hover:border-primary/40 group-hover:text-primary transition-colors"
+        onClick={() => onPlayerSelected?.(p.name)}
+      >
+        View Profile
+      </Button>
     </div>
   );
 }
