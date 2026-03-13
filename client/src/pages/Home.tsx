@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { fetchPlayers, fetchVideos } from "@/lib/api";
 import { useState, useCallback, useRef, useMemo } from "react";
 import { useSearch } from "wouter";
-import { Upload, Users, X, ArrowRight } from "lucide-react";
+import { Upload, Users, X, Target } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { MlbPlayer } from "@shared/schema";
 
@@ -100,10 +100,6 @@ export default function Home() {
               )}
             </div>
 
-            <div className="hidden sm:flex items-center justify-center">
-              <ArrowRight className="w-5 h-5 text-muted-foreground/40" />
-            </div>
-
             {/* Step 2 */}
             <div className={`flex flex-col gap-3 p-4 rounded-lg border transition-colors ${rightLoaded ? 'border-primary/40 bg-primary/5' : 'border-border bg-secondary/30'}`}>
               <div className="flex items-center gap-2">
@@ -125,6 +121,18 @@ export default function Home() {
                   }
                 />
               )}
+            </div>
+
+            {/* Step 3 */}
+            <div className="flex flex-col gap-3 p-4 rounded-lg border border-border bg-secondary/30">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 bg-secondary text-muted-foreground">
+                  3
+                </div>
+                <Target className="w-4 h-4 text-muted-foreground" />
+                <p className="font-semibold text-sm">Find Your Edge</p>
+              </div>
+              <p className="text-xs text-muted-foreground">Measure joint angles, trace hand paths, and pinpoint the mechanical differences that separate good from elite.</p>
             </div>
           </div>
         </div>
