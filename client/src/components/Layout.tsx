@@ -1,4 +1,4 @@
-import { Video, BarChart2, Search, Bell, Menu, User, Upload, Library, Film, LogOut, Lock } from "lucide-react";
+import { Video, BarChart2, Bell, Menu, User, Upload, Library, Film, LogOut, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { VideoLibraryModal } from "@/components/VideoLibraryModal";
 import { Link, useLocation } from "wouter";
@@ -52,15 +52,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="relative hidden md:block">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <input 
-                type="text" 
-                placeholder="Search MLB players..." 
-                className="bg-secondary/50 border border-border rounded-full pl-9 pr-4 py-1.5 text-sm focus:outline-none focus:border-primary transition-colors w-64"
-              />
-            </div>
-            <VideoLibraryModal
+<VideoLibraryModal
               mode="user"
               trigger={
                 <Button size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold hidden sm:flex">
