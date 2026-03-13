@@ -13,8 +13,8 @@ import {
 import { useToast } from "@/hooks/use-toast";
 
 const allCategories = [
-  "Gather", "Touchdown", "Thrust", "Contact", "Post-Contact",
-  "Hand Path", "Head Position", "Scissor Kick", "Full Swings"
+  "Gather > Touchdown", "Touchdown > Finish",
+  "Hand Path", "Head Position", "Scissor Kick", "Thrust", "Full Swings"
 ];
 
 const sourceOptions = ["MLB.com", "YouTube", "Upload", "Baseball Savant", "Other"];

@@ -6,7 +6,7 @@ import { fetchVideos } from "@/lib/api";
 import { useState } from "react";
 import type { Video } from "@shared/schema";
 
-const categories = ["All", "Gather", "Touchdown", "Thrust", "Contact", "Post-Contact", "Hand Path", "Head Position", "Scissor Kick", "Full Swings"];
+const categories = ["All", "Gather > Touchdown", "Touchdown > Finish", "Hand Path", "Head Position", "Scissor Kick", "Thrust", "Full Swings"];
 
 export default function Library() {
   const [activeCategory, setActiveCategory] = useState("All");

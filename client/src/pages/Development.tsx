@@ -6,11 +6,11 @@ import { fetchDrills, fetchVideos } from "@/lib/api";
 import { useState } from "react";
 import type { Drill, Video } from "@shared/schema";
 
-const corePhases = ["Gather", "Touchdown", "Thrust", "Contact", "Post-Contact"];
-const detailPhases = ["Hand Path", "Head Position", "Scissor Kick"];
+const corePhases = ["Gather > Touchdown", "Touchdown > Finish"];
+const detailPhases = ["Hand Path", "Head Position", "Scissor Kick", "Thrust"];
 
 export default function Development() {
-  const [focusPhase, setFocusPhase] = useState("Gather");
+  const [focusPhase, setFocusPhase] = useState("Gather > Touchdown");
   
   const { data: allDrills = [], isLoading: drillsLoading } = useQuery({
     queryKey: ["/api/drills"],
@@ -45,7 +45,7 @@ export default function Development() {
       {/* Progress Overview */}
       <div className="mt-4">
         <h3 className="font-display font-bold text-xl mb-3">Core Phases</h3>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {corePhases.map(phase => (
             <PhaseCard 
               key={phase} 
@@ -59,7 +59,7 @@ export default function Development() {
 
       <div className="mt-6">
         <h3 className="font-display font-bold text-xl mb-3">Swing Details</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {detailPhases.map(phase => (
             <PhaseCard 
               key={phase} 
