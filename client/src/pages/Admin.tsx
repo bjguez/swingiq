@@ -158,6 +158,7 @@ export default function Admin() {
       fps: editData.fps ?? null,
       duration: editData.duration ?? null,
       sourceUrl: editData.sourceUrl ?? null,
+      season: editData.season ?? null,
       isProVideo: editData.isProVideo ?? false,
     };
     updateMutation.mutate({ id: editingId, data: payload as Partial<Video> });
@@ -569,7 +570,7 @@ function EditRow({ video, editData, setEditData, players, onSave, onCancel, savi
           />
         </div>
       </div>
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
         <div>
           <label className="text-xs text-muted-foreground block mb-1">Category</label>
           <select
@@ -614,6 +615,17 @@ function EditRow({ video, editData, setEditData, players, onSave, onCancel, savi
             placeholder="0:12"
             className="h-9 bg-background"
             data-testid="edit-duration"
+          />
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground block mb-1">Season / Year</label>
+          <Input
+            type="number"
+            value={editData.season ?? ""}
+            onChange={(e) => setEditData({ ...editData, season: parseInt(e.target.value) || null })}
+            placeholder="2024"
+            className="h-9 bg-background"
+            data-testid="edit-season"
           />
         </div>
         <div>
@@ -666,6 +678,7 @@ function AddVideoForm({ players, onClose, onSuccess }: { players: MlbPlayer[]; o
     sourceUrl: "",
     duration: "",
     fps: "",
+    season: "",
     isProVideo: true,
   });
 
@@ -724,6 +737,7 @@ function AddVideoForm({ players, onClose, onSuccess }: { players: MlbPlayer[]; o
         sourceUrl: formData.sourceUrl || null,
         duration: formData.duration || null,
         fps: formData.fps ? parseInt(formData.fps) : null,
+        season: formData.season ? parseInt(formData.season) : null,
         thumbnailUrl: null,
       };
       const res = await fetch("/api/videos", {
@@ -823,7 +837,7 @@ function AddVideoForm({ players, onClose, onSuccess }: { players: MlbPlayer[]; o
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
         <div>
           <label className="text-xs text-muted-foreground block mb-1">Category / Phase Tag</label>
           <select
@@ -869,6 +883,17 @@ function AddVideoForm({ players, onClose, onSuccess }: { players: MlbPlayer[]; o
             placeholder="0:12"
             className="bg-background"
             data-testid="input-add-duration"
+          />
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground block mb-1">Season / Year</label>
+          <Input
+            type="number"
+            value={formData.season}
+            onChange={(e) => setFormData(prev => ({ ...prev, season: e.target.value }))}
+            placeholder="2024"
+            className="bg-background"
+            data-testid="input-add-season"
           />
         </div>
         <div>

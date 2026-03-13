@@ -12,22 +12,28 @@ const categories = ["All", "Gather > Touchdown", "Touchdown > Finish", "Hand Pat
 
 export default function Library() {
   const [activeCategory, setActiveCategory] = useState("All");
+  const [activeYear, setActiveYear] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [previewVideo, setPreviewVideo] = useState<Video | null>(null);
   const [, navigate] = useLocation();
-  
-  const { data: allVideos = [], isLoading } = useQuery({ 
-    queryKey: ["/api/videos"], 
+
+  const { data: allVideos = [], isLoading } = useQuery({
+    queryKey: ["/api/videos"],
     queryFn: () => fetchVideos()
   });
 
-  const filtered = allVideos.filter((v: Video) => {
-    if (!v.isProVideo) return false;
+  const proVideos = allVideos.filter((v: Video) => v.isProVideo);
+  const availableYears = ["All", ...Array.from(
+    new Set(proVideos.map((v: Video) => v.season).filter(Boolean) as number[])
+  ).sort((a, b) => b - a).map(String)];
+
+  const filtered = proVideos.filter((v: Video) => {
     const matchCategory = activeCategory === "All" || v.category === activeCategory;
+    const matchYear = activeYear === "All" || String(v.season) === activeYear;
     const matchSearch = !searchQuery ||
       v.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (v.playerName?.toLowerCase().includes(searchQuery.toLowerCase()));
-    return matchCategory && matchSearch;
+    return matchCategory && matchYear && matchSearch;
   });
 
   return (
@@ -60,13 +66,13 @@ export default function Library() {
       {/* Categories */}
       <div className="flex overflow-x-auto pb-2 gap-2 mt-4 scrollbar-none">
         {categories.map((cat) => (
-          <button 
+          <button
             key={cat}
             onClick={() => setActiveCategory(cat)}
             data-testid={`filter-${cat}`}
             className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
-              activeCategory === cat 
-                ? 'bg-primary text-primary-foreground' 
+              activeCategory === cat
+                ? 'bg-primary text-primary-foreground'
                 : 'bg-secondary/50 text-muted-foreground hover:bg-secondary hover:text-foreground border border-border/50'
             }`}
           >
@@ -74,6 +80,26 @@ export default function Library() {
           </button>
         ))}
       </div>
+
+      {/* Year filter — only show if we have season data */}
+      {availableYears.length > 1 && (
+        <div className="flex overflow-x-auto pb-1 gap-2 scrollbar-none">
+          <span className="text-xs text-muted-foreground self-center shrink-0">Season:</span>
+          {availableYears.map((year) => (
+            <button
+              key={year}
+              onClick={() => setActiveYear(year)}
+              className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
+                activeYear === year
+                  ? 'bg-primary/20 text-primary border border-primary/40'
+                  : 'bg-secondary/50 text-muted-foreground hover:bg-secondary hover:text-foreground border border-border/50'
+              }`}
+            >
+              {year}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Video Grid */}
       {isLoading ? (
@@ -136,7 +162,7 @@ export default function Library() {
               <div className="p-4">
                 <h3 className="font-bold text-lg leading-tight mb-1 group-hover:text-primary transition-colors">{item.title}</h3>
                 <p className="text-sm text-muted-foreground flex items-center justify-between mt-2">
-                  <span>{item.playerName} • {item.source}</span>
+                  <span>{item.playerName}{item.season ? ` • ${item.season}` : ""} • {item.source}</span>
                   <Button
                     variant="ghost"
                     size="sm"
