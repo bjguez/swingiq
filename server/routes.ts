@@ -227,6 +227,33 @@ export async function registerRoutes(
     }
   });
 
+  // MLB schedule/scores proxy — today's games across MLB + Spring Training
+  app.get("/api/mlb/scores", async (_req, res) => {
+    try {
+      const today = new Date().toISOString().split("T")[0];
+      const url = `https://statsapi.mlb.com/api/v1/schedule?sportId=1,17&date=${today}&hydrate=linescore`;
+      const response = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
+      if (!response.ok) return res.status(502).json({ message: "MLB API error" });
+      const data = await response.json() as any;
+      const games = (data.dates?.[0]?.games ?? []).map((g: any) => ({
+        gamePk: g.gamePk,
+        status: g.status?.abstractGameState ?? "Preview",         // Preview | Live | Final
+        detailedState: g.status?.detailedState ?? "",
+        awayTeam: g.teams?.away?.team?.abbreviation ?? "?",
+        awayScore: g.teams?.away?.score ?? 0,
+        homeTeam: g.teams?.home?.team?.abbreviation ?? "?",
+        homeScore: g.teams?.home?.score ?? 0,
+        inning: g.linescore?.currentInning ?? null,
+        isTopInning: g.linescore?.isTopInning ?? true,
+        gameDate: g.gameDate,
+        sportId: g.sport?.id ?? 1,
+      }));
+      res.json({ games, date: today });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch scores" });
+    }
+  });
+
   // Baseball Savant spray chart proxy — parses statcast CSV, returns JSON batted ball points
   app.get("/api/mlb/players/:mlbId/spray-chart", async (req, res) => {
     const { mlbId } = req.params;
