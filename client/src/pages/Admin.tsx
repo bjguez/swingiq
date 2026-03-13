@@ -8,7 +8,7 @@ import type { Video, MlbPlayer } from "@shared/schema";
 import {
   Upload, Trash2, Pencil, Save, X, Plus, PlayCircle,
   Film, Loader2, CheckCircle2, AlertCircle, Search, Filter,
-  Users, UserPlus,
+  Users, UserPlus, Scissors,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -60,6 +60,7 @@ export default function Admin() {
   const [searchQuery, setSearchQuery] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editData, setEditData] = useState<Partial<Video>>({});
+  const [trimmingId, setTrimmingId] = useState<string | null>(null);
   const [showAddVideoForm, setShowAddVideoForm] = useState(false);
 
   // Player state
@@ -303,11 +304,22 @@ export default function Admin() {
                       onCancel={cancelEdit}
                       saving={updateMutation.isPending}
                     />
+                  ) : trimmingId === video.id ? (
+                    <TrimRow
+                      key={video.id}
+                      video={video}
+                      onDone={() => {
+                        queryClient.invalidateQueries({ queryKey: ["/api/videos"] });
+                        setTrimmingId(null);
+                      }}
+                      onCancel={() => setTrimmingId(null)}
+                    />
                   ) : (
                     <VideoRow
                       key={video.id}
                       video={video}
                       onEdit={() => startEdit(video)}
+                      onTrim={() => { setTrimmingId(video.id); setEditingId(null); }}
                       onDelete={() => {
                         if (confirm(`Delete "${video.title}"?`)) {
                           deleteMutation.mutate(video.id);
@@ -479,7 +491,7 @@ function FilterPill({ label, active, onClick, count }: { label: string; active: 
 
 // ── Video components ──────────────────────────────────────────────────────────
 
-function VideoRow({ video, onEdit, onDelete, deleting }: { video: Video; onEdit: () => void; onDelete: () => void; deleting: boolean }) {
+function VideoRow({ video, onEdit, onTrim, onDelete, deleting }: { video: Video; onEdit: () => void; onTrim: () => void; onDelete: () => void; deleting: boolean }) {
   return (
     <div className="p-3 grid grid-cols-12 gap-2 items-center hover:bg-secondary/20 transition-colors text-sm" data-testid={`admin-row-${video.id}`}>
       <div className="col-span-3 font-medium flex items-center gap-2 min-w-0">
@@ -510,6 +522,11 @@ function VideoRow({ video, onEdit, onDelete, deleting }: { video: Video; onEdit:
         <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" onClick={onEdit} data-testid={`button-edit-${video.id}`}>
           <Pencil className="w-4 h-4" />
         </Button>
+        {video.sourceUrl && (
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-yellow-400" onClick={onTrim} title="Trim video" data-testid={`button-trim-${video.id}`}>
+            <Scissors className="w-4 h-4" />
+          </Button>
+        )}
         <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-red-500" onClick={onDelete} disabled={deleting} data-testid={`button-delete-${video.id}`}>
           <Trash2 className="w-4 h-4" />
         </Button>
@@ -659,6 +676,126 @@ function EditRow({ video, editData, setEditData, players, onSave, onCancel, savi
         <Button size="sm" onClick={onSave} disabled={saving} data-testid="button-save-edit">
           {saving ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Save className="w-4 h-4 mr-1" />}
           Save Changes
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function TrimRow({ video, onDone, onCancel }: { video: Video; onDone: () => void; onCancel: () => void }) {
+  const { toast } = useToast();
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [startTime, setStartTime] = useState(0);
+  const [endTime, setEndTime] = useState<number | null>(null);
+  const [duration, setDuration] = useState<number | null>(null);
+  const [trimming, setTrimming] = useState(false);
+
+  const fmt = (s: number) => {
+    const m = Math.floor(s / 60);
+    const sec = Math.floor(s % 60);
+    const ms = Math.floor((s % 1) * 10);
+    return `${m}:${sec.toString().padStart(2, "0")}.${ms}`;
+  };
+
+  const markIn = () => {
+    if (videoRef.current) setStartTime(videoRef.current.currentTime);
+  };
+
+  const markOut = () => {
+    if (videoRef.current) setEndTime(videoRef.current.currentTime);
+  };
+
+  const applyTrim = async () => {
+    if (endTime === null || endTime <= startTime) {
+      toast({ title: "End time must be after start time", variant: "destructive" });
+      return;
+    }
+    setTrimming(true);
+    try {
+      const res = await fetch(`/api/videos/${video.id}/trim`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ startTime, endTime }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "Trim failed");
+      }
+      toast({ title: "Video trimmed successfully" });
+      onDone();
+    } catch (err: any) {
+      toast({ title: err.message || "Trim failed", variant: "destructive" });
+    }
+    setTrimming(false);
+  };
+
+  return (
+    <div className="p-4 bg-yellow-500/5 border-l-2 border-yellow-500 space-y-3">
+      <div className="flex items-center gap-2">
+        <Scissors className="w-4 h-4 text-yellow-500 shrink-0" />
+        <span className="font-semibold text-sm truncate">Trim: {video.title}</span>
+        {duration !== null && (
+          <span className="text-xs text-muted-foreground ml-auto shrink-0">Total: {fmt(duration)}</span>
+        )}
+      </div>
+
+      {/* Inline video preview */}
+      <video
+        ref={videoRef}
+        src={video.sourceUrl!}
+        controls
+        className="w-full max-h-56 rounded-lg bg-black"
+        onLoadedMetadata={() => {
+          if (videoRef.current) {
+            const d = videoRef.current.duration;
+            setDuration(d);
+            setEndTime(d);
+          }
+        }}
+      />
+
+      {/* Mark In / Mark Out */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <Button size="sm" variant="outline" onClick={markIn} className="border-green-500/50 text-green-400 hover:bg-green-500/10 font-mono">
+          ▶ Mark In &nbsp;{fmt(startTime)}
+        </Button>
+        <Button size="sm" variant="outline" onClick={markOut} className="border-red-500/50 text-red-400 hover:bg-red-500/10 font-mono">
+          ■ Mark Out &nbsp;{endTime !== null ? fmt(endTime) : "—"}
+        </Button>
+        {endTime !== null && endTime > startTime && (
+          <span className="text-xs text-yellow-400 font-mono ml-auto">Clip length: {fmt(endTime - startTime)}</span>
+        )}
+      </div>
+
+      {/* Visual range bar */}
+      {duration !== null && endTime !== null && (
+        <div className="relative h-2 bg-secondary rounded-full overflow-hidden">
+          <div
+            className="absolute h-full bg-yellow-500/40 rounded-full"
+            style={{
+              left: `${(startTime / duration) * 100}%`,
+              width: `${Math.max(0, ((endTime - startTime) / duration) * 100)}%`,
+            }}
+          />
+          <div className="absolute top-0 h-full w-0.5 bg-green-500" style={{ left: `${(startTime / duration) * 100}%` }} />
+          <div className="absolute top-0 h-full w-0.5 bg-red-500" style={{ left: `${(endTime / duration) * 100}%` }} />
+        </div>
+      )}
+
+      <div className="flex justify-end gap-2 pt-1">
+        <Button variant="outline" size="sm" onClick={onCancel} disabled={trimming}>
+          <X className="w-4 h-4 mr-1" /> Cancel
+        </Button>
+        <Button
+          size="sm"
+          onClick={applyTrim}
+          disabled={trimming || endTime === null || endTime <= startTime}
+          className="bg-yellow-500 text-black hover:bg-yellow-400 font-semibold"
+        >
+          {trimming
+            ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Trimming…</>
+            : <><Scissors className="w-4 h-4 mr-1" /> Apply Trim</>
+          }
         </Button>
       </div>
     </div>
