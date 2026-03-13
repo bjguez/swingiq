@@ -43,6 +43,7 @@ export const videos = pgTable("videos", {
   duration: text("duration"),
   fps: integer("fps"),
   thumbnailUrl: text("thumbnail_url"),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "set null" }),
   isProVideo: boolean("is_pro_video").default(false),
   season: integer("season"),
   createdAt: timestamp("created_at").defaultNow(),

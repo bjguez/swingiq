@@ -50,12 +50,14 @@ export async function registerRoutes(
       const key = await uploadToR2(req.file.buffer, req.file.originalname, req.file.mimetype);
       const presignedUrl = await getPresignedUrl(key);
       const title = (req.body.title || req.file.originalname).replace(/\.[^.]+$/, "");
+      const userId = (req.user as any)?.id ?? null;
       const video = await storage.createVideo({
         title,
         category: "Upload",
         source: "User Upload",
         sourceUrl: key,
         isProVideo: false,
+        userId,
       });
       res.status(201).json({ sourceUrl: key, presignedUrl, videoId: video.id });
     } catch (err: any) {
@@ -283,13 +285,19 @@ export async function registerRoutes(
   app.get("/api/videos", async (req, res) => {
     try {
       const { category, playerId } = req.query;
+      const userId = (req.user as any)?.id ?? null;
+
       let vids;
       if (category) {
-        vids = await storage.getVideosByCategory(category as string);
+        // Category filter: pro videos only (used by Library/Development)
+        vids = (await storage.getVideosByCategory(category as string)).filter(v => v.isProVideo);
       } else if (playerId) {
         vids = await storage.getVideosByPlayer(playerId as string);
       } else {
-        vids = await storage.getAllVideos();
+        // Default: all pro videos + this user's own uploads
+        const proVideos = await storage.getProVideos();
+        const userVideos = userId ? await storage.getVideosByUser(userId) : [];
+        vids = [...proVideos, ...userVideos];
       }
       res.json(await resolveVideoUrls(vids));
     } catch (err) {
@@ -333,8 +341,17 @@ export async function registerRoutes(
 
   app.delete("/api/videos/:id", async (req, res) => {
     try {
-      const deleted = await storage.deleteVideo(req.params.id);
-      if (!deleted) return res.status(404).json({ message: "Video not found" });
+      const video = await storage.getVideo(req.params.id);
+      if (!video) return res.status(404).json({ message: "Video not found" });
+      // Pro videos can be deleted by admin (no userId); user videos only by their owner
+      const userId = (req.user as any)?.id ?? null;
+      if (!video.isProVideo && video.userId && video.userId !== userId) {
+        return res.status(403).json({ message: "Not authorized to delete this video" });
+      }
+      if (video.sourceUrl && isR2Key(video.sourceUrl)) {
+        try { await deleteFromR2(video.sourceUrl); } catch {}
+      }
+      await storage.deleteVideo(req.params.id);
       res.json({ success: true });
     } catch (err) {
       res.status(500).json({ message: "Failed to delete video" });

@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { db } from "./db";
 import {
   users, mlbPlayers, videos, drills, sessions,
@@ -20,6 +20,8 @@ export interface IStorage {
   deletePlayer(id: string): Promise<boolean>;
 
   getAllVideos(): Promise<Video[]>;
+  getProVideos(): Promise<Video[]>;
+  getVideosByUser(userId: string): Promise<Video[]>;
   getVideosByCategory(category: string): Promise<Video[]>;
   getVideosByPlayer(playerId: string): Promise<Video[]>;
   getVideo(id: string): Promise<Video | undefined>;
@@ -75,6 +77,16 @@ export class DatabaseStorage implements IStorage {
 
   async getAllVideos(): Promise<Video[]> {
     return db.select().from(videos);
+  }
+
+  async getProVideos(): Promise<Video[]> {
+    return db.select().from(videos).where(eq(videos.isProVideo, true));
+  }
+
+  async getVideosByUser(userId: string): Promise<Video[]> {
+    return db.select().from(videos).where(
+      and(eq(videos.isProVideo, false), eq(videos.userId, userId))
+    );
   }
 
   async getVideosByCategory(category: string): Promise<Video[]> {

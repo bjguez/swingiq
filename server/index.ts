@@ -73,6 +73,9 @@ app.use((req, res, next) => {
   await pool.query(`
     ALTER TABLE videos ADD COLUMN IF NOT EXISTS season INTEGER
   `);
+  await pool.query(`
+    ALTER TABLE videos ADD COLUMN IF NOT EXISTS user_id VARCHAR
+  `);
 
   await registerRoutes(httpServer, app);
 
