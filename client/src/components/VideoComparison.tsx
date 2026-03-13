@@ -15,10 +15,12 @@ import { detectPose, resetPoseDetector, type PoseResult } from "@/lib/poseDetect
 interface VideoComparisonProps {
   externalLeftSrc?: string | null;
   externalLeftLabel?: string;
+  externalRightSrc?: string | null;
+  externalRightLabel?: string;
   onRightVideoSelected?: (label: string) => void;
 }
 
-export default function VideoComparison({ externalLeftSrc, externalLeftLabel, onRightVideoSelected }: VideoComparisonProps = {}) {
+export default function VideoComparison({ externalLeftSrc, externalLeftLabel, externalRightSrc, externalRightLabel, onRightVideoSelected }: VideoComparisonProps = {}) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState([0]);
   const [synced, setSynced] = useState(true);
@@ -44,6 +46,15 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel, on
       setLeftLabel(externalLeftLabel ?? "My Swing");
     }
   }, [externalLeftSrc, externalLeftLabel]);
+
+  useEffect(() => {
+    if (externalRightSrc) {
+      setRightVideoSrc(externalRightSrc);
+      const label = externalRightLabel ?? "Pro Swing";
+      setRightLabel(label);
+      onRightVideoSelected?.(label);
+    }
+  }, [externalRightSrc, externalRightLabel]);
 
   useEffect(() => {
     resetPoseDetector();

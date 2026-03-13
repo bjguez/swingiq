@@ -1,9 +1,11 @@
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
-import { PlayCircle, Filter, Search } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { PlayCircle, Search, X, BarChart2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchVideos } from "@/lib/api";
 import { useState } from "react";
+import { useLocation } from "wouter";
 import type { Video } from "@shared/schema";
 
 const categories = ["All", "Gather > Touchdown", "Touchdown > Finish", "Hand Path", "Head Position", "Scissor Kick", "Thrust", "Full Swings"];
@@ -11,6 +13,8 @@ const categories = ["All", "Gather > Touchdown", "Touchdown > Finish", "Hand Pat
 export default function Library() {
   const [activeCategory, setActiveCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
+  const [previewVideo, setPreviewVideo] = useState<Video | null>(null);
+  const [, navigate] = useLocation();
   
   const { data: allVideos = [], isLoading } = useQuery({ 
     queryKey: ["/api/videos"], 
@@ -89,7 +93,7 @@ export default function Library() {
           {filtered.map((item) => (
             <div key={item.id} className="group bg-card border border-border rounded-xl overflow-hidden hover:border-primary/50 transition-all hover:shadow-[0_0_20px_rgba(20,184,102,0.1)]" data-testid={`card-video-${item.id}`}>
               {/* Thumbnail */}
-              <div className="relative aspect-video bg-black overflow-hidden cursor-pointer">
+              <div className="relative aspect-video bg-black overflow-hidden cursor-pointer" onClick={() => setPreviewVideo(item)}>
                 {item.sourceUrl ? (
                   <video
                     src={item.sourceUrl}
@@ -133,7 +137,13 @@ export default function Library() {
                 <h3 className="font-bold text-lg leading-tight mb-1 group-hover:text-primary transition-colors">{item.title}</h3>
                 <p className="text-sm text-muted-foreground flex items-center justify-between mt-2">
                   <span>{item.playerName} • {item.source}</span>
-                  <Button variant="ghost" size="sm" className="h-6 text-xs px-2 hover:bg-primary/20 hover:text-primary">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 text-xs px-2 hover:bg-primary/20 hover:text-primary"
+                    onClick={() => navigate(`/?proVideoId=${item.id}`)}
+                  >
+                    <BarChart2 className="w-3 h-3 mr-1" />
                     Analyze
                   </Button>
                 </p>
@@ -148,6 +158,43 @@ export default function Library() {
           )}
         </div>
       )}
+      {/* Video Preview Modal */}
+      <Dialog open={!!previewVideo} onOpenChange={(open) => { if (!open) setPreviewVideo(null); }}>
+        <DialogContent className="max-w-3xl p-0 overflow-hidden bg-black border border-border">
+          <div className="relative">
+            {previewVideo?.sourceUrl ? (
+              <video
+                src={previewVideo.sourceUrl}
+                className="w-full aspect-video object-contain bg-black"
+                controls
+                autoPlay
+              />
+            ) : (
+              <div className="w-full aspect-video flex items-center justify-center bg-secondary">
+                <PlayCircle className="w-16 h-16 text-muted-foreground/30" />
+              </div>
+            )}
+          </div>
+          <div className="p-4 flex items-start justify-between gap-4">
+            <div>
+              <h3 className="font-bold text-lg">{previewVideo?.title}</h3>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                {previewVideo?.playerName} • {previewVideo?.source}
+                {previewVideo?.fps && <> • {previewVideo.fps}fps</>}
+              </p>
+            </div>
+            <Button
+              className="bg-primary text-primary-foreground hover:bg-primary/90 shrink-0"
+              onClick={() => {
+                if (previewVideo) navigate(`/?proVideoId=${previewVideo.id}`);
+              }}
+            >
+              <BarChart2 className="w-4 h-4 mr-2" />
+              Analyze
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 }

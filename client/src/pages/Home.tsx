@@ -2,12 +2,20 @@ import Layout from "@/components/Layout";
 import VideoComparison from "@/components/VideoComparison";
 import DataDashboard from "@/components/DataDashboard";
 import { useQuery } from "@tanstack/react-query";
-import { fetchPlayers } from "@/lib/api";
-import { useState, useCallback, useRef } from "react";
+import { fetchPlayers, fetchVideos } from "@/lib/api";
+import { useState, useCallback, useRef, useMemo } from "react";
+import { useSearch } from "wouter";
 import type { MlbPlayer } from "@shared/schema";
 
 export default function Home() {
+  const search = useSearch();
+  const proVideoId = useMemo(() => new URLSearchParams(search).get("proVideoId"), [search]);
+
   const { data: players = [] } = useQuery({ queryKey: ["/api/players"], queryFn: fetchPlayers });
+  const { data: allVideos = [] } = useQuery({ queryKey: ["/api/videos"], queryFn: () => fetchVideos(), enabled: !!proVideoId });
+
+  const proVideo = useMemo(() => proVideoId ? allVideos.find((v: any) => v.id === proVideoId) ?? null : null, [proVideoId, allVideos]);
+
   const [externalVideo, setExternalVideo] = useState<{ src: string; label: string } | null>(null);
   const [selectedPlayerName, setSelectedPlayerName] = useState<string | null>(null);
   const comparisonRef = useRef<HTMLDivElement>(null);
@@ -42,6 +50,8 @@ export default function Home() {
         <VideoComparison
           externalLeftSrc={externalVideo?.src}
           externalLeftLabel={externalVideo?.label}
+          externalRightSrc={proVideo?.sourceUrl ?? null}
+          externalRightLabel={proVideo?.playerName ?? undefined}
           onRightVideoSelected={handleRightVideoSelected}
         />
       </div>
