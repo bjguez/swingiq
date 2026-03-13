@@ -149,7 +149,18 @@ export default function Admin() {
 
   const saveEdit = () => {
     if (!editingId) return;
-    updateMutation.mutate({ id: editingId, data: editData });
+    const payload: Record<string, unknown> = {
+      title: editData.title,
+      category: editData.category,
+      source: editData.source,
+      playerName: editData.playerName ?? null,
+      playerId: editData.playerId ?? null,
+      fps: editData.fps ?? null,
+      duration: editData.duration ?? null,
+      sourceUrl: editData.sourceUrl ?? null,
+      isProVideo: editData.isProVideo ?? false,
+    };
+    updateMutation.mutate({ id: editingId, data: payload as Partial<Video> });
   };
 
   const proCount = allVideos.filter((v: Video) => v.isProVideo).length;

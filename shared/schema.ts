@@ -76,7 +76,7 @@ export const insertUserSchema = createInsertSchema(users).pick({
 });
 
 export const insertMlbPlayerSchema = createInsertSchema(mlbPlayers).omit({ id: true });
-export const insertVideoSchema = createInsertSchema(videos).omit({ id: true });
+export const insertVideoSchema = createInsertSchema(videos).omit({ id: true, createdAt: true });
 export const insertDrillSchema = createInsertSchema(drills).omit({ id: true });
 export const insertSessionSchema = createInsertSchema(sessions).omit({ id: true });
 
