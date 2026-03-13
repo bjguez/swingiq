@@ -1,6 +1,7 @@
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { motion } from "framer-motion";
 import { PlayCircle, Search, X, BarChart2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchVideos } from "@/lib/api";
@@ -116,8 +117,15 @@ export default function Library() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
-          {filtered.map((item) => (
-            <div key={item.id} className="group bg-card border border-border rounded-xl overflow-hidden hover:border-primary/50 transition-all hover:shadow-[0_0_20px_rgba(20,184,102,0.1)]" data-testid={`card-video-${item.id}`}>
+          {filtered.map((item, i) => (
+            <motion.div
+              key={item.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.22, delay: i * 0.04, ease: "easeOut" }}
+              className="group bg-card border border-border rounded-xl overflow-hidden hover:border-primary/50 transition-all hover:shadow-[0_0_20px_rgba(20,184,102,0.1)]"
+              data-testid={`card-video-${item.id}`}
+            >
               {/* Thumbnail */}
               <div className="relative aspect-video bg-black overflow-hidden cursor-pointer" onClick={() => setPreviewVideo(item)}>
                 {item.sourceUrl ? (
@@ -174,7 +182,7 @@ export default function Library() {
                   </Button>
                 </p>
               </div>
-            </div>
+            </motion.div>
           ))}
 
           {filtered.length === 0 && (

@@ -1,3 +1,4 @@
+import { motion, AnimatePresence } from "framer-motion";
 import { Video, BarChart2, Bell, Menu, User, Upload, Library, Film, LogOut, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { VideoLibraryModal } from "@/components/VideoLibraryModal";
@@ -92,9 +93,18 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 container mx-auto px-4 py-6 flex flex-col gap-6">
-        {children}
-      </main>
+      <AnimatePresence mode="wait">
+        <motion.main
+          key={location}
+          className="flex-1 container mx-auto px-4 py-6 flex flex-col gap-6"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -6 }}
+          transition={{ duration: 0.18, ease: "easeOut" }}
+        >
+          {children}
+        </motion.main>
+      </AnimatePresence>
     </div>
   );
 }

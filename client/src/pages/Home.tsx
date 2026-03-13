@@ -1,3 +1,4 @@
+import { motion } from "framer-motion";
 import Layout from "@/components/Layout";
 import VideoComparison from "@/components/VideoComparison";
 import DataDashboard from "@/components/DataDashboard";
@@ -68,7 +69,13 @@ export default function Home() {
 
       {/* Getting Started Guide */}
       {guideVisible && (
-        <div className="bg-card border border-border rounded-xl p-5 relative">
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -8 }}
+          transition={{ duration: 0.2, ease: "easeOut" }}
+          className="bg-card border border-border rounded-xl p-5 relative"
+        >
           <button
             onClick={() => setShowGuide(false)}
             className="absolute top-3 right-3 text-muted-foreground hover:text-foreground transition-colors"
@@ -135,7 +142,7 @@ export default function Home() {
               <p className="text-xs text-muted-foreground">Measure joint angles, trace hand paths, and pinpoint the mechanical differences that separate good from elite.</p>
             </div>
           </div>
-        </div>
+        </motion.div>
       )}
 
       <div ref={comparisonRef}>

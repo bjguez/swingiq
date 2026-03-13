@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { motion } from "framer-motion";
 import { Zap, Target, BarChart, ExternalLink, Upload, ChevronRight, ChevronDown, ChevronUp, Film } from "lucide-react";
 import { Link } from "wouter";
 import { UserVideoCard } from "./UserVideoCard";
@@ -99,8 +100,15 @@ function PlayerCardGrid({ onPlayerSelected }: { onPlayerSelected?: (name: string
         </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-          {players.map((p) => (
-            <PlayerCard key={p.id} player={p} onPlayerSelected={onPlayerSelected} />
+          {players.map((p, i) => (
+            <motion.div
+              key={p.id}
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2, delay: i * 0.05, ease: "easeOut" }}
+            >
+              <PlayerCard player={p} onPlayerSelected={onPlayerSelected} />
+            </motion.div>
           ))}
         </div>
       )}
@@ -123,7 +131,11 @@ function PlayerCard({ player: p, onPlayerSelected }: { player: MlbPlayer; onPlay
     : null;
 
   return (
-    <div className="group bg-card border border-border rounded-xl p-4 flex flex-col gap-3 hover:border-primary/40 transition-colors">
+    <motion.div
+      whileHover={{ scale: 1.02 }}
+      transition={{ type: "spring", stiffness: 300, damping: 20 }}
+      className="group bg-card border border-border rounded-xl p-4 flex flex-col gap-3 hover:border-primary/40 transition-colors"
+    >
       <div className="flex items-center gap-3">
         <div className="w-12 h-12 rounded-full bg-secondary border border-border overflow-hidden shrink-0 flex items-center justify-center">
           {headshot ? (
@@ -162,7 +174,7 @@ function PlayerCard({ player: p, onPlayerSelected }: { player: MlbPlayer; onPlay
       >
         View Profile
       </Button>
-    </div>
+    </motion.div>
   );
 }
 
