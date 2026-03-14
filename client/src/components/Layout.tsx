@@ -90,13 +90,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
         {/* Mobile nav dropdown */}
         {mobileMenuOpen && (
-          <nav className="md:hidden border-t border-border bg-card px-4 py-3 flex flex-col gap-1">
+          <nav className="md:hidden border-t border-border bg-card px-4 py-3 flex flex-col gap-1 items-center">
             {navLinks.map(({ href, icon, label, badge }) => (
-              <Link key={href} href={href} onClick={() => setMobileMenuOpen(false)}>
+              <Link key={href} href={href} onClick={() => setMobileMenuOpen(false)} className="w-full">
                 <Button
                   variant="ghost"
                   size="sm"
-                  className={`w-full justify-start font-medium ${location === href ? 'bg-secondary/50 text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                  className={`w-full justify-center font-medium ${location === href ? 'bg-secondary/50 text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
                 >
                   {icon}
                   {label}
