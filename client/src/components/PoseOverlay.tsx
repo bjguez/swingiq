@@ -10,18 +10,20 @@ interface PoseOverlayProps {
 }
 
 const UPPER_COLOR = "#22c55e";
-const LOWER_COLOR = "#3b82f6";
-const JOINT_COLOR = "#ffffff";
-const ANGLE_LABEL_COLOR = "#fbbf24";
+const LOWER_COLOR = "#60a5fa";
+const JOINT_COLOR = "rgba(255,255,255,0.9)";
+const ANGLE_BG = "rgba(0,0,0,0.72)";
+const ANGLE_TEXT = "#fde68a";
 const MIN_VISIBILITY = 0.5;
+const LINE_WIDTH = 2;
 
-const KEY_ANGLE_JOINTS: { index: number; label: string; key: keyof PoseResult["jointAngles"] }[] = [
-  { index: 13, label: "L Elbow", key: "leftElbow" },
-  { index: 14, label: "R Elbow", key: "rightElbow" },
-  { index: 23, label: "L Hip", key: "leftHip" },
-  { index: 24, label: "R Hip", key: "rightHip" },
-  { index: 25, label: "L Knee", key: "leftKnee" },
-  { index: 26, label: "R Knee", key: "rightKnee" },
+const KEY_ANGLE_JOINTS: { index: number; key: keyof PoseResult["jointAngles"] }[] = [
+  { index: 13, key: "leftElbow" },
+  { index: 14, key: "rightElbow" },
+  { index: 23, key: "leftHip" },
+  { index: 24, key: "rightHip" },
+  { index: 25, key: "leftKnee" },
+  { index: 26, key: "rightKnee" },
 ];
 
 function computeVideoRect(containerW: number, containerH: number, videoEl?: HTMLVideoElement | null) {
@@ -99,6 +101,8 @@ export default function PoseOverlay({ poseResult, visible, videoElement, isFulls
     const { offsetX, offsetY, drawW, drawH } = computeVideoRect(width, height, videoElement);
     const toCanvas = (p: PoseLandmark) => ({ x: offsetX + p.x * drawW, y: offsetY + p.y * drawH });
 
+    // Draw skeleton connections
+    ctx.lineWidth = LINE_WIDTH;
     for (const [i, j] of SKELETON_CONNECTIONS) {
       const a = lm[i];
       const b = lm[j];
@@ -106,48 +110,57 @@ export default function PoseOverlay({ poseResult, visible, videoElement, isFulls
 
       const pa = toCanvas(a);
       const pb = toCanvas(b);
-
       const isUpper = UPPER_BODY_INDICES.has(i) && UPPER_BODY_INDICES.has(j);
-      ctx.strokeStyle = isUpper ? UPPER_COLOR : LOWER_COLOR;
-      ctx.lineWidth = 3;
-      ctx.shadowColor = isUpper ? UPPER_COLOR : LOWER_COLOR;
-      ctx.shadowBlur = 6;
+      const color = isUpper ? UPPER_COLOR : LOWER_COLOR;
+
+      ctx.strokeStyle = color;
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 5;
       ctx.beginPath();
       ctx.moveTo(pa.x, pa.y);
       ctx.lineTo(pb.x, pb.y);
       ctx.stroke();
-      ctx.shadowBlur = 0;
     }
+    ctx.shadowBlur = 0;
 
+    // Draw joints
     for (let i = 11; i < 33; i++) {
       const p = lm[i];
       if ((p.visibility ?? 0) < MIN_VISIBILITY) continue;
       const cp = toCanvas(p);
       ctx.fillStyle = JOINT_COLOR;
-      ctx.shadowColor = JOINT_COLOR;
-      ctx.shadowBlur = 4;
+      ctx.shadowColor = "rgba(255,255,255,0.6)";
+      ctx.shadowBlur = 3;
       ctx.beginPath();
-      ctx.arc(cp.x, cp.y, 4, 0, Math.PI * 2);
+      ctx.arc(cp.x, cp.y, 3, 0, Math.PI * 2);
       ctx.fill();
-      ctx.shadowBlur = 0;
     }
+    ctx.shadowBlur = 0;
 
-    ctx.font = "bold 11px Inter, sans-serif";
+    // Draw angle labels
+    ctx.font = "bold 10px 'Inter', 'SF Mono', monospace";
     ctx.textAlign = "left";
-    for (const { index, label, key } of KEY_ANGLE_JOINTS) {
+    ctx.textBaseline = "middle";
+    for (const { index, key } of KEY_ANGLE_JOINTS) {
       const p = lm[index];
       if ((p.visibility ?? 0) < MIN_VISIBILITY) continue;
       const cp = toCanvas(p);
       const angle = poseResult.jointAngles[key];
-
-      ctx.fillStyle = "rgba(0,0,0,0.6)";
       const text = `${angle}°`;
       const metrics = ctx.measureText(text);
-      const pad = 3;
-      ctx.fillRect(cp.x + 8, cp.y - 10, metrics.width + pad * 2, 16);
+      const pad = 4;
+      const bw = metrics.width + pad * 2;
+      const bh = 15;
+      const bx = cp.x + 7;
+      const by = cp.y - bh / 2;
 
-      ctx.fillStyle = ANGLE_LABEL_COLOR;
-      ctx.fillText(text, cp.x + 8 + pad, cp.y + 2);
+      ctx.fillStyle = ANGLE_BG;
+      ctx.beginPath();
+      ctx.roundRect(bx, by, bw, bh, 3);
+      ctx.fill();
+
+      ctx.fillStyle = ANGLE_TEXT;
+      ctx.fillText(text, bx + pad, cp.y);
     }
   }, [poseResult, visible, videoElement, canvasSize]);
 
