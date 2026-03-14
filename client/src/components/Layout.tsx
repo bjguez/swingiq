@@ -1,5 +1,6 @@
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Video, BarChart2, Bell, Menu, User, Upload, Library, Film, LogOut, Lock } from "lucide-react";
+import { Video, BarChart2, Bell, Menu, X, User, Upload, Library, Film, LogOut, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { VideoLibraryModal } from "@/components/VideoLibraryModal";
 import { Link, useLocation } from "wouter";
@@ -10,6 +11,14 @@ import ScoreTicker from "@/components/ScoreTicker";
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { user, logout } = useAuth();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const navLinks = [
+    { href: "/", icon: <Video className="w-4 h-4 mr-2" />, label: "Analysis" },
+    { href: "/library", icon: <Library className="w-4 h-4 mr-2" />, label: "Pro Library" },
+    { href: "/my-swings", icon: <Film className="w-4 h-4 mr-2" />, label: "My Swings" },
+    { href: "/development", icon: <BarChart2 className="w-4 h-4 mr-2" />, label: "Development", badge: <Lock className="w-3 h-3 ml-1.5 text-yellow-500" /> },
+  ];
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
@@ -23,38 +32,22 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               </div>
               Swing Studio
             </div>
-            
+
             <nav className="hidden md:flex items-center gap-1 ml-4">
-              <Link href="/">
-                <Button variant="ghost" size="sm" className={`font-medium ${location === '/' ? 'bg-secondary/50 text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
-                  <Video className="w-4 h-4 mr-2" />
-                  Analysis
-                </Button>
-              </Link>
-              <Link href="/library">
-                <Button variant="ghost" size="sm" className={`font-medium ${location === '/library' ? 'bg-secondary/50 text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
-                  <Library className="w-4 h-4 mr-2" />
-                  Pro Library
-                </Button>
-              </Link>
-              <Link href="/my-swings">
-                <Button variant="ghost" size="sm" className={`font-medium ${location === '/my-swings' ? 'bg-secondary/50 text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
-                  <Film className="w-4 h-4 mr-2" />
-                  My Swings
-                </Button>
-              </Link>
-              <Link href="/development">
-                <Button variant="ghost" size="sm" className={`font-medium relative ${location === '/development' ? 'bg-secondary/50 text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
-                  <BarChart2 className="w-4 h-4 mr-2" />
-                  Development
-                  <Lock className="w-3 h-3 ml-1.5 text-yellow-500" />
-                </Button>
-              </Link>
+              {navLinks.map(({ href, icon, label, badge }) => (
+                <Link key={href} href={href}>
+                  <Button variant="ghost" size="sm" className={`font-medium ${location === href ? 'bg-secondary/50 text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
+                    {icon}
+                    {label}
+                    {badge}
+                  </Button>
+                </Link>
+              ))}
             </nav>
           </div>
 
           <div className="flex items-center gap-3">
-<VideoLibraryModal
+            <VideoLibraryModal
               mode="user"
               trigger={
                 <Button size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold hidden sm:flex">
@@ -66,8 +59,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <Button variant="ghost" size="icon" className="text-muted-foreground">
               <Bell className="w-5 h-5" />
             </Button>
-            <Button variant="ghost" size="icon" className="md:hidden">
-              <Menu className="w-5 h-5" />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="md:hidden"
+              onClick={() => setMobileMenuOpen(o => !o)}
+            >
+              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -89,6 +87,37 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </DropdownMenu>
           </div>
         </div>
+
+        {/* Mobile nav dropdown */}
+        {mobileMenuOpen && (
+          <nav className="md:hidden border-t border-border bg-card px-4 py-3 flex flex-col gap-1">
+            {navLinks.map(({ href, icon, label, badge }) => (
+              <Link key={href} href={href} onClick={() => setMobileMenuOpen(false)}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className={`w-full justify-start font-medium ${location === href ? 'bg-secondary/50 text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                >
+                  {icon}
+                  {label}
+                  {badge}
+                </Button>
+              </Link>
+            ))}
+            <div className="pt-2 border-t border-border mt-1">
+              <VideoLibraryModal
+                mode="user"
+                trigger={
+                  <Button size="sm" className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-bold">
+                    <Upload className="w-4 h-4 mr-2" />
+                    Upload Swing
+                  </Button>
+                }
+              />
+            </div>
+          </nav>
+        )}
+
         <ScoreTicker />
       </header>
 

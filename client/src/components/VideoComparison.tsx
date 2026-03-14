@@ -87,18 +87,33 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel, ex
 
   useEffect(() => {
     const handleChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
+      setIsFullscreen(!!(document.fullscreenElement || (document as any).webkitFullscreenElement));
     };
     document.addEventListener("fullscreenchange", handleChange);
-    return () => document.removeEventListener("fullscreenchange", handleChange);
+    document.addEventListener("webkitfullscreenchange", handleChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", handleChange);
+      document.removeEventListener("webkitfullscreenchange", handleChange);
+    };
   }, []);
 
   const toggleFullscreen = useCallback(() => {
     if (!containerRef.current) return;
-    if (document.fullscreenElement) {
-      document.exitFullscreen();
+    const el = containerRef.current as any;
+    const isFs = !!(document.fullscreenElement || (document as any).webkitFullscreenElement);
+
+    if (!el.requestFullscreen && !el.webkitRequestFullscreen) {
+      // iOS Safari: no arbitrary element fullscreen — use CSS overlay instead
+      setIsFullscreen(prev => !prev);
+      return;
+    }
+
+    if (isFs) {
+      if (document.exitFullscreen) document.exitFullscreen();
+      else if ((document as any).webkitExitFullscreen) (document as any).webkitExitFullscreen();
     } else {
-      containerRef.current.requestFullscreen();
+      if (el.requestFullscreen) el.requestFullscreen();
+      else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
     }
   }, []);
 
@@ -605,13 +620,13 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel, ex
           </div>
         </div>
 
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="icon" className="h-10 w-10 text-muted-foreground hover:text-foreground" onClick={stepBackward} data-testid="button-step-back">
               <SkipBack className="w-5 h-5" />
             </Button>
-            <Button 
-              size="icon" 
+            <Button
+              size="icon"
               className="h-12 w-12 rounded-full bg-primary text-primary-foreground hover:bg-primary/90"
               onClick={togglePlay}
               data-testid="button-play"
@@ -622,15 +637,15 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel, ex
               <SkipForward className="w-5 h-5" />
             </Button>
           </div>
-          
+
           <div className="flex items-center gap-1.5">
             {/* Speed controls */}
-            <div className="flex items-center gap-1 bg-secondary/50 border border-border rounded-md p-1">
+            <div className="flex items-center gap-0.5 bg-secondary/50 border border-border rounded-md p-1">
               {SPEEDS.map(s => (
                 <button
                   key={s}
                   onClick={() => applyRate(s)}
-                  className={`px-2 py-0.5 rounded text-xs font-mono font-semibold transition-colors ${
+                  className={`px-1.5 py-0.5 rounded text-xs font-mono font-semibold transition-colors ${
                     playbackRate === s
                       ? "bg-primary text-primary-foreground"
                       : "text-muted-foreground hover:text-foreground hover:bg-secondary"

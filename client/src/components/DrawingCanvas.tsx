@@ -47,7 +47,7 @@ export default function DrawingCanvas({ tool, color, annotations, onAnnotationsC
     setIsDrawing(false);
   }, [tool]);
 
-  const getPos = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+  const getPos = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
     const rect = canvas.getBoundingClientRect();
@@ -211,7 +211,7 @@ export default function DrawingCanvas({ tool, color, annotations, onAnnotationsC
 
   const isInteractive = tool !== "select";
 
-  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const handleMouseDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!isInteractive) return;
     const pos = getPos(e);
 
@@ -259,7 +259,7 @@ export default function DrawingCanvas({ tool, color, annotations, onAnnotationsC
     }
   };
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const handleMouseMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!isDrawing || !currentAction) return;
     const pos = getPos(e);
 
@@ -291,10 +291,10 @@ export default function DrawingCanvas({ tool, color, annotations, onAnnotationsC
         height={canvasSize.height}
         className="w-full h-full"
         style={{ cursor: isInteractive ? "crosshair" : "default" }}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
+        onPointerDown={handleMouseDown}
+        onPointerMove={handleMouseMove}
+        onPointerUp={handleMouseUp}
+        onPointerLeave={handleMouseUp}
       />
     </div>
   );
