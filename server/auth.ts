@@ -87,7 +87,7 @@ export function setupAuth(app: Express) {
       if (existing) return res.status(400).json({ message: "Username already taken" });
 
       const user = await storage.createUser({
-        username: parsed.data.username,
+        username: parsed.data.username.toLowerCase(),
         password: await hashPassword(parsed.data.password),
       });
 
