@@ -290,7 +290,7 @@ export default function DrawingCanvas({ tool, color, annotations, onAnnotationsC
         width={canvasSize.width}
         height={canvasSize.height}
         className="w-full h-full"
-        style={{ cursor: isInteractive ? "crosshair" : "default" }}
+        style={{ cursor: isInteractive ? "crosshair" : "default", touchAction: isInteractive ? "none" : "auto" }}
         onPointerDown={handleMouseDown}
         onPointerMove={handleMouseMove}
         onPointerUp={handleMouseUp}
