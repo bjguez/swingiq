@@ -2,10 +2,22 @@ import { useState, useRef, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, Upload, PlayCircle, Loader2, User, AlertCircle } from "lucide-react";
+import { Search, Upload, PlayCircle, Loader2, AlertCircle, Lock } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchVideos, fetchPlayers, fetchVideoPresignedUrl } from "@/lib/api";
 import type { Video, MlbPlayer } from "@shared/schema";
+import { useAuth } from "@/hooks/use-auth";
+import { AuthGateModal } from "@/components/AuthGateModal";
+
+const UPLOAD_COUNT_KEY = "swingiq_upload_count";
+const FREE_UPLOAD_LIMIT = 5;
+
+function getUploadCount(): number {
+  return parseInt(localStorage.getItem(UPLOAD_COUNT_KEY) ?? "0", 10);
+}
+function incrementUploadCount() {
+  localStorage.setItem(UPLOAD_COUNT_KEY, String(getUploadCount() + 1));
+}
 
 interface VideoLibraryModalProps {
   trigger: React.ReactNode;
@@ -14,10 +26,15 @@ interface VideoLibraryModalProps {
   onCompSelected?: (url: string, label?: string) => void;
 }
 
-type UploadState = "idle" | "uploading" | "error";
+type UploadState = "idle" | "uploading" | "error" | "limit_reached";
 
-export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected, onCompSelected }: VideoLibraryModalProps) {
+export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected }: VideoLibraryModalProps) {
+  const { user } = useAuth();
+  const isPaid = user?.subscriptionTier === "paid";
+
   const [isOpen, setIsOpen] = useState(false);
+  const [authGateOpen, setAuthGateOpen] = useState(false);
+  const [pendingProVideo, setPendingProVideo] = useState<Video | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [handFilter, setHandFilter] = useState<"all" | "L" | "R">("all");
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -49,6 +66,14 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected, onCo
     }
     return true;
   });
+
+  const handleUploadClick = () => {
+    if (!isPaid && getUploadCount() >= FREE_UPLOAD_LIMIT) {
+      setUploadState("limit_reached");
+      return;
+    }
+    fileInputRef.current?.click();
+  };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -83,6 +108,7 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected, onCo
       });
 
       const url = response.presignedUrl ?? response.sourceUrl;
+      incrementUploadCount();
       queryClient.invalidateQueries({ queryKey: ["/api/videos"] });
       onVideoSelected?.(url, "My Swing");
       setIsOpen(false);
@@ -99,7 +125,7 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected, onCo
     setIsOpen(false);
   };
 
-  const handleSelectProVideo = async (video: Video) => {
+  const doImportProVideo = async (video: Video) => {
     if (!video.sourceUrl || !onVideoSelected) { setIsOpen(false); return; }
     try {
       const url = await fetchVideoPresignedUrl(video.id);
@@ -108,6 +134,15 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected, onCo
       onVideoSelected(video.sourceUrl, video.playerName || video.title);
     }
     setIsOpen(false);
+  };
+
+  const handleSelectProVideo = (video: Video) => {
+    if (!user) {
+      setPendingProVideo(video);
+      setAuthGateOpen(true);
+    } else {
+      doImportProVideo(video);
+    }
   };
 
   useEffect(() => {
@@ -123,6 +158,7 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected, onCo
   }, [isOpen]);
 
   return (
+    <>
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogContent className="max-w-2xl bg-card border-border text-foreground">
@@ -220,6 +256,16 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected, onCo
           {/* ── USER MODE ── */}
           {mode === "user" && (
             <>
+              {/* Limit reached */}
+              {uploadState === "limit_reached" && (
+                <div className="border border-yellow-500/30 rounded-xl p-10 flex flex-col items-center justify-center text-center bg-yellow-500/5">
+                  <Lock className="w-12 h-12 text-yellow-500 mb-4" />
+                  <h3 className="font-display font-bold text-xl mb-2">Free Limit Reached</h3>
+                  <p className="text-muted-foreground text-sm mb-4">You've used all {FREE_UPLOAD_LIMIT} free swing uploads. Upgrade to continue uploading and unlock all features.</p>
+                  <Button onClick={() => setUploadState("idle")}>Go Back</Button>
+                </div>
+              )}
+
               {/* Step 1: Upload */}
               {uploadState === "idle" && (
                 <div className="flex flex-col gap-4">
@@ -232,7 +278,7 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected, onCo
                     data-testid="input-file-upload"
                   />
                   <div
-                    onClick={() => fileInputRef.current?.click()}
+                    onClick={handleUploadClick}
                     className="border-2 border-dashed border-border rounded-xl p-10 flex flex-col items-center justify-center text-center bg-secondary/10 hover:bg-secondary/20 transition-colors cursor-pointer"
                     data-testid="dropzone-upload"
                     onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
@@ -255,7 +301,7 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected, onCo
                     <p className="text-muted-foreground text-sm max-w-xs mb-4">
                       Drag and drop or click to select a video file.
                     </p>
-                    <Button onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}>
+                    <Button onClick={(e) => { e.stopPropagation(); handleUploadClick(); }}>
                       Select File
                     </Button>
                     <p className="text-xs text-muted-foreground mt-3">MP4, MOV, WebM up to 500MB</p>
@@ -321,5 +367,13 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected, onCo
         </div>
       </DialogContent>
     </Dialog>
+
+    <AuthGateModal
+      open={authGateOpen}
+      onOpenChange={setAuthGateOpen}
+      reason="Sign in to compare your swing against a pro."
+      onSuccess={() => { if (pendingProVideo) doImportProVideo(pendingProVideo); setPendingProVideo(null); }}
+    />
+    </>
   );
 }

@@ -12,12 +12,12 @@ import Admin from "@/pages/Admin";
 import AuthPage from "@/pages/AuthPage";
 import { useAuth } from "@/hooks/use-auth";
 
-function ProtectedRoute({ component: Component, adminOnly = false }: { component: React.ComponentType; adminOnly?: boolean }) {
+function AdminRoute() {
   const { user, isLoading } = useAuth();
   if (isLoading) return null;
   if (!user) return <Redirect to="/auth" />;
-  if (adminOnly && !user.isAdmin) return <Redirect to="/" />;
-  return <Component />;
+  if (!user.isAdmin) return <Redirect to="/" />;
+  return <Admin />;
 }
 
 function Router() {
@@ -28,21 +28,11 @@ function Router() {
       <Route path="/auth">
         {!isLoading && user ? <Redirect to="/" /> : <AuthPage />}
       </Route>
-      <Route path="/">
-        <ProtectedRoute component={Home} />
-      </Route>
-      <Route path="/development">
-        <ProtectedRoute component={Development} />
-      </Route>
-      <Route path="/library">
-        <ProtectedRoute component={Library} />
-      </Route>
-      <Route path="/my-swings">
-        <ProtectedRoute component={MySwings} />
-      </Route>
-      <Route path="/admin">
-        <ProtectedRoute component={Admin} adminOnly />
-      </Route>
+      <Route path="/" component={Home} />
+      <Route path="/development" component={Development} />
+      <Route path="/library" component={Library} />
+      <Route path="/my-swings" component={MySwings} />
+      <Route path="/admin" component={AdminRoute} />
       <Route component={NotFound} />
     </Switch>
   );

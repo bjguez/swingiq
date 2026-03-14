@@ -1,15 +1,20 @@
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
-import { PlayCircle, Target, ArrowRight, CheckCircle2, Dumbbell, Loader2 } from "lucide-react";
+import { PlayCircle, Target, CheckCircle2, Dumbbell, Loader2, Lock } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchDrills, fetchVideos } from "@/lib/api";
 import { useState } from "react";
 import type { Drill, Video } from "@shared/schema";
+import { useAuth } from "@/hooks/use-auth";
+import { AuthGateModal } from "@/components/AuthGateModal";
 
 const corePhases = ["Gather > Touchdown", "Touchdown > Finish"];
 const detailPhases = ["Hand Path", "Head Position", "Scissor Kick", "Thrust"];
 
 export default function Development() {
+  const { user } = useAuth();
+  const isPaid = user?.subscriptionTier === "paid";
+  const [authGateOpen, setAuthGateOpen] = useState(false);
   const [focusPhase, setFocusPhase] = useState("Gather > Touchdown");
   
   const { data: allDrills = [], isLoading: drillsLoading } = useQuery({
@@ -24,6 +29,36 @@ export default function Development() {
 
   const phaseDrills = allDrills.filter((d: Drill) => d.phase === focusPhase);
   const phaseVideos = allVideos.filter((v: Video) => v.category === focusPhase);
+
+  if (!isPaid) {
+    return (
+      <Layout>
+        <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6 text-center px-4">
+          <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+            <Lock className="w-8 h-8 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold font-display uppercase mb-2">Development Blueprint</h1>
+            <p className="text-muted-foreground max-w-md">
+              Phase-by-phase drill plans and pro model breakdowns are part of the paid tier.
+              Upgrade to unlock structured development programs.
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Button size="lg" onClick={() => setAuthGateOpen(true)}>
+              Upgrade to Unlock
+            </Button>
+            {!user && (
+              <Button size="lg" variant="outline" onClick={() => setAuthGateOpen(true)}>
+                Sign In
+              </Button>
+            )}
+          </div>
+        </div>
+        <AuthGateModal open={authGateOpen} onOpenChange={setAuthGateOpen} reason="Create an account and upgrade to access the Development Blueprint." />
+      </Layout>
+    );
+  }
 
   return (
     <Layout>

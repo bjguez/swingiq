@@ -7,6 +7,16 @@ export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
+  // Profile
+  age: integer("age"),
+  city: text("city"),
+  state: text("state"),
+  skillLevel: text("skill_level"), // 'little_league' | 'select' | 'high_school' | 'college' | 'pro'
+  bats: text("bats"), // 'L' | 'R'
+  throws: text("throws"), // 'L' | 'R'
+  profileComplete: boolean("profile_complete").default(false).notNull(),
+  // Subscription
+  subscriptionTier: text("subscription_tier").default("free").notNull(),
 });
 
 export const mlbPlayers = pgTable("mlb_players", {

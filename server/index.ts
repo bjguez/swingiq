@@ -76,6 +76,30 @@ app.use((req, res, next) => {
   await pool.query(`
     ALTER TABLE videos ADD COLUMN IF NOT EXISTS user_id VARCHAR
   `);
+  await pool.query(`
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS age INTEGER
+  `);
+  await pool.query(`
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS city TEXT
+  `);
+  await pool.query(`
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS state TEXT
+  `);
+  await pool.query(`
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS skill_level TEXT
+  `);
+  await pool.query(`
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS bats TEXT
+  `);
+  await pool.query(`
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS throws TEXT
+  `);
+  await pool.query(`
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_complete BOOLEAN NOT NULL DEFAULT false
+  `);
+  await pool.query(`
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_tier TEXT NOT NULL DEFAULT 'free'
+  `);
 
   await registerRoutes(httpServer, app);
 

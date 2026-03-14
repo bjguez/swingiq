@@ -1,6 +1,18 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
-export type AuthUser = { id: string; username: string; isAdmin: boolean };
+export type AuthUser = {
+  id: string;
+  username: string;
+  isAdmin: boolean;
+  age?: number | null;
+  city?: string | null;
+  state?: string | null;
+  skillLevel?: string | null;
+  bats?: string | null;
+  throws?: string | null;
+  profileComplete?: boolean;
+  subscriptionTier?: string;
+};
 
 async function fetchCurrentUser(): Promise<AuthUser | null> {
   const res = await fetch("/api/auth/me");
@@ -55,6 +67,31 @@ export function useAuth() {
     },
   });
 
+  const updateProfileMutation = useMutation({
+    mutationFn: async (profile: {
+      age?: number;
+      city?: string;
+      state?: string;
+      skillLevel?: string;
+      bats?: string;
+      throws?: string;
+    }) => {
+      const res = await fetch("/api/auth/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(profile),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Profile update failed");
+      }
+      return res.json() as Promise<AuthUser>;
+    },
+    onSuccess: (user) => {
+      queryClient.setQueryData(["/api/auth/me"], user);
+    },
+  });
+
   const logoutMutation = useMutation({
     mutationFn: async () => {
       await fetch("/api/auth/logout", { method: "POST" });
@@ -69,10 +106,13 @@ export function useAuth() {
     isLoading,
     login: loginMutation.mutateAsync,
     register: registerMutation.mutateAsync,
+    updateProfile: updateProfileMutation.mutateAsync,
     logout: logoutMutation.mutate,
     loginError: loginMutation.error,
     registerError: registerMutation.error,
+    updateProfileError: updateProfileMutation.error,
     isLoggingIn: loginMutation.isPending,
     isRegistering: registerMutation.isPending,
+    isUpdatingProfile: updateProfileMutation.isPending,
   };
 }

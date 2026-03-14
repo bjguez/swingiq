@@ -27,9 +27,11 @@ async function comparePasswords(supplied: string, stored: string): Promise<boole
 
 declare global {
   namespace Express {
-    interface User extends import("@shared/schema").User {}
+    // eslint-disable-next-line @typescript-eslint/no-empty-interface
+    interface User extends SchemaUser {}
   }
 }
+type SchemaUser = import("@shared/schema").User;
 
 export function setupAuth(app: Express) {
   const PgSession = connectPgSimple(session);
@@ -123,6 +125,38 @@ export function setupAuth(app: Express) {
     const user = req.user as User;
     const adminUsername = process.env.ADMIN_USERNAME;
     const isAdmin = adminUsername ? user.username === adminUsername : false;
-    res.json({ id: user.id, username: user.username, isAdmin });
+    res.json({
+      id: user.id, username: user.username, isAdmin,
+      age: user.age, city: user.city, state: user.state,
+      skillLevel: user.skillLevel, bats: user.bats, throws: user.throws,
+      profileComplete: user.profileComplete,
+      subscriptionTier: user.subscriptionTier ?? "free",
+    });
+  });
+
+  app.put("/api/auth/profile", async (req, res, next) => {
+    if (!req.user) return res.status(401).json({ message: "Not authenticated" });
+    try {
+      const { age, city, state, skillLevel, bats, throws: throwHand } = req.body;
+      const updated = await storage.updateUser((req.user as User).id, {
+        age: age ? Number(age) : null,
+        city: city || null,
+        state: state || null,
+        skillLevel: skillLevel || null,
+        bats: bats || null,
+        throws: throwHand || null,
+        profileComplete: true,
+      });
+      if (!updated) return res.status(404).json({ message: "User not found" });
+      const adminUsername = process.env.ADMIN_USERNAME;
+      const isAdmin = adminUsername ? updated.username === adminUsername : false;
+      res.json({
+        id: updated.id, username: updated.username, isAdmin,
+        age: updated.age, city: updated.city, state: updated.state,
+        skillLevel: updated.skillLevel, bats: updated.bats, throws: updated.throws,
+        profileComplete: updated.profileComplete,
+        subscriptionTier: updated.subscriptionTier ?? "free",
+      });
+    } catch (err) { next(err); }
   });
 }
