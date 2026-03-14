@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, Upload, PlayCircle, Loader2, ScanFace, CheckCircle2, User, AlertCircle, ChevronRight, Film, ArrowLeft } from "lucide-react";
+import { Search, Upload, PlayCircle, Loader2, User, AlertCircle } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchVideos, fetchPlayers, fetchVideoPresignedUrl } from "@/lib/api";
 import type { Video, MlbPlayer } from "@shared/schema";
@@ -14,30 +14,41 @@ interface VideoLibraryModalProps {
   onCompSelected?: (url: string, label?: string) => void;
 }
 
-type UploadState = "idle" | "uploading" | "comp_prompt" | "analyzing" | "results" | "error";
+type UploadState = "idle" | "uploading" | "error";
 
 export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected, onCompSelected }: VideoLibraryModalProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [handFilter, setHandFilter] = useState<"all" | "L" | "R">("all");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
 
   const [uploadState, setUploadState] = useState<UploadState>("idle");
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [uploadedVideoUrl, setUploadedVideoUrl] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
   const { data: allVideos = [] } = useQuery({ queryKey: ["/api/videos"], queryFn: () => fetchVideos() });
   const { data: players = [] } = useQuery({ queryKey: ["/api/players"], queryFn: fetchPlayers });
 
   const userVideos = (allVideos as Video[]).filter(v => !v.isProVideo && v.sourceUrl);
-  const filteredVideos = (allVideos as Video[]).filter((v: Video) => {
-    if (!searchQuery) return true;
-    const q = searchQuery.toLowerCase();
-    return v.title.toLowerCase().includes(q) || (v.playerName?.toLowerCase().includes(q) ?? false);
-  });
 
-  const compPlayers = (players as MlbPlayer[]).slice(0, 3);
+  // Build a name→bats lookup for filtering by handedness
+  const playerBatsMap = new Map<string, string>(
+    (players as MlbPlayer[]).map(p => [p.name.toLowerCase(), p.bats ?? ""])
+  );
+
+  const filteredVideos = (allVideos as Video[]).filter((v: Video) => {
+    if (!v.isProVideo || !v.sourceUrl) return false;
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      if (!v.title.toLowerCase().includes(q) && !(v.playerName?.toLowerCase().includes(q) ?? false)) return false;
+    }
+    if (handFilter !== "all" && v.playerName) {
+      const bats = playerBatsMap.get(v.playerName.toLowerCase());
+      if (bats !== handFilter) return false;
+    }
+    return true;
+  });
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -71,9 +82,10 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected, onCo
         xhr.send(formData);
       });
 
-      setUploadedVideoUrl(response.presignedUrl ?? response.sourceUrl);
+      const url = response.presignedUrl ?? response.sourceUrl;
       queryClient.invalidateQueries({ queryKey: ["/api/videos"] });
-      setUploadState("comp_prompt");
+      onVideoSelected?.(url, "My Swing");
+      setIsOpen(false);
     } catch (err: any) {
       setUploadError(err.message || "Upload failed. Please try again.");
       setUploadState("error");
@@ -82,25 +94,8 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected, onCo
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const handleSkip = () => {
-    if (uploadedVideoUrl) onVideoSelected?.(uploadedVideoUrl, "My Swing");
-    setIsOpen(false);
-  };
-
   const handleSelectExistingVideo = (video: Video) => {
     if (video.sourceUrl) onVideoSelected?.(video.sourceUrl, video.title);
-    setIsOpen(false);
-  };
-
-  const handleSelectCompVideo = async (video: Video, playerName: string) => {
-    if (uploadedVideoUrl) onVideoSelected?.(uploadedVideoUrl, "My Swing");
-    if (!video.sourceUrl) { setIsOpen(false); return; }
-    try {
-      const url = await fetchVideoPresignedUrl(video.id);
-      onCompSelected?.(url, playerName);
-    } catch {
-      onCompSelected?.(video.sourceUrl, playerName);
-    }
     setIsOpen(false);
   };
 
@@ -120,7 +115,6 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected, onCo
       const t = setTimeout(() => {
         setUploadState("idle");
         setUploadProgress(0);
-        setUploadedVideoUrl(null);
         setUploadError(null);
         setSearchQuery("");
       }, 300);
@@ -128,38 +122,50 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected, onCo
     }
   }, [isOpen]);
 
-  const getTitle = () => {
-    if (mode === "pro") return "Pro Library";
-    switch (uploadState) {
-      case "comp_prompt": return "Step 2: Find Your Comp";
-      case "analyzing": return "Analyzing Mechanics";
-      case "results": return "Your MLB Comps";
-      default: return "Upload Your Swing";
-    }
-  };
-
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogContent className="max-w-2xl bg-card border-border text-foreground">
         <DialogHeader>
-          <DialogTitle className="font-display text-2xl uppercase tracking-wider">{getTitle()}</DialogTitle>
-          <DialogDescription className="sr-only">{mode === "pro" ? "Browse the pro video library" : "Upload your swing video"}</DialogDescription>
+          <DialogTitle className="font-display text-2xl uppercase tracking-wider">
+            {mode === "pro" ? "Pro Library" : "Upload Your Swing"}
+          </DialogTitle>
+          <DialogDescription className="sr-only">
+            {mode === "pro" ? "Browse the pro video library" : "Upload your swing video"}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="mt-2">
           {/* ── PRO MODE: Library Browser ── */}
           {mode === "pro" && (
-            <div className="space-y-4">
-              <div className="relative">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  placeholder="Search player name or video title..."
-                  className="pl-9 bg-background border-border"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  data-testid="input-search-library"
-                />
+            <div className="space-y-3">
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    placeholder="Search player name or video title..."
+                    className="pl-9 bg-background border-border"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    data-testid="input-search-library"
+                  />
+                </div>
+                <div className="flex items-center gap-0.5 bg-secondary/50 border border-border rounded-md p-1 shrink-0">
+                  {(["all", "L", "R"] as const).map(h => (
+                    <button
+                      key={h}
+                      onClick={() => setHandFilter(h)}
+                      className={`px-2.5 py-1 rounded text-xs font-semibold transition-colors ${
+                        handFilter === h
+                          ? "bg-primary text-primary-foreground"
+                          : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+                      }`}
+                      title={h === "all" ? "All hitters" : h === "L" ? "Left-handed" : "Right-handed"}
+                    >
+                      {h === "all" ? "All" : `Bats ${h}`}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div className="border border-border rounded-md overflow-hidden">
                 <div className="bg-secondary/50 p-2 text-xs font-semibold text-muted-foreground grid grid-cols-12 gap-2 uppercase tracking-wider">
@@ -178,7 +184,14 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected, onCo
                         </div>
                         <div className="min-w-0">
                           <div className="truncate">{video.title}</div>
-                          <div className="text-xs text-muted-foreground">{video.playerName}</div>
+                          <div className="text-xs text-muted-foreground flex items-center gap-1.5">
+                            {video.playerName}
+                            {video.playerName && playerBatsMap.get(video.playerName.toLowerCase()) && (
+                              <span className="px-1 py-0.5 rounded text-[10px] bg-secondary/70 text-muted-foreground font-mono">
+                                {playerBatsMap.get(video.playerName.toLowerCase())}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                       <div className="col-span-2 text-muted-foreground text-xs">{video.category}</div>
@@ -240,7 +253,7 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected, onCo
                     </div>
                     <h3 className="font-display font-bold text-xl mb-1">Upload New Swing</h3>
                     <p className="text-muted-foreground text-sm max-w-xs mb-4">
-                      Drag and drop or click to select. Our AI will find your MLB comp after upload.
+                      Drag and drop or click to select a video file.
                     </p>
                     <Button onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}>
                       Select File
@@ -303,166 +316,10 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected, onCo
                   <Button onClick={() => { setUploadState("idle"); setUploadError(null); }}>Try Again</Button>
                 </div>
               )}
-
-              {/* Step 2: Comp Prompt */}
-              {uploadState === "comp_prompt" && (
-                <div className="flex flex-col gap-5 animate-in fade-in duration-300">
-                  <div className="flex items-center gap-2 text-green-500 bg-green-500/10 p-3 rounded-lg border border-green-500/20">
-                    <CheckCircle2 className="w-5 h-5 shrink-0" />
-                    <span className="font-medium text-sm">Video uploaded successfully.</span>
-                  </div>
-                  <div className="text-center py-4">
-                    <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-4 text-primary">
-                      <ScanFace className="w-8 h-8" />
-                    </div>
-                    <h3 className="font-display font-bold text-xl mb-2">Find Your MLB Comp?</h3>
-                    <p className="text-muted-foreground text-sm max-w-sm mx-auto">
-                      We'll analyze your swing mechanics and match you to the most similar MLB hitters based on biometrics and kinematic patterns.
-                    </p>
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <Button
-                      className="w-full h-12 text-base"
-                      onClick={() => {
-                        setUploadState("analyzing");
-                        setTimeout(() => setUploadState("results"), 2500);
-                      }}
-                      data-testid="button-find-comp"
-                    >
-                      <ScanFace className="w-5 h-5 mr-2" />
-                      Analyze My Mechanics
-                    </Button>
-                    <Button variant="outline" className="w-full" onClick={handleSkip} data-testid="button-skip-comp">
-                      Skip — Go to Analysis
-                      <ChevronRight className="w-4 h-4 ml-1" />
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              {/* Step 3: Analyzing */}
-              {uploadState === "analyzing" && (
-                <div className="border border-border rounded-xl p-14 flex flex-col items-center justify-center text-center bg-secondary/10 animate-in fade-in duration-300">
-                  <ScanFace className="w-14 h-14 text-primary animate-pulse mb-4" />
-                  <h3 className="font-display font-bold text-xl mb-2">Analyzing Biometrics</h3>
-                  <p className="text-muted-foreground text-sm">Measuring limb ratios, posture, and kinetic sequences...</p>
-                  <div className="flex gap-1 mt-6">
-                    {["Hip rotation", "Bat path", "Shoulder tilt", "Stride length"].map((label, i) => (
-                      <span
-                        key={label}
-                        className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 animate-pulse"
-                        style={{ animationDelay: `${i * 200}ms` }}
-                      >
-                        {label}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Step 4: Results */}
-              {uploadState === "results" && (
-                <div className="flex flex-col gap-4 animate-in fade-in zoom-in duration-300">
-                  <div className="flex items-center gap-2 text-green-500 bg-green-500/10 p-3 rounded-lg border border-green-500/20">
-                    <CheckCircle2 className="w-4 h-4 shrink-0" />
-                    <span className="font-medium text-sm">Analysis complete. Here are your top MLB comps.</span>
-                  </div>
-
-                  <div className="flex flex-col gap-3 max-h-95 overflow-y-auto pr-1">
-                    {compPlayers.map((player: MlbPlayer, i: number) => {
-                      const playerVideos = (allVideos as Video[]).filter(
-                        v => v.isProVideo && v.playerName?.toLowerCase() === player.name.toLowerCase()
-                      );
-                      return (
-                        <CompResultCard
-                          key={player.id}
-                          player={player}
-                          matchPct={94 - i * 6}
-                          isTopMatch={i === 0}
-                          videos={playerVideos}
-                          onSelectVideo={(video) => handleSelectCompVideo(video, player.name)}
-                        />
-                      );
-                    })}
-                  </div>
-
-                  <div className="flex gap-2 pt-1 border-t border-border">
-                    <Button
-                      variant="outline"
-                      className="flex-1"
-                      onClick={() => { setUploadState("idle"); setUploadedVideoUrl(null); }}
-                    >
-                      <ArrowLeft className="w-4 h-4 mr-1" />
-                      Upload Different Video
-                    </Button>
-                    <Button variant="ghost" className="flex-1 text-muted-foreground" onClick={handleSkip}>
-                      Skip for Now
-                    </Button>
-                  </div>
-                </div>
-              )}
             </>
           )}
         </div>
       </DialogContent>
     </Dialog>
-  );
-}
-
-function CompResultCard({
-  player, matchPct, isTopMatch, videos, onSelectVideo,
-}: {
-  player: MlbPlayer;
-  matchPct: number;
-  isTopMatch: boolean;
-  videos: Video[];
-  onSelectVideo: (video: Video) => void;
-}) {
-  return (
-    <div className={`rounded-xl border p-4 ${isTopMatch ? "bg-primary/5 border-primary/40" : "bg-card border-border"}`}>
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-3">
-          {isTopMatch && (
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary text-primary-foreground uppercase tracking-wider">
-              Best Match
-            </span>
-          )}
-          <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-full bg-secondary border border-border flex items-center justify-center shrink-0">
-              <User className="w-4 h-4 text-muted-foreground" />
-            </div>
-            <div>
-              <div className="font-display font-bold leading-none">{player.name}</div>
-              <div className="text-xs text-muted-foreground mt-0.5">
-                {player.height}, {player.weight}lbs · {player.bats === "R" ? "R" : "L"}-handed · {player.team}
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className="text-primary font-mono font-bold text-lg">{matchPct}%</div>
-      </div>
-
-      {videos.length > 0 ? (
-        <div className="flex flex-col gap-1.5">
-          {videos.map((v) => (
-            <button
-              key={v.id}
-              onClick={() => onSelectVideo(v)}
-              className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-secondary/40 border border-border hover:border-primary/50 hover:bg-primary/5 transition-colors text-sm group"
-            >
-              <div className="flex items-center gap-2 min-w-0">
-                <Film className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                <span className="truncate">{v.title}</span>
-              </div>
-              <span className="text-xs text-primary font-semibold shrink-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
-                Load <ChevronRight className="w-3 h-3" />
-              </span>
-            </button>
-          ))}
-        </div>
-      ) : (
-        <p className="text-xs text-muted-foreground italic px-1">No videos in library for this player yet.</p>
-      )}
-    </div>
   );
 }
