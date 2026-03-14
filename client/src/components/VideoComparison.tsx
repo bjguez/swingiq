@@ -25,8 +25,8 @@ interface VideoComparisonProps {
 export default function VideoComparison({ externalLeftSrc, externalLeftLabel, externalRightSrc, externalRightLabel, onRightVideoSelected }: VideoComparisonProps = {}) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState([0]);
-  const [synced, setSynced] = useState(true);
-  const [activePanel, setActivePanel] = useState<"left" | "right" | null>(null);
+  const [synced, setSynced] = useState(false);
+  const [activePanel, setActivePanel] = useState<"left" | "right" | null>("left");
   const [leftDuration, setLeftDuration] = useState(1);
   const [rightDuration, setRightDuration] = useState(1);
   const [currentTime, setCurrentTime] = useState(0);
