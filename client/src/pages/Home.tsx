@@ -158,6 +158,7 @@ export default function Home() {
       <DataDashboard
         player={selectedPlayer}
         onSelectVideo={handleSelectUserVideo}
+        onSelectProVideo={handleSelectProVideo}
         onPlayerSelected={handlePlayerSelected}
       />
     </Layout>
