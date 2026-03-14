@@ -75,7 +75,6 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel, ex
   const [timerEnd, setTimerEnd] = useState<number | null>(null);
 
   const [poseEnabled, setPoseEnabled] = useState(false);
-  const [posePanel, setPosePanel] = useState<"left" | "right">("left");
   const [poseResult, setPoseResult] = useState<PoseResult | null>(null);
   const [poseLoading, setPoseLoading] = useState(false);
   const poseRafRef = useRef<number>(0);
@@ -264,8 +263,8 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel, ex
     setTimerEnd(null);
   }, []);
 
-  const activePoseVideoSrc = posePanel === "right" ? rightVideoSrc : leftVideoSrc;
-  const activePoseRef = posePanel === "right" ? rightVideoRef : leftVideoRef;
+  const activePoseVideoSrc = activePanel === "right" ? rightVideoSrc : leftVideoSrc;
+  const activePoseRef = activePanel === "right" ? rightVideoRef : leftVideoRef;
 
   const runPoseDetection = useCallback(async (force = false) => {
     if (!poseEnabled || !activePoseVideoSrc) return;
@@ -390,7 +389,7 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel, ex
             }
           />
 
-          {posePanel === "left" && (
+          {activePanel !== "right" && (
             <PoseOverlay poseResult={poseResult} visible={poseEnabled} videoElement={leftVideoRef.current?.getVideoElement()} isFullscreen={isFullscreen} />
           )}
 
@@ -402,8 +401,8 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel, ex
             onTimerClick={handleTimerClick}
           />
 
-          {posePanel === "left" && poseEnabled && poseResult && (
-            <div data-testid="pose-hud" className="absolute bottom-2 left-2 z-30 bg-black/80 border border-border rounded-lg p-2 text-xs font-mono space-y-1 pointer-events-none">
+          {activePanel !== "right" && poseEnabled && poseResult && (
+            <div data-testid="pose-hud" className="hidden sm:block absolute bottom-2 left-2 z-30 bg-black/80 border border-border rounded-lg p-2 text-xs font-mono space-y-1 pointer-events-none">
               <div className="flex items-center gap-2 mb-1">
                 <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${
                   poseResult.phase === "Unknown" ? "bg-muted text-muted-foreground" : "bg-primary/30 text-primary"
@@ -424,7 +423,7 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel, ex
             </div>
           )}
 
-          {posePanel === "left" && poseLoading && poseEnabled && (
+          {activePanel !== "right" && poseLoading && poseEnabled && (
             <div className="absolute inset-0 flex items-center justify-center z-25 pointer-events-none">
               <div className="bg-black/60 rounded-lg px-4 py-2 text-sm text-white animate-pulse">
                 Loading pose model...
@@ -486,7 +485,7 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel, ex
             }
           />
 
-          {posePanel === "right" && (
+          {activePanel === "right" && (
             <PoseOverlay poseResult={poseResult} visible={poseEnabled} videoElement={rightVideoRef.current?.getVideoElement()} isFullscreen={isFullscreen} />
           )}
 
@@ -498,8 +497,8 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel, ex
             onTimerClick={handleTimerClick}
           />
 
-          {posePanel === "right" && poseEnabled && poseResult && (
-            <div data-testid="pose-hud" className="absolute bottom-2 left-2 z-30 bg-black/80 border border-border rounded-lg p-2 text-xs font-mono space-y-1 pointer-events-none">
+          {activePanel === "right" && poseEnabled && poseResult && (
+            <div data-testid="pose-hud" className="hidden sm:block absolute bottom-2 left-2 z-30 bg-black/80 border border-border rounded-lg p-2 text-xs font-mono space-y-1 pointer-events-none">
               <div className="flex items-center gap-2 mb-1">
                 <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${
                   poseResult.phase === "Unknown" ? "bg-muted text-muted-foreground" : "bg-primary/30 text-primary"
@@ -520,7 +519,7 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel, ex
             </div>
           )}
 
-          {posePanel === "right" && poseLoading && poseEnabled && (
+          {activePanel === "right" && poseLoading && poseEnabled && (
             <div className="absolute inset-0 flex items-center justify-center z-25 pointer-events-none">
               <div className="bg-black/60 rounded-lg px-4 py-2 text-sm text-white animate-pulse">
                 Loading pose model...
@@ -552,21 +551,6 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel, ex
           tooltip="Pose Detection"
           onClick={() => setPoseEnabled(prev => !prev)}
         />
-        {poseEnabled && (
-          <div className="flex items-center gap-0.5 bg-secondary/50 border border-border rounded-md p-1">
-            <button
-              onClick={() => setPosePanel("left")}
-              className={`px-1.5 py-0.5 rounded text-xs font-semibold transition-colors ${posePanel === "left" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-secondary"}`}
-              title="Pose on amateur panel"
-            >L</button>
-            <button
-              onClick={() => setPosePanel("right")}
-              className={`px-1.5 py-0.5 rounded text-xs font-semibold transition-colors ${posePanel === "right" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-secondary"}`}
-              title="Pose on pro panel"
-            >R</button>
-          </div>
-        )}
-
         {timerStart !== null && (
           <div data-testid="timer-display" className="flex items-center gap-2 px-2 py-1 rounded bg-black/40 border border-border text-xs font-mono shrink-0">
             <span className="text-muted-foreground">A:</span>
