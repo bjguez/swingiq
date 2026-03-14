@@ -77,14 +77,6 @@ export default function VideoTrimmer({ videoId, videoUrl, videoTitle, trigger }:
 
   const pct = (t: number) => duration > 0 ? (t / duration) * 100 : 0;
 
-  const markIn = () => {
-    if (videoRef.current) setStartTime(videoRef.current.currentTime);
-  };
-
-  const markOut = () => {
-    if (videoRef.current) setEndTime(videoRef.current.currentTime);
-  };
-
   const handlePointerDown = (handle: "start" | "end") => (e: React.PointerEvent) => {
     e.preventDefault();
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
@@ -194,7 +186,7 @@ export default function VideoTrimmer({ videoId, videoUrl, videoTitle, trigger }:
             <div
               className="absolute top-0 bottom-0 w-4 cursor-col-resize z-20 flex items-center justify-center group"
               style={{ left: `calc(${pct(startTime)}% - 8px)` }}
-              onMouseDown={handleMouseDown("start")}
+              onPointerDown={handlePointerDown("start")}
               data-testid="trim-handle-start"
             >
               <div className="w-1.5 h-8 bg-primary rounded-full group-hover:bg-primary/80 shadow-lg" />
@@ -203,7 +195,7 @@ export default function VideoTrimmer({ videoId, videoUrl, videoTitle, trigger }:
             <div
               className="absolute top-0 bottom-0 w-4 cursor-col-resize z-20 flex items-center justify-center group"
               style={{ left: `calc(${pct(endTime)}% - 8px)` }}
-              onMouseDown={handleMouseDown("end")}
+              onPointerDown={handlePointerDown("end")}
               data-testid="trim-handle-end"
             >
               <div className="w-1.5 h-8 bg-primary rounded-full group-hover:bg-primary/80 shadow-lg" />
