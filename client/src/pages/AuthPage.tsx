@@ -40,7 +40,7 @@ export default function AuthPage() {
           <div className="w-10 h-10 rounded-md bg-primary flex items-center justify-center text-primary-foreground">
             <Video size={22} />
           </div>
-          SwingIQ
+          Swing Studio
         </div>
 
         <Tabs defaultValue="login">
@@ -53,7 +53,7 @@ export default function AuthPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Welcome back</CardTitle>
-                <CardDescription>Sign in to your SwingIQ account</CardDescription>
+                <CardDescription>Sign in to your Swing Studio account</CardDescription>
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleLogin} className="space-y-4">

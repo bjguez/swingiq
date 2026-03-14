@@ -77,11 +77,20 @@ export default function VideoTrimmer({ videoId, videoUrl, videoTitle, trigger }:
 
   const pct = (t: number) => duration > 0 ? (t / duration) * 100 : 0;
 
-  const handleMouseDown = (handle: "start" | "end") => (e: React.MouseEvent) => {
+  const markIn = () => {
+    if (videoRef.current) setStartTime(videoRef.current.currentTime);
+  };
+
+  const markOut = () => {
+    if (videoRef.current) setEndTime(videoRef.current.currentTime);
+  };
+
+  const handlePointerDown = (handle: "start" | "end") => (e: React.PointerEvent) => {
     e.preventDefault();
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     dragging.current = handle;
 
-    const onMove = (ev: MouseEvent) => {
+    const onMove = (ev: PointerEvent) => {
       if (!dragging.current || !trackRef.current) return;
       const rect = trackRef.current.getBoundingClientRect();
       const ratio = Math.max(0, Math.min(1, (ev.clientX - rect.left) / rect.width));
@@ -102,12 +111,12 @@ export default function VideoTrimmer({ videoId, videoUrl, videoTitle, trigger }:
 
     const onUp = () => {
       dragging.current = null;
-      document.removeEventListener("mousemove", onMove);
-      document.removeEventListener("mouseup", onUp);
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerup", onUp);
     };
 
-    document.addEventListener("mousemove", onMove);
-    document.addEventListener("mouseup", onUp);
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerup", onUp);
   };
 
   const handleTrim = async () => {

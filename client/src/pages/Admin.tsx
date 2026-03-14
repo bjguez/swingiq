@@ -177,7 +177,7 @@ export default function Admin() {
             <span className="px-2 py-0.5 rounded text-xs font-semibold bg-orange-500/20 text-orange-400 uppercase tracking-wider">Admin</span>
           </div>
           <h1 className="text-3xl md:text-4xl font-bold font-display uppercase">Video Management</h1>
-          <p className="text-muted-foreground">Upload, tag, and manage the SwingIQ video library.</p>
+          <p className="text-muted-foreground">Upload, tag, and manage the Swing Studio video library.</p>
         </div>
       </div>
 

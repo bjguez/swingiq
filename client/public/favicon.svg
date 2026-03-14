@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Background -->
+  <rect width="32" height="32" rx="7" fill="hsl(142, 71%, 45%)"/>
+  <!-- Play triangle (video/analysis theme) -->
+  <polygon points="12,9 25,16 12,23" fill="white" opacity="0.95"/>
+  <!-- Small dot bottom-left suggesting a frame/crop tool -->
+  <circle cx="7.5" cy="24.5" r="2.5" fill="white" opacity="0.7"/>
+</svg>
