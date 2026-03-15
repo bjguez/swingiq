@@ -1,17 +1,18 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Video, BarChart2, Bell, Menu, X, User, Upload, Library, Film, LogOut, Lock } from "lucide-react";
+import { Video, BarChart2, Bell, Menu, X, User, Upload, Library, Film, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { VideoLibraryModal } from "@/components/VideoLibraryModal";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { ProfileSheet } from "@/components/ProfileSheet";
 import ScoreTicker from "@/components/ScoreTicker";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   const navLinks = [
     { href: "/", icon: <Video className="w-4 h-4 mr-2" />, label: "Analysis" },
@@ -67,24 +68,18 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             >
               {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <div className="w-8 h-8 rounded-full bg-secondary border border-border flex items-center justify-center overflow-hidden ml-2 cursor-pointer">
-                  <User className="w-5 h-5 text-muted-foreground" />
-                </div>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {user && (
-                  <DropdownMenuItem disabled className="font-medium text-foreground">
-                    {user.username}
-                  </DropdownMenuItem>
-                )}
-                <DropdownMenuItem onClick={() => logout()} className="text-destructive focus:text-destructive">
-                  <LogOut className="w-4 h-4 mr-2" />
-                  Sign Out
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <button
+              onClick={() => setProfileOpen(true)}
+              className="w-8 h-8 rounded-full bg-secondary border border-border flex items-center justify-center overflow-hidden ml-2 cursor-pointer hover:border-primary/50 transition-colors"
+              title={user ? user.username : "Account"}
+            >
+              {user ? (
+                <span className="text-xs font-bold text-foreground uppercase">{user.username[0]}</span>
+              ) : (
+                <User className="w-5 h-5 text-muted-foreground" />
+              )}
+            </button>
+            <ProfileSheet open={profileOpen} onOpenChange={setProfileOpen} />
           </div>
         </div>
 
