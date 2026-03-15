@@ -40,6 +40,15 @@ export async function getPresignedUrl(key: string, expiresIn = 604800): Promise<
   return getSignedUrl(r2, new GetObjectCommand({ Bucket: bucket, Key: key }), { expiresIn });
 }
 
+/** Returns a public URL for a key using the custom domain if configured, else falls back to presigned URL */
+export async function getVideoUrl(key: string): Promise<string> {
+  const publicBase = process.env.R2_PUBLIC_URL;
+  if (publicBase) {
+    return `${publicBase.replace(/\/$/, "")}/${key}`;
+  }
+  return getPresignedUrl(key);
+}
+
 export async function deleteFromR2(key: string): Promise<void> {
   await r2.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
 }

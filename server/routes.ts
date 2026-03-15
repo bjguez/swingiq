@@ -7,7 +7,7 @@ import path from "path";
 import fs from "fs";
 import express from "express";
 import { execFile } from "child_process";
-import { uploadToR2, getPresignedUrl, deleteFromR2, isR2Key, r2Configured, checkR2Exists } from "./r2";
+import { uploadToR2, getVideoUrl, deleteFromR2, isR2Key, r2Configured, checkR2Exists } from "./r2";
 
 const uploadDir = path.resolve("uploads");
 if (!fs.existsSync(uploadDir)) {
@@ -81,7 +81,7 @@ export async function registerRoutes(
       }
 
       const key = await uploadToR2(uploadBuffer, uploadName, "video/mp4");
-      const presignedUrl = await getPresignedUrl(key);
+      const presignedUrl = await getVideoUrl(key);
       const title = (req.body.title || req.file.originalname).replace(/\.[^.]+$/, "");
       const userId = (req.user as any)?.id ?? null;
 
@@ -116,7 +116,7 @@ export async function registerRoutes(
         // Legacy local file — return as-is
         return res.json({ url: video.sourceUrl });
       }
-      const url = await getPresignedUrl(video.sourceUrl);
+      const url = await getVideoUrl(video.sourceUrl);
       res.json({ url });
     } catch (err: any) {
       console.error("Presigned URL error:", err);
@@ -242,7 +242,7 @@ export async function registerRoutes(
         videos: await Promise.all((userVideoMap.get(u.id) ?? []).map(async v => ({
           id: v.id,
           title: v.title,
-          sourceUrl: v.sourceUrl && isR2Key(v.sourceUrl) ? await getPresignedUrl(v.sourceUrl) : v.sourceUrl,
+          sourceUrl: v.sourceUrl && isR2Key(v.sourceUrl) ? await getVideoUrl(v.sourceUrl) : v.sourceUrl,
           createdAt: v.createdAt,
         }))),
       })));
@@ -566,7 +566,7 @@ export async function registerRoutes(
     return Promise.all(
       vids.map(async (v) => {
         if (v.sourceUrl && isR2Key(v.sourceUrl)) {
-          return { ...v, sourceUrl: await getPresignedUrl(v.sourceUrl) };
+          return { ...v, sourceUrl: await getVideoUrl(v.sourceUrl) };
         }
         return v;
       })
