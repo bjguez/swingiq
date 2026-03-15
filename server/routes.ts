@@ -466,9 +466,11 @@ export async function registerRoutes(
   // MLB awards proxy
   app.get("/api/mlb/players/:mlbId/awards", async (req, res) => {
     const { mlbId } = req.params;
-    // Only surface recognized MLB-level awards (exclude minor league all-stars, etc.)
+    // Only surface recognized MLB-level awards. Use ID matching for awards with generic
+    // names (MVP, ROY, All-Star) to avoid false positives from minor league equivalents.
+    // Only use name matching for awards with truly unique names.
     const MLB_IDS = /^(ALMVP|NLMVP|ALSS|NLSS|ALGG|NLGG|ALROY|NLROY|MLBAS|ALAS|NLAS|AAHAA|NAHAA)/i;
-    const MLB_NAMES = /silver slugger|gold glove|most valuable|rookie of the year|hank aaron|^all-star/i;
+    const MLB_NAMES = /silver slugger|gold glove|hank aaron/i;
     try {
       const response = await fetch(`https://statsapi.mlb.com/api/v1/people/${mlbId}/awards`);
       const data = await response.json() as any;
