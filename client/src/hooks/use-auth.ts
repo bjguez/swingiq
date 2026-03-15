@@ -48,6 +48,7 @@ export function useAuth() {
     },
     onSuccess: (user) => {
       queryClient.setQueryData(["/api/auth/me"], user);
+      queryClient.invalidateQueries({ queryKey: ["/api/videos"] });
     },
   });
 
@@ -66,6 +67,7 @@ export function useAuth() {
     },
     onSuccess: (user) => {
       queryClient.setQueryData(["/api/auth/me"], user);
+      queryClient.invalidateQueries({ queryKey: ["/api/videos"] });
     },
   });
 
@@ -102,6 +104,7 @@ export function useAuth() {
     },
     onSuccess: () => {
       queryClient.setQueryData(["/api/auth/me"], null);
+      queryClient.invalidateQueries({ queryKey: ["/api/videos"] });
     },
   });
 
