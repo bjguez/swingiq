@@ -260,9 +260,15 @@ function PlayerHeader({ player, onBack }: { player: MlbPlayer; onBack?: () => vo
 
 // ─── Player Stats ─────────────────────────────────────────────────────────────
 
-function StatTile({ label, value, decimals = 0 }: { label: string; value: number | null | undefined; decimals?: number }) {
+// Baseball convention: strip leading zero from rate stats (.309 not 0.309)
+function fmtRate(v: number | null | undefined): string | null {
+  if (v == null) return null;
+  return v.toFixed(3).replace(/^0\./, ".");
+}
+
+function StatTile({ label, value, isRate = false }: { label: string; value: number | null | undefined; isRate?: boolean }) {
   if (value == null) return null;
-  const display = decimals > 0 ? value.toFixed(decimals) : String(value);
+  const display = isRate ? fmtRate(value)! : String(value);
   return (
     <div className="bg-secondary/40 rounded-lg p-3 flex flex-col gap-1">
       <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-semibold leading-tight">{label}</p>
@@ -271,23 +277,112 @@ function StatTile({ label, value, decimals = 0 }: { label: string; value: number
   );
 }
 
+interface SeasonSplit {
+  season: string;
+  team: { name: string };
+  stat: {
+    gamesPlayed: number;
+    atBats: number;
+    avg: string;
+    homeRuns: number;
+    rbi: number;
+    obp: string;
+    slg: string;
+    ops: string;
+  };
+}
+
 function PlayerStatsSection({ player }: { player: MlbPlayer }) {
+  const [showTable, setShowTable] = useState(false);
+
+  const { data: statsData, isLoading } = useQuery<{ seasons: SeasonSplit[]; career: any }>({
+    queryKey: ["/api/mlb/players/stats", player.savantId],
+    queryFn: () => fetch(`/api/mlb/players/${player.savantId}/stats`).then(r => r.json()),
+    enabled: !!player.savantId && showTable,
+  });
+
   const hasStats = player.battingAvg != null || player.homeRuns != null || player.rbi != null ||
     player.obp != null || player.slg != null || player.ops != null;
 
-  if (!hasStats) return null;
+  if (!hasStats && !player.savantId) return null;
+
+  const seasons = (statsData?.seasons ?? []).slice().reverse(); // most recent first
+
+  // Strip leading zero from MLB API rate strings (e.g. ".309" → keep, "0.309" → ".309")
+  const fmt = (v: string | number | null | undefined) => {
+    if (v == null) return "—";
+    const s = String(v);
+    return s.replace(/^0(\.\d+)$/, "$1");
+  };
 
   return (
-    <div className="bg-card border border-border rounded-xl p-5 space-y-3">
-      <h3 className="font-display font-bold text-xl uppercase text-muted-foreground">Career Stats</h3>
-      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-        <StatTile label="AVG" value={player.battingAvg} decimals={3} />
-        <StatTile label="HR" value={player.homeRuns} />
-        <StatTile label="RBI" value={player.rbi} />
-        <StatTile label="OBP" value={player.obp} decimals={3} />
-        <StatTile label="SLG" value={player.slg} decimals={3} />
-        <StatTile label="OPS" value={player.ops} decimals={3} />
+    <div className="bg-card border border-border rounded-xl p-5 space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="font-display font-bold text-xl uppercase text-muted-foreground">Career Stats</h3>
+        {player.savantId && (
+          <button
+            onClick={() => setShowTable(v => !v)}
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+          >
+            {showTable ? "Hide" : "Year-by-Year"}
+            <ChevronRight className={`w-3.5 h-3.5 transition-transform ${showTable ? "rotate-90" : ""}`} />
+          </button>
+        )}
       </div>
+
+      {hasStats && (
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+          <StatTile label="AVG" value={player.battingAvg} isRate />
+          <StatTile label="HR" value={player.homeRuns} />
+          <StatTile label="RBI" value={player.rbi} />
+          <StatTile label="OBP" value={player.obp} isRate />
+          <StatTile label="SLG" value={player.slg} isRate />
+          <StatTile label="OPS" value={player.ops} isRate />
+        </div>
+      )}
+
+      {showTable && (
+        <div className="overflow-x-auto rounded-lg border border-border">
+          {isLoading ? (
+            <div className="p-6 text-center text-sm text-muted-foreground">Loading season stats…</div>
+          ) : seasons.length === 0 ? (
+            <div className="p-6 text-center text-sm text-muted-foreground">No season data available.</div>
+          ) : (
+            <table className="w-full text-sm font-mono">
+              <thead>
+                <tr className="bg-secondary/50 text-[11px] uppercase tracking-wider text-muted-foreground">
+                  <th className="text-left px-3 py-2 font-semibold">Year</th>
+                  <th className="text-left px-3 py-2 font-semibold">Team</th>
+                  <th className="text-right px-3 py-2 font-semibold">G</th>
+                  <th className="text-right px-3 py-2 font-semibold">AB</th>
+                  <th className="text-right px-3 py-2 font-semibold">AVG</th>
+                  <th className="text-right px-3 py-2 font-semibold">HR</th>
+                  <th className="text-right px-3 py-2 font-semibold">RBI</th>
+                  <th className="text-right px-3 py-2 font-semibold">OBP</th>
+                  <th className="text-right px-3 py-2 font-semibold">SLG</th>
+                  <th className="text-right px-3 py-2 font-semibold">OPS</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/40">
+                {seasons.map((s, i) => (
+                  <tr key={`${s.season}-${i}`} className="hover:bg-secondary/20 transition-colors">
+                    <td className="px-3 py-2 font-bold text-foreground">{s.season}</td>
+                    <td className="px-3 py-2 text-muted-foreground truncate max-w-[100px]">{s.team?.name ?? "—"}</td>
+                    <td className="px-3 py-2 text-right">{s.stat.gamesPlayed ?? "—"}</td>
+                    <td className="px-3 py-2 text-right">{s.stat.atBats ?? "—"}</td>
+                    <td className="px-3 py-2 text-right">{fmt(s.stat.avg)}</td>
+                    <td className="px-3 py-2 text-right">{s.stat.homeRuns ?? "—"}</td>
+                    <td className="px-3 py-2 text-right">{s.stat.rbi ?? "—"}</td>
+                    <td className="px-3 py-2 text-right">{fmt(s.stat.obp)}</td>
+                    <td className="px-3 py-2 text-right">{fmt(s.stat.slg)}</td>
+                    <td className="px-3 py-2 text-right font-semibold text-foreground">{fmt(s.stat.ops)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
     </div>
   );
 }
