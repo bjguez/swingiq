@@ -107,6 +107,24 @@ app.use((req, res, next) => {
     ALTER TABLE users ADD COLUMN IF NOT EXISTS weight_lbs INTEGER
   `);
   await pool.query(`
+    ALTER TABLE mlb_players ADD COLUMN IF NOT EXISTS batting_avg REAL
+  `);
+  await pool.query(`
+    ALTER TABLE mlb_players ADD COLUMN IF NOT EXISTS home_runs INTEGER
+  `);
+  await pool.query(`
+    ALTER TABLE mlb_players ADD COLUMN IF NOT EXISTS rbi INTEGER
+  `);
+  await pool.query(`
+    ALTER TABLE mlb_players ADD COLUMN IF NOT EXISTS obp REAL
+  `);
+  await pool.query(`
+    ALTER TABLE mlb_players ADD COLUMN IF NOT EXISTS slg REAL
+  `);
+  await pool.query(`
+    ALTER TABLE mlb_players ADD COLUMN IF NOT EXISTS ops REAL
+  `);
+  await pool.query(`
     UPDATE videos SET category = 'Full Swing' WHERE category = 'Full Swings'
   `);
 
