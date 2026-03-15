@@ -9,15 +9,7 @@ import type { Video, MlbPlayer } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
 import { AuthGateModal } from "@/components/AuthGateModal";
 
-const UPLOAD_COUNT_KEY = "swingiq_upload_count";
 const FREE_UPLOAD_LIMIT = 5;
-
-function getUploadCount(): number {
-  return parseInt(localStorage.getItem(UPLOAD_COUNT_KEY) ?? "0", 10);
-}
-function incrementUploadCount() {
-  localStorage.setItem(UPLOAD_COUNT_KEY, String(getUploadCount() + 1));
-}
 
 interface VideoLibraryModalProps {
   trigger: React.ReactNode;
@@ -68,7 +60,11 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected }: Vi
   });
 
   const handleUploadClick = () => {
-    if (!isPaid && getUploadCount() >= FREE_UPLOAD_LIMIT) {
+    if (!user) {
+      setAuthGateOpen(true);
+      return;
+    }
+    if (!isPaid && userVideos.length >= FREE_UPLOAD_LIMIT) {
       setUploadState("limit_reached");
       return;
     }
@@ -108,7 +104,6 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected }: Vi
       });
 
       const url = response.presignedUrl ?? response.sourceUrl;
-      incrementUploadCount();
       queryClient.invalidateQueries({ queryKey: ["/api/videos"] });
       onVideoSelected?.(url, "My Swing");
       setIsOpen(false);
@@ -371,8 +366,11 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected }: Vi
     <AuthGateModal
       open={authGateOpen}
       onOpenChange={setAuthGateOpen}
-      reason="Sign in to compare your swing against a pro."
-      onSuccess={() => { if (pendingProVideo) doImportProVideo(pendingProVideo); setPendingProVideo(null); }}
+      reason={pendingProVideo ? "Sign in to load a pro swing for comparison." : "Free to analyze — no credit card required. Create an account to upload and save your swings."}
+      onSuccess={() => {
+        if (pendingProVideo) { doImportProVideo(pendingProVideo); setPendingProVideo(null); }
+        else fileInputRef.current?.click();
+      }}
     />
     </>
   );

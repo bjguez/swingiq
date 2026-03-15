@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
-import { Lock, User, ChevronRight } from "lucide-react";
+import { Lock, ChevronRight } from "lucide-react";
 
 type Step = "gate" | "login" | "register" | "profile";
 
@@ -48,6 +48,7 @@ export function AuthGateModal({ open, onOpenChange, reason, onSuccess }: AuthGat
 
   const handleProfileSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!profile.bats || !profile.throws || !profile.skillLevel) return;
     try {
       await updateProfile({
         age: profile.age ? Number(profile.age) : undefined,
@@ -60,11 +61,6 @@ export function AuthGateModal({ open, onOpenChange, reason, onSuccess }: AuthGat
       onSuccess?.();
       onOpenChange(false);
     } catch {}
-  };
-
-  const handleSkipProfile = () => {
-    onSuccess?.();
-    onOpenChange(false);
   };
 
   const resetState = () => {
@@ -168,7 +164,7 @@ export function AuthGateModal({ open, onOpenChange, reason, onSuccess }: AuthGat
         {/* Profile step */}
         {step === "profile" && (
           <form onSubmit={handleProfileSubmit} className="space-y-4">
-            <p className="text-sm text-muted-foreground">Help us personalize your experience. You can always update this later.</p>
+            <p className="text-sm text-muted-foreground">Help us personalize your experience.</p>
             <div className="grid grid-cols-2 gap-2">
               <Input
                 placeholder="Age"
@@ -178,30 +174,50 @@ export function AuthGateModal({ open, onOpenChange, reason, onSuccess }: AuthGat
                 value={profile.age}
                 onChange={(e) => setProfile(p => ({ ...p, age: e.target.value }))}
               />
-              <div className="flex gap-1.5">
-                {["L", "R"].map(h => (
-                  <button
-                    key={h}
-                    type="button"
-                    onClick={() => setProfile(p => ({ ...p, bats: h }))}
-                    className={`flex-1 py-2 rounded-md text-sm font-semibold border transition-colors ${profile.bats === h ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:text-foreground"}`}
-                  >
-                    Bats {h}
-                  </button>
-                ))}
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold text-muted-foreground shrink-0">Bats</span>
+                <div className="flex gap-1.5 flex-1">
+                  {["L", "R"].map(h => (
+                    <button
+                      key={h}
+                      type="button"
+                      onClick={() => setProfile(p => ({ ...p, bats: h }))}
+                      className={`cursor-pointer flex-1 py-2 rounded-md text-sm font-semibold border transition-colors ${profile.bats === h ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:text-foreground"}`}
+                    >
+                      {h}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <Input
-                placeholder="City"
-                value={profile.city}
-                onChange={(e) => setProfile(p => ({ ...p, city: e.target.value }))}
-              />
-              <Input
-                placeholder="State"
-                value={profile.state}
-                onChange={(e) => setProfile(p => ({ ...p, state: e.target.value }))}
-              />
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold text-muted-foreground shrink-0">Throws</span>
+                <div className="flex gap-1.5 flex-1">
+                  {["L", "R"].map(h => (
+                    <button
+                      key={h}
+                      type="button"
+                      onClick={() => setProfile(p => ({ ...p, throws: h }))}
+                      className={`cursor-pointer flex-1 py-2 rounded-md text-sm font-semibold border transition-colors ${profile.throws === h ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:text-foreground"}`}
+                    >
+                      {h}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-1.5">
+                <Input
+                  placeholder="City"
+                  value={profile.city}
+                  onChange={(e) => setProfile(p => ({ ...p, city: e.target.value }))}
+                />
+                <Input
+                  placeholder="State"
+                  value={profile.state}
+                  onChange={(e) => setProfile(p => ({ ...p, state: e.target.value }))}
+                />
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-1.5">
               {SKILL_LEVELS.map(s => (
@@ -209,19 +225,20 @@ export function AuthGateModal({ open, onOpenChange, reason, onSuccess }: AuthGat
                   key={s.value}
                   type="button"
                   onClick={() => setProfile(p => ({ ...p, skillLevel: s.value }))}
-                  className={`py-2 px-3 rounded-md text-xs font-semibold border transition-colors text-left ${profile.skillLevel === s.value ? "bg-primary/10 border-primary/50 text-primary" : "border-border text-muted-foreground hover:text-foreground hover:border-border/80"}`}
+                  className={`cursor-pointer py-2 px-3 rounded-md text-xs font-semibold border transition-colors text-left ${profile.skillLevel === s.value ? "bg-primary/10 border-primary/50 text-primary" : "border-border text-muted-foreground hover:text-foreground hover:border-border/80"}`}
                 >
                   {s.label}
                 </button>
               ))}
             </div>
-            <div className="flex gap-2 pt-1">
-              <Button type="submit" className="flex-1" disabled={isUpdatingProfile}>
+            <div className="pt-1">
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={isUpdatingProfile || !profile.bats || !profile.throws || !profile.skillLevel}
+              >
                 {isUpdatingProfile ? "Saving..." : "Save Profile"}
                 <ChevronRight className="w-4 h-4 ml-1" />
-              </Button>
-              <Button type="button" variant="ghost" onClick={handleSkipProfile} className="text-muted-foreground">
-                Skip
               </Button>
             </div>
           </form>

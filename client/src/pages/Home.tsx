@@ -82,7 +82,7 @@ export default function Home() {
           >
             <X className="w-4 h-4" />
           </button>
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-4">Get Started</p>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-4">Get Started For Free</p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {/* Step 1 */}
             <div className={`flex flex-col gap-3 p-4 rounded-lg border transition-colors ${leftLoaded ? 'border-primary/40 bg-primary/5' : 'border-border bg-secondary/30'}`}>
