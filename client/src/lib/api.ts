@@ -6,6 +6,24 @@ export async function fetchPlayers(): Promise<MlbPlayer[]> {
   return res.json();
 }
 
+export async function fetchPlayersPage(opts: {
+  search?: string;
+  bats?: string;
+  limit?: number;
+  offset?: number;
+  seed?: number;
+}): Promise<{ players: MlbPlayer[]; total: number }> {
+  const params = new URLSearchParams();
+  if (opts.search) params.set("search", opts.search);
+  if (opts.bats) params.set("bats", opts.bats);
+  params.set("limit", String(opts.limit ?? 9));
+  params.set("offset", String(opts.offset ?? 0));
+  params.set("seed", String(opts.seed ?? 0));
+  const res = await fetch(`/api/players?${params}`);
+  if (!res.ok) throw new Error("Failed to fetch players");
+  return res.json();
+}
+
 export async function fetchPlayer(id: string): Promise<MlbPlayer> {
   const res = await fetch(`/api/players/${id}`);
   if (!res.ok) throw new Error("Failed to fetch player");

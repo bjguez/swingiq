@@ -1,12 +1,12 @@
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Upload, ChevronRight, Film, User } from "lucide-react";
+import { Upload, ChevronRight, Film, User, Search } from "lucide-react";
 import { Link } from "wouter";
 import { UserVideoCard } from "./UserVideoCard";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "./ui/button";
 import type { MlbPlayer, Video } from "@shared/schema";
-import { fetchVideos, fetchPlayers } from "@/lib/api";
+import { fetchVideos, fetchPlayersPage } from "@/lib/api";
 
 interface DataDashboardProps {
   player: MlbPlayer | null;
@@ -20,7 +20,7 @@ interface DataDashboardProps {
 export default function DataDashboard({ player, onSelectVideo, onSelectProVideo, onPlayerSelected }: DataDashboardProps) {
   const { data: allVideos = [] } = useQuery<Video[]>({
     queryKey: ["/api/videos"],
-    queryFn: fetchVideos,
+    queryFn: () => fetchVideos(),
   });
   const userVideos = allVideos.filter(v => !v.isProVideo && v.sourceUrl);
 
@@ -44,21 +44,94 @@ export default function DataDashboard({ player, onSelectVideo, onSelectProVideo,
 
 // ─── Player Card Grid (empty state) ──────────────────────────────────────────
 
-function PlayerCardGrid({ onPlayerSelected }: { onPlayerSelected?: (name: string) => void }) {
-  const { data: players = [], isLoading } = useQuery<MlbPlayer[]>({
-    queryKey: ["/api/players"],
-    queryFn: fetchPlayers,
+function useVisibleCount() {
+  const [count, setCount] = useState(() => {
+    if (typeof window === "undefined") return 9;
+    if (window.innerWidth < 640) return 3;
+    if (window.innerWidth < 1024) return 6;
+    return 9;
   });
+  useEffect(() => {
+    const update = () => {
+      if (window.innerWidth < 640) setCount(3);
+      else if (window.innerWidth < 1024) setCount(6);
+      else setCount(9);
+    };
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
+  return count;
+}
+
+function PlayerCardGrid({ onPlayerSelected }: { onPlayerSelected?: (name: string) => void }) {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [batsFilter, setBatsFilter] = useState<"" | "L" | "R">("");
+  const visibleCount = useVisibleCount();
+
+  // Stable random seed per session — different order every visit
+  const seed = useMemo(() => Math.floor(Math.random() * 1e9), []);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchQuery), 300);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
+
+  const isFiltering = !!debouncedSearch || !!batsFilter;
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["/api/players/page", { search: debouncedSearch, bats: batsFilter, limit: isFiltering ? 200 : visibleCount, seed }],
+    queryFn: () => fetchPlayersPage({
+      search: debouncedSearch || undefined,
+      bats: batsFilter || undefined,
+      limit: isFiltering ? 200 : visibleCount,
+      seed,
+    }),
+  });
+
+  const players = data?.players ?? [];
+  const total = data?.total ?? 0;
+  const visible = players;
 
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold font-display">Compare Against a Pro</h2>
-        <span className="text-xs text-muted-foreground">{players.length} players in database</span>
+        <span className="text-xs text-muted-foreground">{total} players</span>
       </div>
+
+      {/* Search + Bats filter */}
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+          <input
+            type="text"
+            placeholder="Search players or teams..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="w-full h-9 pl-8 pr-3 text-sm rounded-md border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-0"
+          />
+        </div>
+        <div className="flex gap-1 shrink-0">
+          {(["", "L", "R"] as const).map(v => (
+            <button
+              key={v}
+              onClick={() => setBatsFilter(v)}
+              className={`px-3 h-9 text-xs font-semibold rounded-md border transition-colors ${
+                batsFilter === v
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "border-border text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {v === "" ? "All" : `Bats ${v}`}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {isLoading ? (
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-          {[1,2,3,4,5,6].map(i => (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {[1, 2, 3].map(i => (
             <div key={i} className="bg-card border border-border rounded-xl p-4 animate-pulse space-y-3">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-full bg-secondary shrink-0" />
@@ -71,18 +144,18 @@ function PlayerCardGrid({ onPlayerSelected }: { onPlayerSelected?: (name: string
             </div>
           ))}
         </div>
-      ) : players.length === 0 ? (
+      ) : visible.length === 0 ? (
         <div className="bg-card border border-border rounded-xl p-10 text-center text-muted-foreground text-sm">
-          No players in database yet.
+          No players match your search.
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-          {players.map((p, i) => (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {visible.map((p, i) => (
             <motion.div
               key={p.id}
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.2, delay: i * 0.05, ease: "easeOut" }}
+              transition={{ duration: 0.2, delay: i * 0.04, ease: "easeOut" }}
             >
               <PlayerCard player={p} onPlayerSelected={onPlayerSelected} />
             </motion.div>

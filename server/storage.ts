@@ -1,4 +1,4 @@
-import { eq, and } from "drizzle-orm";
+import { eq, and, ilike, or, sql } from "drizzle-orm";
 import { db } from "./db";
 import {
   users, mlbPlayers, videos, drills, sessions,
@@ -17,6 +17,7 @@ export interface IStorage {
   updateUser(id: string, data: Partial<Omit<User, "id">>): Promise<User | undefined>;
 
   getAllPlayers(): Promise<MlbPlayer[]>;
+  getPlayers(opts: { search?: string; bats?: string; limit?: number; offset?: number; seed?: number }): Promise<{ players: MlbPlayer[]; total: number }>;
   getPlayer(id: string): Promise<MlbPlayer | undefined>;
   createPlayer(player: InsertMlbPlayer): Promise<MlbPlayer>;
   deletePlayer(id: string): Promise<boolean>;
@@ -69,6 +70,22 @@ export class DatabaseStorage implements IStorage {
 
   async getAllPlayers(): Promise<MlbPlayer[]> {
     return db.select().from(mlbPlayers);
+  }
+
+  async getPlayers(opts: { search?: string; bats?: string; limit?: number; offset?: number; seed?: number }): Promise<{ players: MlbPlayer[]; total: number }> {
+    const { search, bats, limit = 9, offset = 0, seed = 0 } = opts;
+    const conditions = [
+      ...(bats ? [eq(mlbPlayers.bats, bats)] : []),
+      ...(search ? [or(ilike(mlbPlayers.name, `%${search}%`), ilike(mlbPlayers.team, `%${search}%`))] : []),
+    ];
+    const where = conditions.length > 0 ? and(...conditions) : undefined;
+    const [players, [{ total }]] = await Promise.all([
+      db.select().from(mlbPlayers).where(where)
+        .orderBy(sql`md5(${mlbPlayers.id}::text || ${String(seed)})`)
+        .limit(limit).offset(offset),
+      db.select({ total: sql<number>`count(*)::int` }).from(mlbPlayers).where(where),
+    ]);
+    return { players, total };
   }
 
   async getPlayer(id: string): Promise<MlbPlayer | undefined> {

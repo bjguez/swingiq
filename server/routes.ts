@@ -190,7 +190,7 @@ export async function registerRoutes(
         list.push(v);
         userVideoMap.set(v.userId!, list);
       });
-      const result = allUsers.map(u => ({
+      const result = await Promise.all(allUsers.map(async u => ({
         id: u.id,
         username: u.username,
         subscriptionTier: u.subscriptionTier,
@@ -204,21 +204,32 @@ export async function registerRoutes(
         state: u.state,
         profileComplete: u.profileComplete,
         uploadCount: userVideoMap.get(u.id)?.length ?? 0,
-        videos: (userVideoMap.get(u.id) ?? []).map(v => ({
+        videos: await Promise.all((userVideoMap.get(u.id) ?? []).map(async v => ({
           id: v.id,
           title: v.title,
-          sourceUrl: v.sourceUrl,
+          sourceUrl: v.sourceUrl && isR2Key(v.sourceUrl) ? await getPresignedUrl(v.sourceUrl) : v.sourceUrl,
           createdAt: v.createdAt,
-        })),
-      }));
+        }))),
+      })));
       res.json(result);
     } catch (err: any) {
       res.status(500).json({ message: err.message || "Failed to fetch users" });
     }
   });
 
-  app.get("/api/players", async (_req, res) => {
+  app.get("/api/players", async (req, res) => {
     try {
+      const { search, bats, limit, offset, seed } = req.query as Record<string, string | undefined>;
+      if (search !== undefined || bats !== undefined || limit !== undefined || seed !== undefined) {
+        const result = await storage.getPlayers({
+          search: search || undefined,
+          bats: bats || undefined,
+          limit: limit ? Number(limit) : 9,
+          offset: offset ? Number(offset) : 0,
+          seed: seed ? Number(seed) : 0,
+        });
+        return res.json(result);
+      }
       const players = await storage.getAllPlayers();
       res.json(players);
     } catch (err) {
