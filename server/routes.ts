@@ -169,6 +169,44 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/admin/users", async (req, res) => {
+    const adminUsername = process.env.ADMIN_USERNAME;
+    if (!req.user || (req.user as any).username !== adminUsername) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    try {
+      const allUsers = await storage.getAllUsers();
+      const allVideos = await storage.getAllVideos();
+      const userVideoMap = new Map<string, typeof allVideos>();
+      allVideos.filter(v => !v.isProVideo && v.userId).forEach(v => {
+        const list = userVideoMap.get(v.userId!) ?? [];
+        list.push(v);
+        userVideoMap.set(v.userId!, list);
+      });
+      const result = allUsers.map(u => ({
+        id: u.id,
+        username: u.username,
+        subscriptionTier: u.subscriptionTier,
+        skillLevel: u.skillLevel,
+        bats: u.bats,
+        age: u.age,
+        city: u.city,
+        state: u.state,
+        profileComplete: u.profileComplete,
+        uploadCount: userVideoMap.get(u.id)?.length ?? 0,
+        videos: (userVideoMap.get(u.id) ?? []).map(v => ({
+          id: v.id,
+          title: v.title,
+          sourceUrl: v.sourceUrl,
+          createdAt: v.createdAt,
+        })),
+      }));
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to fetch users" });
+    }
+  });
+
   app.get("/api/players", async (_req, res) => {
     try {
       const players = await storage.getAllPlayers();

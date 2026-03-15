@@ -53,7 +53,8 @@ interface MlbLookupResult {
 export default function Admin() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<"videos" | "uploads" | "players">("videos");
+  const [activeTab, setActiveTab] = useState<"videos" | "users" | "players">("videos");
+  const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
 
   // Video state
   const [filterCategory, setFilterCategory] = useState("All");
@@ -74,6 +75,16 @@ export default function Admin() {
   const { data: players = [] } = useQuery({
     queryKey: ["/api/players"],
     queryFn: fetchPlayers,
+  });
+
+  const { data: adminUsers = [] } = useQuery({
+    queryKey: ["/api/admin/users"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/users");
+      if (!res.ok) throw new Error("Failed to fetch users");
+      return res.json();
+    },
+    enabled: activeTab === "users",
   });
 
   const deleteMutation = useMutation({
@@ -195,18 +206,15 @@ export default function Admin() {
           Videos
         </button>
         <button
-          onClick={() => setActiveTab("uploads")}
+          onClick={() => setActiveTab("users")}
           className={`px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors ${
-            activeTab === "uploads"
+            activeTab === "users"
               ? "border-primary text-primary"
               : "border-transparent text-muted-foreground hover:text-foreground"
           }`}
         >
-          <Upload className="w-4 h-4 inline mr-2" />
-          User Uploads
-          {uploadCount > 0 && (
-            <span className="ml-2 text-xs bg-secondary px-1.5 py-0.5 rounded-full text-muted-foreground">{uploadCount}</span>
-          )}
+          <UserPlus className="w-4 h-4 inline mr-2" />
+          Users
         </button>
         <button
           onClick={() => setActiveTab("players")}
@@ -341,55 +349,99 @@ export default function Admin() {
       )}
 
       {/* ── USER UPLOADS TAB ── */}
-      {activeTab === "uploads" && (
+      {activeTab === "users" && (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
-            <StatCard label="Total Uploads" value={uploadCount} />
-            <StatCard label="With Files" value={userUploads.filter(v => !!v.sourceUrl).length} />
-            <StatCard label="With Source URL" value={userUploads.filter(v => !!v.sourceUrl).length} />
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <StatCard label="Total Users" value={adminUsers.length} />
+            <StatCard label="Paid" value={adminUsers.filter((u: any) => u.subscriptionTier === "paid").length} />
+            <StatCard label="With Uploads" value={adminUsers.filter((u: any) => u.uploadCount > 0).length} />
+            <StatCard label="Total Uploads" value={adminUsers.reduce((sum: number, u: any) => sum + u.uploadCount, 0)} />
           </div>
           <div className="border border-border rounded-xl overflow-hidden">
             <div className="bg-secondary/50 p-3 text-xs font-semibold text-muted-foreground grid grid-cols-12 gap-2 uppercase tracking-wider">
-              <div className="col-span-4">Title</div>
-              <div className="col-span-3">Uploaded</div>
-              <div className="col-span-3">File</div>
+              <div className="col-span-3">Username</div>
+              <div className="col-span-2">Tier</div>
+              <div className="col-span-2">Profile</div>
+              <div className="col-span-2">Location</div>
+              <div className="col-span-1 text-center">Uploads</div>
               <div className="col-span-2 text-right">Actions</div>
             </div>
             <div className="divide-y divide-border/50 max-h-[600px] overflow-y-auto">
-              {userUploads.length === 0 ? (
-                <div className="p-8 text-center text-muted-foreground">No user uploads yet.</div>
-              ) : userUploads.map((video: Video) => (
-                <div key={video.id} className="grid grid-cols-12 gap-2 p-3 items-center hover:bg-secondary/20">
-                  <div className="col-span-4 text-sm font-medium truncate">{video.title}</div>
-                  <div className="col-span-3 text-xs text-muted-foreground">
-                    {(video as any).createdAt
-                      ? new Date((video as any).createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-                      : "—"}
-                  </div>
-                  <div className="col-span-3 text-xs text-muted-foreground truncate">
-                    {video.sourceUrl ? (
-                      <span className="flex items-center gap-1">
-                        <CheckCircle2 className="w-3 h-3 text-green-500 shrink-0" /> R2 stored
+              {adminUsers.length === 0 ? (
+                <div className="p-8 text-center text-muted-foreground">No users yet.</div>
+              ) : adminUsers.map((u: any) => (
+                <>
+                  <div key={u.id} className="grid grid-cols-12 gap-2 p-3 items-center hover:bg-secondary/20">
+                    <div className="col-span-3 text-sm font-semibold flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0 text-xs font-bold text-primary uppercase">
+                        {u.username[0]}
+                      </div>
+                      <span className="truncate">{u.username}</span>
+                    </div>
+                    <div className="col-span-2">
+                      <span className={`text-xs px-2 py-0.5 rounded font-semibold ${u.subscriptionTier === "paid" ? "bg-primary/20 text-primary" : "bg-secondary text-muted-foreground"}`}>
+                        {u.subscriptionTier === "paid" ? "Pro" : "Free"}
                       </span>
-                    ) : (
-                      <span className="flex items-center gap-1">
-                        <AlertCircle className="w-3 h-3 text-yellow-500 shrink-0" /> No file
+                    </div>
+                    <div className="col-span-2 text-xs text-muted-foreground">
+                      {[u.skillLevel?.replace("_", " "), u.bats ? `Bats ${u.bats}` : null].filter(Boolean).join(" · ") || "—"}
+                    </div>
+                    <div className="col-span-2 text-xs text-muted-foreground truncate">
+                      {[u.city, u.state].filter(Boolean).join(", ") || "—"}
+                    </div>
+                    <div className="col-span-1 text-center">
+                      <span className={`text-xs font-bold ${u.uploadCount > 0 ? "text-foreground" : "text-muted-foreground"}`}>
+                        {u.uploadCount}
                       </span>
-                    )}
+                    </div>
+                    <div className="col-span-2 flex justify-end">
+                      {u.uploadCount > 0 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                          onClick={() => setExpandedUserId(expandedUserId === u.id ? null : u.id)}
+                        >
+                          {expandedUserId === u.id ? "Hide" : "Videos"}
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                  <div className="col-span-2 flex justify-end">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 w-7 p-0 hover:bg-destructive/20 hover:text-destructive"
-                      onClick={() => {
-                        if (confirm(`Delete "${video.title}"?`)) deleteMutation.mutate(video.id);
-                      }}
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </Button>
-                  </div>
-                </div>
+                  {expandedUserId === u.id && u.videos.length > 0 && (
+                    <div key={`${u.id}-videos`} className="bg-secondary/20 border-t border-border/50 px-4 py-3 space-y-2">
+                      {u.videos.map((v: any) => (
+                        <div key={v.id} className="flex items-center justify-between text-sm">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <PlayCircle className="w-4 h-4 text-primary shrink-0" />
+                            <span className="truncate text-xs">{v.title}</span>
+                            <span className="text-xs text-muted-foreground shrink-0">
+                              {v.createdAt ? new Date(v.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : ""}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            {v.sourceUrl ? (
+                              <span className="flex items-center gap-1 text-xs text-green-500">
+                                <CheckCircle2 className="w-3 h-3" /> Stored
+                              </span>
+                            ) : (
+                              <span className="flex items-center gap-1 text-xs text-yellow-500">
+                                <AlertCircle className="w-3 h-3" /> No file
+                              </span>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 w-6 p-0 hover:bg-destructive/20 hover:text-destructive"
+                              onClick={() => { if (confirm(`Delete "${v.title}"?`)) deleteMutation.mutate(v.id); }}
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
               ))}
             </div>
           </div>
