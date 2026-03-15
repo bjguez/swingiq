@@ -13,7 +13,8 @@ interface AwardEntry {
   season: string;
 }
 
-function getAwardDisplay(award: { id: string; name: string }): { emoji: string; label: string } | null {
+function getAwardDisplay(award: { id: string; name: string } | null | undefined): { emoji: string; label: string } | null {
+  if (!award) return null;
   const id = (award.id ?? "").toUpperCase();
   const name = (award.name ?? "").toLowerCase();
   if (id === "ALMVP" || id === "NLMVP" || name.includes("most valuable player")) return { emoji: "🏆", label: "MVP" };
