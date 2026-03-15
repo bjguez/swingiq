@@ -376,16 +376,24 @@ function PlayerStatsSection({ player, awards = [] }: { player: MlbPlayer; awards
     enabled: !!player.savantId && showTable,
   });
 
+  // Extract 4-digit year from whatever format the awards API returns
+  const yearOf = (s: string | number) => String(s).match(/\d{4}/)?.[0] ?? String(s);
+
   const awardsByYear = useMemo(() => {
     const map = new Map<string, string[]>();
     for (const a of awards) {
       const display = getAwardDisplay(a.award);
       if (!display) continue;
-      const key = String(a.season);
+      const key = yearOf(a.season);
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(display.emoji);
     }
+    if (awards.length > 0) console.log("[Awards] keys in map:", Array.from(map.keys()).slice(0, 5));
     return map;
+  }, [awards]);
+
+  useEffect(() => {
+    if (awards.length > 0) console.log("[Awards] sample entry:", JSON.stringify(awards[0]));
   }, [awards]);
 
   const hasStats = player.battingAvg != null || player.homeRuns != null || player.rbi != null ||
@@ -455,7 +463,7 @@ function PlayerStatsSection({ player, awards = [] }: { player: MlbPlayer; awards
                   <tr key={`${s.season}-${i}`} className="hover:bg-secondary/20 transition-colors">
                     <td className="px-3 py-2 font-bold text-foreground whitespace-nowrap">
                       {s.season}
-                      {(awardsByYear.get(String(s.season)) ?? []).map((e, j) => (
+                      {(awardsByYear.get(yearOf(s.season)) ?? []).map((e, j) => (
                         <span key={j} className="ml-0.5">{e}</span>
                       ))}
                     </td>
