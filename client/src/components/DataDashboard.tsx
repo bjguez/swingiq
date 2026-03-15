@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Upload, ChevronRight, Film, User, Search } from "lucide-react";
+import { Upload, ChevronRight, Film, User, Search, ChevronLeft } from "lucide-react";
 import { Link } from "wouter";
 import { UserVideoCard } from "./UserVideoCard";
 import { useQuery } from "@tanstack/react-query";
@@ -35,7 +35,7 @@ export default function DataDashboard({ player, onSelectVideo, onSelectProVideo,
 
   return (
     <div className="space-y-6">
-      <PlayerHeader player={player} />
+      <PlayerHeader player={player} onBack={() => onPlayerSelected?.("")} />
       <PlayerStatsSection player={player} />
       <PlayerClipsSection player={player} allVideos={allVideos} onSelectProVideo={onSelectProVideo} />
       {userVideos.length > 0 && <UserVideosSection videos={userVideos} onSelectVideo={onSelectVideo} />}
@@ -216,7 +216,7 @@ function PlayerCard({ player: p, onPlayerSelected }: { player: MlbPlayer; onPlay
 
 // ─── Player Header ────────────────────────────────────────────────────────────
 
-function PlayerHeader({ player }: { player: MlbPlayer }) {
+function PlayerHeader({ player, onBack }: { player: MlbPlayer; onBack?: () => void }) {
   const headshotUrl = player.savantId
     ? `https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_213,q_auto:best/v1/people/${player.savantId}/headshot/67/current`
     : player.imageUrl ?? null;
@@ -245,6 +245,15 @@ function PlayerHeader({ player }: { player: MlbPlayer }) {
           {player.weight && `, ${player.weight} lbs`}
         </p>
       </div>
+      {onBack && (
+        <button
+          onClick={onBack}
+          className="shrink-0 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <ChevronLeft className="w-3.5 h-3.5" />
+          Change Player
+        </button>
+      )}
     </div>
   );
 }

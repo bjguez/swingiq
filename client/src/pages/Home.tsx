@@ -39,6 +39,7 @@ export default function Home() {
 
   const handleSelectProVideo = useCallback((videoUrl: string, label?: string) => {
     setExternalProVideo({ src: videoUrl, label: label ?? "Pro Swing" });
+    comparisonRef.current?.scrollIntoView({ behavior: "smooth" });
   }, []);
 
   const handleRightVideoSelected = useCallback((label: string) => {
@@ -46,7 +47,7 @@ export default function Home() {
   }, []);
 
   const handlePlayerSelected = useCallback((playerName: string) => {
-    setSelectedPlayerName(playerName);
+    setSelectedPlayerName(playerName || null);
   }, []);
 
   const leftLoaded = !!externalVideo;
