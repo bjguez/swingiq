@@ -78,6 +78,8 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel, ex
   const [poseResult, setPoseResult] = useState<PoseResult | null>(null);
   const [poseLoading, setPoseLoading] = useState(false);
   const poseRafRef = useRef<number>(0);
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [controlsVisible, setControlsVisible] = useState(true);
   const lastPoseTimeRef = useRef<number>(-1);
 
   const leftVideoRef = useRef<VideoPlayerHandle>(null);
@@ -263,6 +265,16 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel, ex
     setTimerEnd(null);
   }, []);
 
+  const resetHideTimer = useCallback(() => {
+    if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    hideTimerRef.current = setTimeout(() => setControlsVisible(false), 4000);
+  }, []);
+
+  const showControls = useCallback(() => {
+    setControlsVisible(true);
+    resetHideTimer();
+  }, [resetHideTimer]);
+
   const activePoseVideoSrc = activePanel === "right" ? rightVideoSrc : leftVideoSrc;
   const activePoseRef = activePanel === "right" ? rightVideoRef : leftVideoRef;
 
@@ -311,6 +323,17 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel, ex
     }
   }, [currentTime, poseEnabled, activePoseVideoSrc, activePoseRef, runPoseDetection, isFullscreen]);
 
+  useEffect(() => {
+    if (isFullscreen) {
+      setControlsVisible(true);
+      resetHideTimer();
+    } else {
+      setControlsVisible(true);
+      if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    }
+    return () => { if (hideTimerRef.current) clearTimeout(hideTimerRef.current); };
+  }, [isFullscreen, resetHideTimer]);
+
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
     const s = Math.floor(seconds % 60);
@@ -327,12 +350,14 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel, ex
   return (
     <div
       ref={containerRef}
-      className={`flex flex-col gap-4 bg-card border border-border rounded-xl p-4 shadow-lg ${
-        isFullscreen ? 'fixed inset-0 z-[9999] rounded-none border-none' : ''
-      }`}
+      className={
+        isFullscreen
+          ? 'fixed inset-0 z-[9999] bg-black overflow-hidden'
+          : 'flex flex-col gap-4 bg-card border border-border rounded-xl p-4 shadow-lg'
+      }
     >
       {/* Videos Container */}
-      <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${isFullscreen ? 'flex-1 min-h-0 grid-rows-[1fr]' : ''}`}>
+      <div className={isFullscreen ? 'absolute inset-0 grid grid-cols-2 gap-px' : 'grid grid-cols-1 md:grid-cols-2 gap-4'}>
         
         {/* Left (Amateur) Video */}
         <div
@@ -341,7 +366,7 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel, ex
             activePanel === 'left' ? 'ring-2 ring-primary border border-primary/50' :
             'border border-border'
           }`}
-          onClick={() => { setActivePanel("left"); setSynced(false); }}
+          onClick={() => { setActivePanel("left"); setSynced(false); if (isFullscreen) showControls(); }}
         >
           <div className="absolute top-0 left-0 right-0 p-3 bg-gradient-to-b from-black/80 to-transparent z-30 flex justify-between items-start pointer-events-none">
             <div>
@@ -439,7 +464,7 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel, ex
             activePanel === 'right' ? 'ring-2 ring-primary border border-primary/50' :
             'border border-border'
           }`}
-          onClick={() => { setActivePanel("right"); setSynced(false); }}
+          onClick={() => { setActivePanel("right"); setSynced(false); if (isFullscreen) showControls(); }}
         >
           <div className="absolute top-0 left-0 right-0 p-3 bg-gradient-to-b from-black/80 to-transparent z-30 flex justify-between items-start pointer-events-none">
             <div>
@@ -530,7 +555,16 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel, ex
       </div>
 
       {/* Drawing Toolbar — horizontal, centered, below videos */}
-      <div className="flex items-center justify-center gap-2 py-2 px-3 border border-border rounded-lg bg-secondary/20 overflow-x-auto">
+      <div
+        className={`flex items-center justify-center gap-2 py-2 px-3 overflow-x-auto transition-all duration-300 ${
+          isFullscreen
+            ? `absolute top-0 inset-x-0 z-50 bg-black/80 backdrop-blur-sm border-b border-white/10 ${
+                controlsVisible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-full pointer-events-none'
+              }`
+            : 'border border-border rounded-lg bg-secondary/20'
+        }`}
+        onPointerDown={isFullscreen ? resetHideTimer : undefined}
+      >
         <ToolButton icon={<MousePointer2 className="w-4 h-4" />} active={activeTool === "select"} tooltip="Select" onClick={() => setActiveTool("select")} />
         <ToolButton icon={<PenTool className="w-4 h-4" />} active={activeTool === "pen"} tooltip="Freehand" onClick={() => setActiveTool("pen")} />
         <ToolButton icon={<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="12" y1="4" x2="12" y2="20" /></svg>} active={activeTool === "line"} tooltip="Straight Line" onClick={() => setActiveTool("line")} />
@@ -590,7 +624,16 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel, ex
       </div>
 
       {/* Playback Controls */}
-      <div className="bg-secondary/30 border border-border rounded-lg p-4 flex flex-col gap-4">
+      <div
+        className={`flex flex-col transition-all duration-300 ${
+          isFullscreen
+            ? `absolute bottom-0 inset-x-0 z-50 bg-black/80 backdrop-blur-sm border-t border-white/10 px-4 pt-3 pb-4 gap-3 ${
+                controlsVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-full pointer-events-none'
+              }`
+            : 'bg-secondary/30 border border-border rounded-lg p-4 gap-4'
+        }`}
+        onPointerDown={isFullscreen ? resetHideTimer : undefined}
+      >
         <div className="flex items-center gap-4">
           <Button 
             variant="outline" 
@@ -668,6 +711,17 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel, ex
           </div>
         </div>
       </div>
+
+      {/* Fullscreen: always-visible exit button when controls are hidden */}
+      {isFullscreen && !controlsVisible && (
+        <button
+          onClick={showControls}
+          className="absolute top-3 right-3 z-50 bg-black/50 rounded-full p-2 text-white/60 hover:text-white transition-colors"
+          title="Show controls"
+        >
+          <Maximize className="w-4 h-4" />
+        </button>
+      )}
     </div>
   );
 }
