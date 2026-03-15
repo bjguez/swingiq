@@ -138,9 +138,9 @@ export async function registerRoutes(
       }
 
       const clipDuration = endTime - startTime;
-      const ext = path.extname(video.sourceUrl) || ".mp4";
-      const tmpInput = path.join(uploadDir, `trim-in-${Date.now()}${ext}`);
-      const tmpOutput = path.join(uploadDir, `trim-out-${Date.now()}${ext}`);
+      const srcExt = path.extname(video.sourceUrl) || ".mp4";
+      const tmpInput = path.join(uploadDir, `trim-in-${Date.now()}${srcExt}`);
+      const tmpOutput = path.join(uploadDir, `trim-out-${Date.now()}.mp4`);
 
       // Download from R2 to temp file
       if (isR2Key(video.sourceUrl)) {
@@ -150,11 +150,9 @@ export async function registerRoutes(
           Bucket: process.env.R2_BUCKET_NAME!,
           Key: video.sourceUrl,
         }));
-        const chunks: Buffer[] = [];
-        for await (const chunk of obj.Body as AsyncIterable<Uint8Array>) {
-          chunks.push(Buffer.from(chunk));
-        }
-        fs.writeFileSync(tmpInput, Buffer.concat(chunks));
+        const { pipeline } = await import("stream/promises");
+        const writeStream = fs.createWriteStream(tmpInput);
+        await pipeline(obj.Body as NodeJS.ReadableStream, writeStream);
       } else {
         const localPath = path.join(uploadDir, path.basename(video.sourceUrl));
         if (!fs.existsSync(localPath)) {
@@ -165,14 +163,18 @@ export async function registerRoutes(
 
       await new Promise<void>((resolve, reject) => {
         execFile("ffmpeg", [
-          "-i", tmpInput,
           "-ss", startTime.toString(),
+          "-i", tmpInput,
           "-t", clipDuration.toString(),
-          "-c", "copy",
+          "-c:v", "libx264",
+          "-preset", "fast",
+          "-crf", "23",
+          "-c:a", "aac",
+          "-movflags", "+faststart",
           "-avoid_negative_ts", "make_zero",
           "-y",
           tmpOutput,
-        ], (error, _stdout, stderr) => {
+        ], { maxBuffer: 100 * 1024 * 1024 }, (error, _stdout, stderr) => {
           if (error) { console.error("FFmpeg error:", stderr); reject(new Error("FFmpeg trimming failed")); }
           else resolve();
         });
@@ -184,7 +186,7 @@ export async function registerRoutes(
 
       // Upload trimmed file to R2
       const trimBuffer = fs.readFileSync(tmpOutput);
-      const newKey = await uploadToR2(trimBuffer, `trimmed${ext}`, "video/mp4");
+      const newKey = await uploadToR2(trimBuffer, "trimmed.mp4", "video/mp4");
 
       // Delete old R2 object if applicable
       if (isR2Key(video.sourceUrl)) {
