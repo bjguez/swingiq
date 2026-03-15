@@ -266,13 +266,30 @@ function fmtRate(v: number | null | undefined): string | null {
   return v.toFixed(3).replace(/^0\./, ".");
 }
 
-function StatTile({ label, value, isRate = false }: { label: string; value: number | null | undefined; isRate?: boolean }) {
+type StatKey = "avg" | "hr" | "rbi" | "obp" | "slg" | "ops";
+
+function statColor(stat: StatKey, value: string | number | null | undefined): string {
+  if (value == null) return "";
+  const n = typeof value === "string" ? parseFloat(value) : value;
+  if (isNaN(n)) return "";
+  switch (stat) {
+    case "avg": return n >= 0.300 ? "text-green-400" : n >= 0.275 ? "text-orange-400" : "";
+    case "hr":  return n >= 30   ? "text-green-400" : n >= 20    ? "text-orange-400" : "";
+    case "rbi": return n >= 100  ? "text-green-400" : n >= 75    ? "text-orange-400" : "";
+    case "obp": return n >= 0.370 ? "text-green-400" : n >= 0.340 ? "text-orange-400" : "";
+    case "slg": return n >= 0.500 ? "text-green-400" : n >= 0.460 ? "text-orange-400" : "";
+    case "ops": return n >= 0.821 ? "text-green-400" : n >= 0.780 ? "text-orange-400" : "";
+  }
+}
+
+function StatTile({ label, value, isRate = false, stat }: { label: string; value: number | null | undefined; isRate?: boolean; stat?: StatKey }) {
   if (value == null) return null;
   const display = isRate ? fmtRate(value)! : String(value);
+  const color = stat ? statColor(stat, value) : "";
   return (
     <div className="bg-secondary/40 rounded-lg p-3 flex flex-col gap-1">
       <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-semibold leading-tight">{label}</p>
-      <p className="text-2xl font-bold font-mono leading-none">{display}</p>
+      <p className={`text-2xl font-bold font-mono leading-none ${color || "text-foreground"}`}>{display}</p>
     </div>
   );
 }
@@ -332,12 +349,12 @@ function PlayerStatsSection({ player }: { player: MlbPlayer }) {
 
       {hasStats && (
         <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-          <StatTile label="AVG" value={player.battingAvg} isRate />
-          <StatTile label="HR" value={player.homeRuns} />
-          <StatTile label="RBI" value={player.rbi} />
-          <StatTile label="OBP" value={player.obp} isRate />
-          <StatTile label="SLG" value={player.slg} isRate />
-          <StatTile label="OPS" value={player.ops} isRate />
+          <StatTile label="AVG" value={player.battingAvg} isRate stat="avg" />
+          <StatTile label="HR" value={player.homeRuns} stat="hr" />
+          <StatTile label="RBI" value={player.rbi} stat="rbi" />
+          <StatTile label="OBP" value={player.obp} isRate stat="obp" />
+          <StatTile label="SLG" value={player.slg} isRate stat="slg" />
+          <StatTile label="OPS" value={player.ops} isRate stat="ops" />
         </div>
       )}
 
@@ -368,14 +385,14 @@ function PlayerStatsSection({ player }: { player: MlbPlayer }) {
                   <tr key={`${s.season}-${i}`} className="hover:bg-secondary/20 transition-colors">
                     <td className="px-3 py-2 font-bold text-foreground">{s.season}</td>
                     <td className="px-3 py-2 text-muted-foreground truncate max-w-[100px]">{s.team?.name ?? "—"}</td>
-                    <td className="px-3 py-2 text-right">{s.stat.gamesPlayed ?? "—"}</td>
-                    <td className="px-3 py-2 text-right">{s.stat.atBats ?? "—"}</td>
-                    <td className="px-3 py-2 text-right">{fmt(s.stat.avg)}</td>
-                    <td className="px-3 py-2 text-right">{s.stat.homeRuns ?? "—"}</td>
-                    <td className="px-3 py-2 text-right">{s.stat.rbi ?? "—"}</td>
-                    <td className="px-3 py-2 text-right">{fmt(s.stat.obp)}</td>
-                    <td className="px-3 py-2 text-right">{fmt(s.stat.slg)}</td>
-                    <td className="px-3 py-2 text-right font-semibold text-foreground">{fmt(s.stat.ops)}</td>
+                    <td className="px-3 py-2 text-right text-muted-foreground">{s.stat.gamesPlayed ?? "—"}</td>
+                    <td className="px-3 py-2 text-right text-muted-foreground">{s.stat.atBats ?? "—"}</td>
+                    <td className={`px-3 py-2 text-right font-semibold ${statColor("avg", s.stat.avg) || "text-foreground"}`}>{fmt(s.stat.avg)}</td>
+                    <td className={`px-3 py-2 text-right font-semibold ${statColor("hr", s.stat.homeRuns) || "text-foreground"}`}>{s.stat.homeRuns ?? "—"}</td>
+                    <td className={`px-3 py-2 text-right font-semibold ${statColor("rbi", s.stat.rbi) || "text-foreground"}`}>{s.stat.rbi ?? "—"}</td>
+                    <td className={`px-3 py-2 text-right font-semibold ${statColor("obp", s.stat.obp) || "text-foreground"}`}>{fmt(s.stat.obp)}</td>
+                    <td className={`px-3 py-2 text-right font-semibold ${statColor("slg", s.stat.slg) || "text-foreground"}`}>{fmt(s.stat.slg)}</td>
+                    <td className={`px-3 py-2 text-right font-semibold ${statColor("ops", s.stat.ops) || "text-foreground"}`}>{fmt(s.stat.ops)}</td>
                   </tr>
                 ))}
               </tbody>
