@@ -10,6 +10,8 @@ export type AuthUser = {
   skillLevel?: string | null;
   bats?: string | null;
   throws?: string | null;
+  heightInches?: number | null;
+  weightLbs?: number | null;
   profileComplete?: boolean;
   subscriptionTier?: string;
 };
@@ -75,6 +77,8 @@ export function useAuth() {
       skillLevel?: string;
       bats?: string;
       throws?: string;
+      heightInches?: number;
+      weightLbs?: number;
     }) => {
       const res = await fetch("/api/auth/profile", {
         method: "PUT",

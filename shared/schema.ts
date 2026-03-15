@@ -14,6 +14,8 @@ export const users = pgTable("users", {
   skillLevel: text("skill_level"), // 'little_league' | 'select' | 'high_school' | 'college' | 'pro'
   bats: text("bats"), // 'L' | 'R'
   throws: text("throws"), // 'L' | 'R'
+  heightInches: integer("height_inches"),
+  weightLbs: integer("weight_lbs"),
   profileComplete: boolean("profile_complete").default(false).notNull(),
   // Subscription
   subscriptionTier: text("subscription_tier").default("free").notNull(),

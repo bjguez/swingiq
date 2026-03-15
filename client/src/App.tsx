@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/Home";
 import Development from "@/pages/Development";
+import Biometrics from "@/pages/Biometrics";
 import Library from "@/pages/Library";
 import MySwings from "@/pages/MySwings";
 import Admin from "@/pages/Admin";
@@ -29,6 +30,7 @@ function Router() {
         {!isLoading && user ? <Redirect to="/" /> : <AuthPage />}
       </Route>
       <Route path="/" component={Home} />
+      <Route path="/biometrics" component={Biometrics} />
       <Route path="/development" component={Development} />
       <Route path="/library" component={Library} />
       <Route path="/my-swings" component={MySwings} />

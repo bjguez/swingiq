@@ -100,6 +100,12 @@ app.use((req, res, next) => {
   await pool.query(`
     ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_tier TEXT NOT NULL DEFAULT 'free'
   `);
+  await pool.query(`
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS height_inches INTEGER
+  `);
+  await pool.query(`
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS weight_lbs INTEGER
+  `);
 
   await registerRoutes(httpServer, app);
 

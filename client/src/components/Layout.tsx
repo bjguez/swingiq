@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Video, BarChart2, Bell, Menu, X, User, Upload, Library, Film, Lock } from "lucide-react";
+import { Video, BarChart2, Bell, Menu, X, User, Upload, Library, Film, Lock, Dna } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { VideoLibraryModal } from "@/components/VideoLibraryModal";
 import { Link, useLocation } from "wouter";
@@ -18,6 +18,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     { href: "/", icon: <Video className="w-4 h-4 mr-2" />, label: "Analysis" },
     { href: "/library", icon: <Library className="w-4 h-4 mr-2" />, label: "Pro Library" },
     { href: "/my-swings", icon: <Film className="w-4 h-4 mr-2" />, label: "My Swings" },
+    { href: "/biometrics", icon: <Dna className="w-4 h-4 mr-2" />, label: "Biometrics", badge: <Lock className="w-3 h-3 ml-1.5 text-yellow-500" /> },
     { href: "/development", icon: <BarChart2 className="w-4 h-4 mr-2" />, label: "Development", badge: <Lock className="w-3 h-3 ml-1.5 text-yellow-500" /> },
   ];
 

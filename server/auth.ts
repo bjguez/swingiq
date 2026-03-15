@@ -129,6 +129,7 @@ export function setupAuth(app: Express) {
       id: user.id, username: user.username, isAdmin,
       age: user.age, city: user.city, state: user.state,
       skillLevel: user.skillLevel, bats: user.bats, throws: user.throws,
+      heightInches: user.heightInches, weightLbs: user.weightLbs,
       profileComplete: user.profileComplete,
       subscriptionTier: user.subscriptionTier ?? "free",
     });
@@ -137,7 +138,7 @@ export function setupAuth(app: Express) {
   app.put("/api/auth/profile", async (req, res, next) => {
     if (!req.user) return res.status(401).json({ message: "Not authenticated" });
     try {
-      const { age, city, state, skillLevel, bats, throws: throwHand } = req.body;
+      const { age, city, state, skillLevel, bats, throws: throwHand, heightInches, weightLbs } = req.body;
       const updated = await storage.updateUser((req.user as User).id, {
         age: age ? Number(age) : null,
         city: city || null,
@@ -145,6 +146,8 @@ export function setupAuth(app: Express) {
         skillLevel: skillLevel || null,
         bats: bats || null,
         throws: throwHand || null,
+        heightInches: heightInches ? Number(heightInches) : null,
+        weightLbs: weightLbs ? Number(weightLbs) : null,
         profileComplete: true,
       });
       if (!updated) return res.status(404).json({ message: "User not found" });
@@ -154,6 +157,7 @@ export function setupAuth(app: Express) {
         id: updated.id, username: updated.username, isAdmin,
         age: updated.age, city: updated.city, state: updated.state,
         skillLevel: updated.skillLevel, bats: updated.bats, throws: updated.throws,
+        heightInches: updated.heightInches, weightLbs: updated.weightLbs,
         profileComplete: updated.profileComplete,
         subscriptionTier: updated.subscriptionTier ?? "free",
       });
