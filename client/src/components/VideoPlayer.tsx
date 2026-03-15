@@ -89,6 +89,7 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
         src={src}
         className={className}
         style={rotationStyle}
+        crossOrigin="anonymous"
         playsInline
         preload="auto"
         onError={() => setLoadError(true)}
