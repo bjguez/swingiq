@@ -388,12 +388,7 @@ function PlayerStatsSection({ player, awards = [] }: { player: MlbPlayer; awards
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(display.emoji);
     }
-    if (awards.length > 0) console.log("[Awards] keys in map:", Array.from(map.keys()).slice(0, 5));
     return map;
-  }, [awards]);
-
-  useEffect(() => {
-    if (awards.length > 0) console.log("[Awards] sample entry:", JSON.stringify(awards[0]));
   }, [awards]);
 
   const hasStats = player.battingAvg != null || player.homeRuns != null || player.rbi != null ||
