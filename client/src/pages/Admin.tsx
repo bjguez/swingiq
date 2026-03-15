@@ -754,29 +754,39 @@ export default function Admin() {
             <div className="border border-border rounded-xl overflow-hidden">
               <div className="bg-secondary/50 p-3 text-xs font-semibold text-muted-foreground grid grid-cols-12 gap-2 uppercase tracking-wider">
                 <div className="col-span-1">Status</div>
-                <div className="col-span-4">Title</div>
-                <div className="col-span-3">Player</div>
+                <div className="col-span-3">Title</div>
+                <div className="col-span-2">Player</div>
                 <div className="col-span-1">Type</div>
-                <div className="col-span-3">R2 Key</div>
+                <div className="col-span-1">Format</div>
+                <div className="col-span-4">R2 Key</div>
               </div>
               <div className="divide-y divide-border/50 max-h-[600px] overflow-y-auto">
-                {r2Health.videos.map(v => (
-                  <div key={v.id} className="grid grid-cols-12 gap-2 p-3 items-center text-sm">
-                    <div className="col-span-1">
-                      {v.exists
-                        ? <CheckCircle2 className="w-4 h-4 text-green-500" />
-                        : <AlertCircle className="w-4 h-4 text-destructive" />}
+                {r2Health.videos.map(v => {
+                  const ext = v.key.split(".").pop()?.toLowerCase() ?? "?";
+                  const needsTranscode = ["mov", "avi", "webm"].includes(ext);
+                  return (
+                    <div key={v.id} className="grid grid-cols-12 gap-2 p-3 items-center text-sm">
+                      <div className="col-span-1">
+                        {v.exists
+                          ? <CheckCircle2 className="w-4 h-4 text-green-500" />
+                          : <AlertCircle className="w-4 h-4 text-destructive" />}
+                      </div>
+                      <div className={`col-span-3 font-medium truncate ${!v.exists ? "text-destructive" : ""}`}>{v.title}</div>
+                      <div className="col-span-2 text-xs text-muted-foreground truncate">{v.playerName || "—"}</div>
+                      <div className="col-span-1">
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${v.isProVideo ? "bg-primary/20 text-primary" : "bg-secondary text-muted-foreground"}`}>
+                          {v.isProVideo ? "Pro" : "User"}
+                        </span>
+                      </div>
+                      <div className="col-span-1">
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono font-semibold uppercase ${needsTranscode ? "bg-orange-500/20 text-orange-400" : "bg-green-500/10 text-green-500"}`}>
+                          .{ext}
+                        </span>
+                      </div>
+                      <div className="col-span-4 text-xs text-muted-foreground font-mono truncate">{v.key}</div>
                     </div>
-                    <div className={`col-span-4 font-medium truncate ${!v.exists ? "text-destructive" : ""}`}>{v.title}</div>
-                    <div className="col-span-3 text-xs text-muted-foreground truncate">{v.playerName || "—"}</div>
-                    <div className="col-span-1">
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${v.isProVideo ? "bg-primary/20 text-primary" : "bg-secondary text-muted-foreground"}`}>
-                        {v.isProVideo ? "Pro" : "User"}
-                      </span>
-                    </div>
-                    <div className="col-span-3 text-xs text-muted-foreground font-mono truncate">{v.key}</div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
