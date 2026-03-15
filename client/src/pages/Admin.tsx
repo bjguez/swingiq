@@ -78,6 +78,8 @@ export default function Admin() {
 
   // Player state
   const [showAddPlayerForm, setShowAddPlayerForm] = useState(false);
+  const [backfilling, setBackfilling] = useState(false);
+  const [backfillResult, setBackfillResult] = useState<{ updated: number; failed: number; total: number } | null>(null);
 
   const { data: allVideos = [], isLoading } = useQuery({
     queryKey: ["/api/videos"],
@@ -610,16 +612,44 @@ export default function Admin() {
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 flex-1 mr-4">
               <StatCard label="Total Players" value={players.length} />
               <StatCard label="With Statcast" value={players.filter((p: MlbPlayer) => p.avgExitVelo != null).length} />
-              <StatCard label="With Bat Speed" value={players.filter((p: MlbPlayer) => p.batSpeed != null).length} />
+              <StatCard label="With Career Stats" value={players.filter((p: MlbPlayer) => p.battingAvg != null).length} />
             </div>
-            <Button
-              onClick={() => setShowAddPlayerForm(!showAddPlayerForm)}
-              className="bg-primary text-primary-foreground hover:bg-primary/90 shrink-0"
-            >
-              <UserPlus className="w-4 h-4 mr-2" />
-              Add Player
-            </Button>
+            <div className="flex gap-2 shrink-0">
+              <Button
+                variant="outline"
+                disabled={backfilling}
+                onClick={async () => {
+                  setBackfilling(true);
+                  setBackfillResult(null);
+                  try {
+                    const res = await fetch("/api/admin/backfill-player-stats", { method: "POST" });
+                    const data = await res.json();
+                    setBackfillResult(data);
+                    queryClient.invalidateQueries({ queryKey: ["/api/players"] });
+                  } finally {
+                    setBackfilling(false);
+                  }
+                }}
+              >
+                {backfilling ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
+                Backfill Stats
+              </Button>
+              <Button
+                onClick={() => setShowAddPlayerForm(!showAddPlayerForm)}
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
+              >
+                <UserPlus className="w-4 h-4 mr-2" />
+                Add Player
+              </Button>
+            </div>
           </div>
+          {backfillResult && (
+            <div className="mb-4 p-3 rounded-lg border border-border bg-secondary/30 text-sm text-muted-foreground">
+              Backfill complete: <span className="text-foreground font-medium">{backfillResult.updated}</span> updated,{" "}
+              <span className="text-foreground font-medium">{backfillResult.failed}</span> failed,{" "}
+              <span className="text-foreground font-medium">{backfillResult.total}</span> total processed.
+            </div>
+          )}
 
           {showAddPlayerForm && (
             <AddPlayerForm

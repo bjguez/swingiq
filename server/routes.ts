@@ -407,6 +407,44 @@ export async function registerRoutes(
     }
   });
 
+  // Backfill career stats for all players with a savantId but missing batting stats
+  app.post("/api/admin/backfill-player-stats", async (_req, res) => {
+    try {
+      const allPlayers = await storage.getAllPlayers();
+      const needsStats = allPlayers.filter(p => p.savantId && p.battingAvg == null);
+      let updated = 0;
+      let failed = 0;
+      for (const player of needsStats) {
+        try {
+          const careerRes = await fetch(
+            `https://statsapi.mlb.com/api/v1/people/${player.savantId}/stats?stats=career&group=hitting`,
+            { signal: AbortSignal.timeout(6000) }
+          );
+          if (!careerRes.ok) { failed++; continue; }
+          const careerData = await careerRes.json() as any;
+          const stat = careerData.stats?.[0]?.splits?.[0]?.stat ?? null;
+          if (!stat) { failed++; continue; }
+          const toNum = (v: any) => v != null && v !== "" ? parseFloat(v) || null : null;
+          const toInt = (v: any) => v != null && v !== "" ? parseInt(v, 10) || null : null;
+          await storage.updatePlayer(player.id, {
+            battingAvg: toNum(stat.avg),
+            homeRuns: toInt(stat.homeRuns),
+            rbi: toInt(stat.rbi),
+            obp: toNum(stat.obp),
+            slg: toNum(stat.slg),
+            ops: toNum(stat.ops),
+          });
+          updated++;
+        } catch {
+          failed++;
+        }
+      }
+      res.json({ total: needsStats.length, updated, failed });
+    } catch (err) {
+      res.status(500).json({ message: "Backfill failed" });
+    }
+  });
+
   // MLB Stats API proxy — avoids CORS and keeps API calls server-side
   app.get("/api/mlb/players/:mlbId/stats", async (req, res) => {
     const { mlbId } = req.params;

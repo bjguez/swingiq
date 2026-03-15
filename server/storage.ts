@@ -20,6 +20,7 @@ export interface IStorage {
   getPlayers(opts: { search?: string; bats?: string; limit?: number; offset?: number; seed?: number }): Promise<{ players: MlbPlayer[]; total: number }>;
   getPlayer(id: string): Promise<MlbPlayer | undefined>;
   createPlayer(player: InsertMlbPlayer): Promise<MlbPlayer>;
+  updatePlayer(id: string, data: Partial<Omit<MlbPlayer, "id">>): Promise<MlbPlayer | undefined>;
   deletePlayer(id: string): Promise<boolean>;
 
   getAllVideos(): Promise<Video[]>;
@@ -96,6 +97,11 @@ export class DatabaseStorage implements IStorage {
   async createPlayer(player: InsertMlbPlayer): Promise<MlbPlayer> {
     const [created] = await db.insert(mlbPlayers).values(player).returning();
     return created;
+  }
+
+  async updatePlayer(id: string, data: Partial<Omit<MlbPlayer, "id">>): Promise<MlbPlayer | undefined> {
+    const [updated] = await db.update(mlbPlayers).set(data).where(eq(mlbPlayers.id, id)).returning();
+    return updated;
   }
 
   async deletePlayer(id: string): Promise<boolean> {
