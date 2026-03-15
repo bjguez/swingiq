@@ -25,6 +25,7 @@ export default function Home() {
   const [selectedPlayerName, setSelectedPlayerName] = useState<string | null>(null);
   const [showGuide, setShowGuide] = useState(true);
   const comparisonRef = useRef<HTMLDivElement>(null);
+  const dashboardRef = useRef<HTMLDivElement>(null);
 
   const selectedPlayer = (
     selectedPlayerName
@@ -48,6 +49,7 @@ export default function Home() {
 
   const handlePlayerSelected = useCallback((playerName: string) => {
     setSelectedPlayerName(playerName || null);
+    if (playerName) setTimeout(() => dashboardRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
   }, []);
 
   const leftLoaded = !!externalVideo;
@@ -156,12 +158,14 @@ export default function Home() {
         />
       </div>
 
-      <DataDashboard
-        player={selectedPlayer}
-        onSelectVideo={handleSelectUserVideo}
-        onSelectProVideo={handleSelectProVideo}
-        onPlayerSelected={handlePlayerSelected}
-      />
+      <div ref={dashboardRef}>
+        <DataDashboard
+          player={selectedPlayer}
+          onSelectVideo={handleSelectUserVideo}
+          onSelectProVideo={handleSelectProVideo}
+          onPlayerSelected={handlePlayerSelected}
+        />
+      </div>
     </Layout>
   );
 }
