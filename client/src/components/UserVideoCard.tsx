@@ -15,6 +15,7 @@ interface UserVideoCardProps {
   selected?: boolean;
   bulkMode?: boolean;
   onToggleSelect?: (id: string) => void;
+  playLabel?: string;
 }
 
 export function UserVideoCard({
@@ -26,6 +27,7 @@ export function UserVideoCard({
   selected = false,
   bulkMode = false,
   onToggleSelect,
+  playLabel,
 }: UserVideoCardProps) {
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
@@ -94,9 +96,16 @@ export function UserVideoCard({
             onClick={() => onSelect(video)}
             className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity"
           >
-            <div className="bg-primary rounded-full p-2">
-              <Play className="w-5 h-5 text-primary-foreground fill-current" />
-            </div>
+            {playLabel ? (
+              <div className="bg-primary rounded-lg px-3 py-1.5 flex items-center gap-1.5">
+                <Play className="w-3.5 h-3.5 text-primary-foreground fill-current" />
+                <span className="text-primary-foreground text-xs font-semibold">{playLabel}</span>
+              </div>
+            ) : (
+              <div className="bg-primary rounded-full p-2">
+                <Play className="w-5 h-5 text-primary-foreground fill-current" />
+              </div>
+            )}
           </button>
         )}
       </div>

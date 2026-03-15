@@ -6,7 +6,7 @@ import { UserVideoCard } from "./UserVideoCard";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "./ui/button";
 import type { MlbPlayer, Video } from "@shared/schema";
-import { fetchVideos, fetchPlayersPage } from "@/lib/api";
+import { fetchVideos, fetchPlayersPage, fetchVideoPresignedUrl } from "@/lib/api";
 
 interface DataDashboardProps {
   player: MlbPlayer | null;
@@ -348,7 +348,15 @@ function PlayerClipsSection({
               <UserVideoCard
                 key={video.id}
                 video={video}
-                onSelect={onSelectProVideo ? (v) => onSelectProVideo(v.sourceUrl!, player.name) : undefined}
+                onSelect={onSelectProVideo ? async (v) => {
+                  try {
+                    const url = await fetchVideoPresignedUrl(v.id);
+                    onSelectProVideo(url, player.name);
+                  } catch {
+                    onSelectProVideo(v.sourceUrl!, player.name);
+                  }
+                } : undefined}
+                playLabel="Analyze"
                 showDelete={false}
                 showTrim={false}
               />
