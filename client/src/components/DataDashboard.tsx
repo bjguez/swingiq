@@ -8,6 +8,23 @@ import { Button } from "./ui/button";
 import type { MlbPlayer, Video } from "@shared/schema";
 import { fetchVideos, fetchPlayersPage, fetchVideoPresignedUrl } from "@/lib/api";
 
+interface AwardEntry {
+  award: { id: string; name: string };
+  season: string;
+}
+
+function getAwardDisplay(award: { id: string; name: string }): { emoji: string; label: string } | null {
+  const id = (award.id ?? "").toUpperCase();
+  const name = (award.name ?? "").toLowerCase();
+  if (id === "ALMVP" || id === "NLMVP" || name.includes("most valuable player")) return { emoji: "🏆", label: "MVP" };
+  if (id === "ALSS" || id === "NLSS" || name.includes("silver slugger")) return { emoji: "🥈", label: "Silver Slugger" };
+  if (id === "ALGG" || id === "NLGG" || name.includes("gold glove")) return { emoji: "🥇", label: "Gold Glove" };
+  if (id === "ALROY" || id === "NLROY" || name.includes("rookie of the year")) return { emoji: "🌟", label: "Rookie of the Year" };
+  if (name.includes("hank aaron")) return { emoji: "👑", label: "Hank Aaron Award" };
+  if (id.includes("AS") || name.includes("all-star") || name.includes("all star")) return { emoji: "⭐", label: "All-Star" };
+  return null;
+}
+
 interface DataDashboardProps {
   player: MlbPlayer | null;
   onSelectVideo?: (videoUrl: string, label?: string) => void;
@@ -24,6 +41,12 @@ export default function DataDashboard({ player, onSelectVideo, onSelectProVideo,
   });
   const userVideos = allVideos.filter(v => !v.isProVideo && v.sourceUrl);
 
+  const { data: awards = [] } = useQuery<AwardEntry[]>({
+    queryKey: ["/api/mlb/players/awards", player?.savantId],
+    queryFn: () => fetch(`/api/mlb/players/${player!.savantId}/awards`).then(r => r.json()),
+    enabled: !!player?.savantId,
+  });
+
   if (!player) {
     return (
       <div className="space-y-6">
@@ -35,8 +58,8 @@ export default function DataDashboard({ player, onSelectVideo, onSelectProVideo,
 
   return (
     <div className="space-y-6">
-      <PlayerHeader player={player} onBack={() => onPlayerSelected?.("")} />
-      <PlayerStatsSection player={player} />
+      <PlayerHeader player={player} onBack={() => onPlayerSelected?.("")} awards={awards} />
+      <PlayerStatsSection player={player} awards={awards} />
       <PlayerClipsSection player={player} allVideos={allVideos} onSelectProVideo={onSelectProVideo} />
       {userVideos.length > 0 && <UserVideosSection videos={userVideos} onSelectVideo={onSelectVideo} />}
       <PlayerCardGrid onPlayerSelected={onPlayerSelected} />
@@ -214,9 +237,42 @@ function PlayerCard({ player: p, onPlayerSelected }: { player: MlbPlayer; onPlay
   );
 }
 
+// ─── Award Badges ─────────────────────────────────────────────────────────────
+
+function AwardBadges({ awards }: { awards: AwardEntry[] }) {
+  const groups = useMemo(() => {
+    const map = new Map<string, { emoji: string; label: string; years: string[] }>();
+    for (const a of awards) {
+      const display = getAwardDisplay(a.award);
+      if (!display) continue;
+      const key = display.emoji + display.label;
+      if (!map.has(key)) map.set(key, { ...display, years: [] });
+      map.get(key)!.years.push(a.season);
+    }
+    return Array.from(map.values());
+  }, [awards]);
+
+  if (groups.length === 0) return null;
+
+  return (
+    <div className="flex flex-wrap gap-1.5 mt-2">
+      {groups.map(({ emoji, label, years }) => (
+        <span
+          key={emoji + label}
+          className="flex items-center gap-1 bg-secondary/60 border border-border/60 rounded-full px-2 py-0.5 text-xs text-muted-foreground"
+          title={`${label}: ${years.sort().join(", ")}`}
+        >
+          <span>{emoji}</span>
+          <span>{years.length > 1 ? `${years.length}×` : years[0]}</span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
 // ─── Player Header ────────────────────────────────────────────────────────────
 
-function PlayerHeader({ player, onBack }: { player: MlbPlayer; onBack?: () => void }) {
+function PlayerHeader({ player, onBack, awards = [] }: { player: MlbPlayer; onBack?: () => void; awards?: AwardEntry[] }) {
   const headshotUrl = player.savantId
     ? `https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_213,q_auto:best/v1/people/${player.savantId}/headshot/67/current`
     : player.imageUrl ?? null;
@@ -244,6 +300,7 @@ function PlayerHeader({ player, onBack }: { player: MlbPlayer; onBack?: () => vo
           {player.height && ` · ${player.height}`}
           {player.weight && `, ${player.weight} lbs`}
         </p>
+        <AwardBadges awards={awards} />
       </div>
       {onBack && (
         <button
@@ -309,7 +366,7 @@ interface SeasonSplit {
   };
 }
 
-function PlayerStatsSection({ player }: { player: MlbPlayer }) {
+function PlayerStatsSection({ player, awards = [] }: { player: MlbPlayer; awards?: AwardEntry[] }) {
   const [showTable, setShowTable] = useState(false);
 
   const { data: statsData, isLoading } = useQuery<{ seasons: SeasonSplit[]; career: any }>({
@@ -317,6 +374,17 @@ function PlayerStatsSection({ player }: { player: MlbPlayer }) {
     queryFn: () => fetch(`/api/mlb/players/${player.savantId}/stats`).then(r => r.json()),
     enabled: !!player.savantId && showTable,
   });
+
+  const awardsByYear = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const a of awards) {
+      const display = getAwardDisplay(a.award);
+      if (!display) continue;
+      if (!map.has(a.season)) map.set(a.season, []);
+      map.get(a.season)!.push(display.emoji);
+    }
+    return map;
+  }, [awards]);
 
   const hasStats = player.battingAvg != null || player.homeRuns != null || player.rbi != null ||
     player.obp != null || player.slg != null || player.ops != null;
@@ -383,7 +451,12 @@ function PlayerStatsSection({ player }: { player: MlbPlayer }) {
               <tbody className="divide-y divide-border/40">
                 {seasons.map((s, i) => (
                   <tr key={`${s.season}-${i}`} className="hover:bg-secondary/20 transition-colors">
-                    <td className="px-3 py-2 font-bold text-foreground">{s.season}</td>
+                    <td className="px-3 py-2 font-bold text-foreground whitespace-nowrap">
+                      {s.season}
+                      {(awardsByYear.get(s.season) ?? []).map((e, j) => (
+                        <span key={j} className="ml-0.5 text-base leading-none" style={{ fontFamily: "initial" }}>{e}</span>
+                      ))}
+                    </td>
                     <td className="px-3 py-2 text-muted-foreground truncate max-w-[100px]">{s.team?.name ?? "—"}</td>
                     <td className="px-3 py-2 text-right text-muted-foreground">{s.stat.gamesPlayed ?? "—"}</td>
                     <td className="px-3 py-2 text-right text-muted-foreground">{s.stat.atBats ?? "—"}</td>
@@ -397,6 +470,32 @@ function PlayerStatsSection({ player }: { player: MlbPlayer }) {
                 ))}
               </tbody>
             </table>
+          )}
+        </div>
+      )}
+
+      {/* Legend */}
+      {(hasStats || awards.length > 0) && (
+        <div className="border-t border-border/40 pt-3 space-y-2">
+          <p className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground/60">Legend</p>
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
+            <span><span className="text-orange-400 font-semibold">Orange</span> = Great &nbsp;<span className="text-green-400 font-semibold">Green</span> = Elite</span>
+            <span>AVG <span className="text-orange-400">.275+</span> / <span className="text-green-400">.300+</span></span>
+            <span>HR <span className="text-orange-400">20+</span> / <span className="text-green-400">30+</span></span>
+            <span>RBI <span className="text-orange-400">75+</span> / <span className="text-green-400">100+</span></span>
+            <span>OBP <span className="text-orange-400">.340+</span> / <span className="text-green-400">.370+</span></span>
+            <span>SLG <span className="text-orange-400">.460+</span> / <span className="text-green-400">.500+</span></span>
+            <span>OPS <span className="text-orange-400">.780+</span> / <span className="text-green-400">.821+</span></span>
+          </div>
+          {awards.length > 0 && (
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
+              <span>⭐ All-Star</span>
+              <span>🏆 MVP</span>
+              <span>🥈 Silver Slugger</span>
+              <span>🥇 Gold Glove</span>
+              <span>🌟 Rookie of the Year</span>
+              <span>👑 Hank Aaron Award</span>
+            </div>
           )}
         </div>
       )}

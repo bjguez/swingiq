@@ -463,6 +463,18 @@ export async function registerRoutes(
     }
   });
 
+  // MLB awards proxy
+  app.get("/api/mlb/players/:mlbId/awards", async (req, res) => {
+    const { mlbId } = req.params;
+    try {
+      const response = await fetch(`https://statsapi.mlb.com/api/v1/people/${mlbId}/awards`);
+      const data = await response.json() as any;
+      res.json(data.awards ?? []);
+    } catch {
+      res.status(500).json({ message: "Failed to fetch MLB awards" });
+    }
+  });
+
   // MLB schedule/scores proxy — today's games across MLB + Spring Training
   app.get("/api/mlb/scores", async (_req, res) => {
     try {
