@@ -8,7 +8,7 @@ import { useState, useRef, useEffect } from "react";
 import type { Video, MlbPlayer } from "@shared/schema";
 import {
   Upload, Trash2, Pencil, Save, X, Plus, PlayCircle,
-  Film, Loader2, CheckCircle2, AlertCircle, Search, Filter,
+  Film, Loader2, CheckCircle2, AlertCircle, Search,
   Users, UserPlus, Scissors,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -186,8 +186,6 @@ export default function Admin() {
       playerBatsMap.get(v.playerName.toLowerCase()) === filterBats;
     return matchCat && matchSearch && matchBats;
   });
-
-  const userUploads = (allVideos as Video[]).filter(v => !v.isProVideo);
 
   const startEdit = (video: Video) => {
     setEditingId(video.id);
@@ -369,7 +367,6 @@ export default function Admin() {
                   editingId === video.id ? (
                     <EditRow
                       key={video.id}
-                      video={video}
                       editData={editData}
                       setEditData={setEditData}
                       players={players}
@@ -811,8 +808,7 @@ function VideoRow({ video, onEdit, onTrim, onDelete, deleting }: { video: Video;
   );
 }
 
-function EditRow({ video, editData, setEditData, players, onSave, onCancel, saving }: {
-  video: Video;
+function EditRow({ editData, setEditData, players, onSave, onCancel, saving }: {
   editData: Partial<Video>;
   setEditData: (d: Partial<Video>) => void;
   players: MlbPlayer[];
@@ -877,29 +873,6 @@ function EditRow({ video, editData, setEditData, players, onSave, onCancel, savi
               <option key={c} value={c}>{c}</option>
             ))}
           </select>
-        </div>
-        <div>
-          <label className="text-xs text-muted-foreground block mb-1">Source</label>
-          <select
-            value={editData.source || ""}
-            onChange={(e) => setEditData({ ...editData, source: e.target.value })}
-            className="w-full h-9 rounded-md bg-background border border-border px-3 text-sm"
-            data-testid="edit-source"
-          >
-            {sourceOptions.map(s => (
-              <option key={s} value={s}>{s}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="text-xs text-muted-foreground block mb-1">FPS</label>
-          <Input
-            type="number"
-            value={editData.fps || ""}
-            onChange={(e) => setEditData({ ...editData, fps: parseInt(e.target.value) || null })}
-            className="h-9 bg-background"
-            data-testid="edit-fps"
-          />
         </div>
         <div>
           <label className="text-xs text-muted-foreground block mb-1">Duration</label>
@@ -1273,30 +1246,6 @@ function AddVideoForm({ players, onClose, onSuccess }: { players: MlbPlayer[]; o
               <option key={c} value={c}>{c}</option>
             ))}
           </select>
-        </div>
-        <div>
-          <label className="text-xs text-muted-foreground block mb-1">Source</label>
-          <select
-            value={formData.source}
-            onChange={(e) => setFormData(prev => ({ ...prev, source: e.target.value }))}
-            className="w-full h-10 rounded-md bg-background border border-border px-3 text-sm"
-            data-testid="select-add-source"
-          >
-            {sourceOptions.map(s => (
-              <option key={s} value={s}>{s}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="text-xs text-muted-foreground block mb-1">FPS</label>
-          <Input
-            type="number"
-            value={formData.fps}
-            onChange={(e) => setFormData(prev => ({ ...prev, fps: e.target.value }))}
-            placeholder="120"
-            className="bg-background"
-            data-testid="input-add-fps"
-          />
         </div>
         <div>
           <label className="text-xs text-muted-foreground block mb-1">Duration</label>

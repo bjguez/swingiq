@@ -200,16 +200,14 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected }: Vi
               </div>
               <div className="border border-border rounded-md overflow-hidden">
                 <div className="bg-secondary/50 p-2 text-xs font-semibold text-muted-foreground grid grid-cols-12 gap-2 uppercase tracking-wider">
-                  <div className="col-span-5">Video</div>
+                  <div className="col-span-7">Video</div>
                   <div className="col-span-2">Category</div>
-                  <div className="col-span-2">Source</div>
-                  <div className="col-span-1">FPS</div>
-                  <div className="col-span-2 text-right">Action</div>
+                  <div className="col-span-3 text-right">Action</div>
                 </div>
                 <div className="divide-y divide-border/50 max-h-90 overflow-y-auto">
                   {filteredVideos.map((video: Video) => (
                     <div key={video.id} className="p-3 grid grid-cols-12 gap-2 items-center hover:bg-secondary/30 transition-colors text-sm">
-                      <div className="col-span-5 font-bold flex items-center gap-2">
+                      <div className="col-span-7 font-bold flex items-center gap-2">
                         <div className="w-8 h-8 rounded bg-secondary flex items-center justify-center shrink-0">
                           <PlayCircle className="w-4 h-4 text-primary" />
                         </div>
@@ -226,9 +224,7 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected }: Vi
                         </div>
                       </div>
                       <div className="col-span-2 text-muted-foreground text-xs">{video.category}</div>
-                      <div className="col-span-2 text-xs">{video.source}</div>
-                      <div className="col-span-1 text-xs text-muted-foreground">{video.fps || "—"}</div>
-                      <div className="col-span-2 text-right">
+                      <div className="col-span-3 text-right">
                         <Button
                           size="sm" variant="outline"
                           className="border-primary/50 text-primary hover:bg-primary/20 hover:text-primary h-8"

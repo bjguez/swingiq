@@ -38,6 +38,7 @@ export default function DataDashboard({ player, onSelectVideo, onSelectProVideo,
       <PlayerHeader player={player} />
       <PlayerClipsSection player={player} allVideos={allVideos} onSelectProVideo={onSelectProVideo} />
       {userVideos.length > 0 && <UserVideosSection videos={userVideos} onSelectVideo={onSelectVideo} />}
+      <PlayerCardGrid onPlayerSelected={onPlayerSelected} />
     </div>
   );
 }
@@ -303,7 +304,7 @@ function PlayerClipsSection({
               <UserVideoCard
                 key={video.id}
                 video={video}
-                onSelect={onSelectProVideo ? (v) => onSelectProVideo(v.sourceUrl!, v.playerName ?? v.title) : undefined}
+                onSelect={onSelectProVideo ? (v) => onSelectProVideo(v.sourceUrl!, player.name) : undefined}
                 showDelete={false}
                 showTrim={false}
               />

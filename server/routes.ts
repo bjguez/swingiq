@@ -67,7 +67,7 @@ export async function registerRoutes(
               "-movflags", "+faststart",
               "-y",
               tmpOut,
-            ], (error, _stdout, stderr) => {
+            ], { maxBuffer: 100 * 1024 * 1024 }, (error, _stdout, stderr) => {
               if (error) { console.error("FFmpeg transcode error:", stderr); reject(new Error("Transcoding failed")); }
               else resolve();
             });
@@ -303,13 +303,10 @@ export async function registerRoutes(
         const tmpIn = path.join(uploadDir, `migrate-in-${Date.now()}${ext}`);
         const tmpOut = path.join(uploadDir, `migrate-out-${Date.now()}.mp4`);
         try {
-          // Download from R2
+          // Download from R2 — stream directly to disk to avoid loading entire file into memory
           const obj = await r2.send(new GetObjectCommand({ Bucket: process.env.R2_BUCKET_NAME!, Key: oldKey }));
-          const chunks: Buffer[] = [];
-          for await (const chunk of obj.Body as AsyncIterable<Uint8Array>) {
-            chunks.push(Buffer.from(chunk));
-          }
-          fs.writeFileSync(tmpIn, Buffer.concat(chunks));
+          const { pipeline } = await import("stream/promises");
+          await pipeline(obj.Body as NodeJS.ReadableStream, fs.createWriteStream(tmpIn));
 
           // Transcode to H.264 mp4
           await new Promise<void>((resolve, reject) => {
@@ -322,8 +319,8 @@ export async function registerRoutes(
               "-movflags", "+faststart",
               "-y",
               tmpOut,
-            ], (error, _stdout, stderr) => {
-              if (error) { console.error(`FFmpeg error for ${oldKey}:`, stderr); reject(new Error("Transcoding failed")); }
+            ], { maxBuffer: 100 * 1024 * 1024 }, (error, _stdout, stderr) => {
+              if (error) { console.error(`FFmpeg error for ${oldKey}:`, stderr); reject(new Error(`Transcoding failed: ${stderr?.slice(-500)}`)); }
               else resolve();
             });
           });
