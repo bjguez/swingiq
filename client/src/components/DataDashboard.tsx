@@ -381,8 +381,9 @@ function PlayerStatsSection({ player, awards = [] }: { player: MlbPlayer; awards
     for (const a of awards) {
       const display = getAwardDisplay(a.award);
       if (!display) continue;
-      if (!map.has(a.season)) map.set(a.season, []);
-      map.get(a.season)!.push(display.emoji);
+      const key = String(a.season);
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(display.emoji);
     }
     return map;
   }, [awards]);
@@ -454,11 +455,11 @@ function PlayerStatsSection({ player, awards = [] }: { player: MlbPlayer; awards
                   <tr key={`${s.season}-${i}`} className="hover:bg-secondary/20 transition-colors">
                     <td className="px-3 py-2 font-bold text-foreground whitespace-nowrap">
                       {s.season}
-                      {(awardsByYear.get(s.season) ?? []).map((e, j) => (
-                        <span key={j} className="ml-0.5 text-base leading-none" style={{ fontFamily: "initial" }}>{e}</span>
+                      {(awardsByYear.get(String(s.season)) ?? []).map((e, j) => (
+                        <span key={j} className="ml-0.5">{e}</span>
                       ))}
                     </td>
-                    <td className="px-3 py-2 text-muted-foreground truncate max-w-[100px]">{s.team?.name ?? "—"}</td>
+                    <td className="px-3 py-2 text-muted-foreground truncate max-w-25">{s.team?.name ?? "—"}</td>
                     <td className="px-3 py-2 text-right text-muted-foreground">{s.stat.gamesPlayed ?? "—"}</td>
                     <td className="px-3 py-2 text-right text-muted-foreground">{s.stat.atBats ?? "—"}</td>
                     <td className={`px-3 py-2 text-right font-semibold ${statColor("avg", s.stat.avg) || "text-foreground"}`}>{fmt(s.stat.avg)}</td>
