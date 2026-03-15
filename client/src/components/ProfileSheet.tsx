@@ -17,6 +17,14 @@ const SKILL_LEVELS = [
   { value: "pro", label: "Pro / Semi-Pro" },
 ];
 
+const US_STATES = [
+  "AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA",
+  "HI","ID","IL","IN","IA","KS","KY","LA","ME","MD",
+  "MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ",
+  "NM","NY","NC","ND","OH","OK","OR","PA","RI","SC",
+  "SD","TN","TX","UT","VT","VA","WA","WV","WI","WY","DC",
+];
+
 const FREE_UPLOAD_LIMIT = 5;
 
 interface ProfileSheetProps {
@@ -198,14 +206,20 @@ export function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) {
                       ))}
                     </div>
 
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-2 gap-2">
                       <Input placeholder="Age" type="number" min={5} max={100}
                         value={form.age} onChange={e => setForm(f => ({ ...f, age: e.target.value }))} />
                       <Input placeholder="City"
                         value={form.city} onChange={e => setForm(f => ({ ...f, city: e.target.value }))} />
-                      <Input placeholder="State"
-                        value={form.state} onChange={e => setForm(f => ({ ...f, state: e.target.value }))} />
                     </div>
+                    <select
+                      value={form.state}
+                      onChange={e => setForm(f => ({ ...f, state: e.target.value }))}
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 text-foreground"
+                    >
+                      <option value="">State</option>
+                      {US_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
 
                     <div className="flex gap-2">
                       <Button type="submit" className="flex-1" disabled={isUpdatingProfile}>

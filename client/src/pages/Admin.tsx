@@ -1,6 +1,7 @@
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchVideos, fetchPlayers } from "@/lib/api";
 import { useState, useRef, useEffect } from "react";
@@ -14,7 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 
 const allCategories = [
   "Gather > Touchdown", "Touchdown > Finish",
-  "Hand Path", "Head Position", "Scissor Kick", "Thrust", "Full Swings"
+  "Hand Path", "Head Position", "Scissor Kick", "Thrust", "Full Swing"
 ];
 
 const sourceOptions = ["MLB.com", "YouTube", "Upload", "Baseball Savant", "Other"];
@@ -55,6 +56,7 @@ export default function Admin() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<"videos" | "users" | "players">("videos");
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
+  const [playingVideo, setPlayingVideo] = useState<{ title: string; url: string } | null>(null);
 
   // Video state
   const [filterCategory, setFilterCategory] = useState("All");
@@ -361,10 +363,10 @@ export default function Admin() {
             <div className="bg-secondary/50 p-3 text-xs font-semibold text-muted-foreground grid grid-cols-12 gap-2 uppercase tracking-wider">
               <div className="col-span-3">Username</div>
               <div className="col-span-2">Tier</div>
-              <div className="col-span-2">Profile</div>
+              <div className="col-span-3">Profile</div>
               <div className="col-span-2">Location</div>
               <div className="col-span-1 text-center">Uploads</div>
-              <div className="col-span-2 text-right">Actions</div>
+              <div className="col-span-1 text-right">Actions</div>
             </div>
             <div className="divide-y divide-border/50 max-h-[600px] overflow-y-auto">
               {adminUsers.length === 0 ? (
@@ -383,8 +385,17 @@ export default function Admin() {
                         {u.subscriptionTier === "paid" ? "Pro" : "Free"}
                       </span>
                     </div>
-                    <div className="col-span-2 text-xs text-muted-foreground">
-                      {[u.skillLevel?.replace("_", " "), u.bats ? `Bats ${u.bats}` : null].filter(Boolean).join(" · ") || "—"}
+                    <div className="col-span-3 text-xs text-muted-foreground space-y-0.5">
+                      <div>{[u.skillLevel?.replace(/_/g, " "), u.bats ? `Bats ${u.bats}` : null, u.throws ? `Throws ${u.throws}` : null].filter(Boolean).join(" · ") || "—"}</div>
+                      {(u.age || u.heightInches || u.weightLbs) && (
+                        <div className="text-muted-foreground/70">
+                          {[
+                            u.age ? `Age ${u.age}` : null,
+                            u.heightInches ? `${Math.floor(u.heightInches / 12)}'${u.heightInches % 12}"` : null,
+                            u.weightLbs ? `${u.weightLbs} lbs` : null,
+                          ].filter(Boolean).join(" · ")}
+                        </div>
+                      )}
                     </div>
                     <div className="col-span-2 text-xs text-muted-foreground truncate">
                       {[u.city, u.state].filter(Boolean).join(", ") || "—"}
@@ -394,57 +405,107 @@ export default function Admin() {
                         {u.uploadCount}
                       </span>
                     </div>
-                    <div className="col-span-2 flex justify-end">
-                      {u.uploadCount > 0 && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
-                          onClick={() => setExpandedUserId(expandedUserId === u.id ? null : u.id)}
-                        >
-                          {expandedUserId === u.id ? "Hide" : "Videos"}
-                        </Button>
-                      )}
+                    <div className="col-span-1 flex justify-end">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                        onClick={() => setExpandedUserId(expandedUserId === u.id ? null : u.id)}
+                      >
+                        {expandedUserId === u.id ? "Hide" : "View"}
+                      </Button>
                     </div>
                   </div>
-                  {expandedUserId === u.id && u.videos.length > 0 && (
-                    <div key={`${u.id}-videos`} className="bg-secondary/20 border-t border-border/50 px-4 py-3 space-y-2">
-                      {u.videos.map((v: any) => (
-                        <div key={v.id} className="flex items-center justify-between text-sm">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <PlayCircle className="w-4 h-4 text-primary shrink-0" />
-                            <span className="truncate text-xs">{v.title}</span>
-                            <span className="text-xs text-muted-foreground shrink-0">
-                              {v.createdAt ? new Date(v.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : ""}
-                            </span>
+                  {expandedUserId === u.id && (
+                    <div key={`${u.id}-detail`} className="bg-secondary/20 border-t border-border/50 px-4 py-4 space-y-4">
+                      {/* Full profile fields */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                        {[
+                          { label: "Tier", value: u.subscriptionTier === "paid" ? "Pro" : "Free" },
+                          { label: "Bats", value: u.bats || "—" },
+                          { label: "Throws", value: u.throws || "—" },
+                          { label: "Skill", value: u.skillLevel?.replace(/_/g, " ") || "—" },
+                          { label: "Age", value: u.age || "—" },
+                          { label: "Height", value: u.heightInches ? `${Math.floor(u.heightInches / 12)}'${u.heightInches % 12}"` : "—" },
+                          { label: "Weight", value: u.weightLbs ? `${u.weightLbs} lbs` : "—" },
+                          { label: "Location", value: [u.city, u.state].filter(Boolean).join(", ") || "—" },
+                        ].map(({ label, value }) => (
+                          <div key={label} className="bg-secondary/50 rounded px-3 py-2">
+                            <p className="text-muted-foreground mb-0.5">{label}</p>
+                            <p className="font-semibold text-foreground capitalize">{value}</p>
                           </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            {v.sourceUrl ? (
-                              <span className="flex items-center gap-1 text-xs text-green-500">
-                                <CheckCircle2 className="w-3 h-3" /> Stored
-                              </span>
-                            ) : (
-                              <span className="flex items-center gap-1 text-xs text-yellow-500">
-                                <AlertCircle className="w-3 h-3" /> No file
-                              </span>
-                            )}
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-6 w-6 p-0 hover:bg-destructive/20 hover:text-destructive"
-                              onClick={() => { if (confirm(`Delete "${v.title}"?`)) deleteMutation.mutate(v.id); }}
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </Button>
+                        ))}
+                      </div>
+                      {/* Video list */}
+                      {u.videos.length > 0 ? (
+                        <div>
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Uploads ({u.videos.length})</p>
+                          <div className="space-y-1.5">
+                            {u.videos.map((v: any) => (
+                              <div key={v.id} className="flex items-center justify-between bg-secondary/30 rounded-lg px-3 py-2">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <PlayCircle className="w-4 h-4 text-primary shrink-0" />
+                                  <span className="truncate text-xs font-medium">{v.title}</span>
+                                  <span className="text-xs text-muted-foreground shrink-0">
+                                    {v.createdAt ? new Date(v.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : ""}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  {v.sourceUrl ? (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-6 px-2 text-xs text-primary hover:text-primary/80"
+                                      onClick={() => setPlayingVideo({ title: v.title, url: v.sourceUrl })}
+                                    >
+                                      <PlayCircle className="w-3 h-3 mr-1" /> Play
+                                    </Button>
+                                  ) : (
+                                    <span className="flex items-center gap-1 text-xs text-yellow-500">
+                                      <AlertCircle className="w-3 h-3" /> No file
+                                    </span>
+                                  )}
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-6 w-6 p-0 hover:bg-destructive/20 hover:text-destructive"
+                                    onClick={() => { if (confirm(`Delete "${v.title}"?`)) deleteMutation.mutate(v.id); }}
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </Button>
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         </div>
-                      ))}
+                      ) : (
+                        <p className="text-xs text-muted-foreground">No uploads yet.</p>
+                      )}
                     </div>
                   )}
                 </>
               ))}
             </div>
           </div>
+
+          {/* Video Player Dialog */}
+          <Dialog open={!!playingVideo} onOpenChange={(o) => { if (!o) setPlayingVideo(null); }}>
+            <DialogContent className="max-w-3xl bg-card border-border">
+              <DialogHeader>
+                <DialogTitle className="font-display uppercase tracking-wide truncate text-sm">
+                  {playingVideo?.title}
+                </DialogTitle>
+              </DialogHeader>
+              {playingVideo && (
+                <video
+                  src={playingVideo.url}
+                  controls
+                  autoPlay
+                  className="w-full rounded-lg max-h-[70vh]"
+                />
+              )}
+            </DialogContent>
+          </Dialog>
         </>
       )}
 
@@ -861,7 +922,7 @@ function AddVideoForm({ players, onClose, onSuccess }: { players: MlbPlayer[]; o
   const [uploadProgress, setUploadProgress] = useState(0);
   const [formData, setFormData] = useState({
     title: "",
-    category: "Full Swings",
+    category: "Full Swing",
     playerName: "",
     playerId: "",
     source: "Upload",
@@ -885,6 +946,7 @@ function AddVideoForm({ players, onClose, onSuccess }: { players: MlbPlayer[]; o
     fd.append("category", formData.category);
     fd.append("playerName", formData.playerName);
     if (formData.fps) fd.append("fps", formData.fps);
+    fd.append("skipRecord", "1"); // Admin uploads: just store the file, form creates the DB record
 
     try {
       const xhr = new XMLHttpRequest();

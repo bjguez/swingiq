@@ -136,14 +136,14 @@ async function seed() {
 
   await db.insert(videos).values([
     { title: "Trout - Explosive Gather", category: "Gather", playerId: trout.id, playerName: "Mike Trout", source: "MLB.com", duration: "0:12", fps: 120, isProVideo: true },
-    { title: "Trout - Full Swing vs RHP", category: "Full Swings", playerId: trout.id, playerName: "Mike Trout", source: "MLB.com", duration: "0:18", fps: 120, isProVideo: true },
+    { title: "Trout - Full Swing vs RHP", category: "Full Swing", playerId: trout.id, playerName: "Mike Trout", source: "MLB.com", duration: "0:18", fps: 120, isProVideo: true },
     { title: "Bregman - Ideal Hand Path", category: "Hand Path", playerId: bregman.id, playerName: "Alex Bregman", source: "MLB.com", duration: "0:08", fps: 120, isProVideo: true },
     { title: "Bregman - Hip Hinge Gather", category: "Gather", playerId: bregman.id, playerName: "Alex Bregman", source: "YouTube", duration: "0:15", fps: 60, isProVideo: true },
     { title: "Ohtani - Perfect Touchdown", category: "Touchdown", playerId: ohtani.id, playerName: "Shohei Ohtani", source: "MLB.com", duration: "0:15", fps: 120, isProVideo: true },
-    { title: "Ohtani - Full Swing 118mph HR", category: "Full Swings", playerId: ohtani.id, playerName: "Shohei Ohtani", source: "MLB.com", duration: "0:22", fps: 120, isProVideo: true },
+    { title: "Ohtani - Full Swing 118mph HR", category: "Full Swing", playerId: ohtani.id, playerName: "Shohei Ohtani", source: "MLB.com", duration: "0:22", fps: 120, isProVideo: true },
     { title: "Judge - Powerful Thrust", category: "Thrust", playerId: judge.id, playerName: "Aaron Judge", source: "MLB.com", duration: "0:10", fps: 120, isProVideo: true },
     { title: "Judge - Head Position on Slider", category: "Head Position", playerId: judge.id, playerName: "Aaron Judge", source: "YouTube", duration: "0:12", fps: 60, isProVideo: true },
-    { title: "Betts - Compact Swing Mechanics", category: "Full Swings", playerId: betts.id, playerName: "Mookie Betts", source: "MLB.com", duration: "0:22", fps: 120, isProVideo: true },
+    { title: "Betts - Compact Swing Mechanics", category: "Full Swing", playerId: betts.id, playerName: "Mookie Betts", source: "MLB.com", duration: "0:22", fps: 120, isProVideo: true },
     { title: "Betts - Scissor Kick Isolation", category: "Scissor Kick", playerId: betts.id, playerName: "Mookie Betts", source: "MLB.com", duration: "0:09", fps: 120, isProVideo: true },
     { title: "Altuve - Scissor Kick Power", category: "Scissor Kick", playerId: altuve.id, playerName: "Jose Altuve", source: "MLB.com", duration: "0:14", fps: 120, isProVideo: true },
     { title: "Altuve - Gather and Load", category: "Gather", playerId: altuve.id, playerName: "Jose Altuve", source: "YouTube", duration: "0:11", fps: 60, isProVideo: true },

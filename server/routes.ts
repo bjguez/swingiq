@@ -51,6 +51,13 @@ export async function registerRoutes(
       const presignedUrl = await getPresignedUrl(key);
       const title = (req.body.title || req.file.originalname).replace(/\.[^.]+$/, "");
       const userId = (req.user as any)?.id ?? null;
+
+      // Admin uploads (skipRecord=1) only store the file — the admin form creates the proper record.
+      // Regular user uploads create a non-pro video record immediately.
+      if (req.body.skipRecord === "1") {
+        return res.status(201).json({ sourceUrl: key, presignedUrl });
+      }
+
       const video = await storage.createVideo({
         title,
         category: "Upload",
@@ -189,7 +196,10 @@ export async function registerRoutes(
         subscriptionTier: u.subscriptionTier,
         skillLevel: u.skillLevel,
         bats: u.bats,
+        throws: u.throws,
         age: u.age,
+        heightInches: u.heightInches,
+        weightLbs: u.weightLbs,
         city: u.city,
         state: u.state,
         profileComplete: u.profileComplete,
@@ -422,7 +432,12 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Not authorized to delete this video" });
       }
       if (video.sourceUrl && isR2Key(video.sourceUrl)) {
-        try { await deleteFromR2(video.sourceUrl); } catch {}
+        // Only delete the R2 file if no other video record references the same key
+        const allVids = await storage.getAllVideos();
+        const otherRefs = allVids.filter(v => v.id !== video.id && v.sourceUrl === video.sourceUrl);
+        if (otherRefs.length === 0) {
+          try { await deleteFromR2(video.sourceUrl); } catch {}
+        }
       }
       await storage.deleteVideo(req.params.id);
       res.json({ success: true });

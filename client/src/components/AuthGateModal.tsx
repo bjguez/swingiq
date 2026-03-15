@@ -22,6 +22,14 @@ const SKILL_LEVELS = [
   { value: "pro", label: "Pro / Semi-Pro" },
 ];
 
+const US_STATES = [
+  "AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA",
+  "HI","ID","IL","IN","IA","KS","KY","LA","ME","MD",
+  "MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ",
+  "NM","NY","NC","ND","OH","OK","OR","PA","RI","SC",
+  "SD","TN","TX","UT","VT","VA","WA","WV","WI","WY","DC",
+];
+
 export function AuthGateModal({ open, onOpenChange, reason, onSuccess }: AuthGateModalProps) {
   const { login, register, updateProfile, isLoggingIn, isRegistering, isUpdatingProfile, loginError, registerError } = useAuth();
   const [step, setStep] = useState<Step>("gate");
@@ -212,11 +220,14 @@ export function AuthGateModal({ open, onOpenChange, reason, onSuccess }: AuthGat
                   value={profile.city}
                   onChange={(e) => setProfile(p => ({ ...p, city: e.target.value }))}
                 />
-                <Input
-                  placeholder="State"
+                <select
                   value={profile.state}
                   onChange={(e) => setProfile(p => ({ ...p, state: e.target.value }))}
-                />
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 text-foreground"
+                >
+                  <option value="">State</option>
+                  {US_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-1.5">

@@ -106,6 +106,9 @@ app.use((req, res, next) => {
   await pool.query(`
     ALTER TABLE users ADD COLUMN IF NOT EXISTS weight_lbs INTEGER
   `);
+  await pool.query(`
+    UPDATE videos SET category = 'Full Swing' WHERE category = 'Full Swings'
+  `);
 
   await registerRoutes(httpServer, app);
 

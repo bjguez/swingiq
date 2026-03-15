@@ -9,7 +9,7 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import type { Video } from "@shared/schema";
 
-const categories = ["All", "Gather > Touchdown", "Touchdown > Finish", "Hand Path", "Head Position", "Scissor Kick", "Thrust", "Full Swings"];
+const categories = ["All", "Gather > Touchdown", "Touchdown > Finish", "Hand Path", "Head Position", "Scissor Kick", "Thrust", "Full Swing"];
 
 export default function Library() {
   const [activeCategory, setActiveCategory] = useState("All");
