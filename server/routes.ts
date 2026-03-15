@@ -7,7 +7,7 @@ import path from "path";
 import fs from "fs";
 import express from "express";
 import { execFile } from "child_process";
-import { uploadToR2, getPresignedUrl, deleteFromR2, isR2Key, r2Configured } from "./r2";
+import { uploadToR2, getPresignedUrl, deleteFromR2, isR2Key, r2Configured, checkR2Exists } from "./r2";
 
 const uploadDir = path.resolve("uploads");
 if (!fs.existsSync(uploadDir)) {
@@ -214,6 +214,33 @@ export async function registerRoutes(
       res.json(result);
     } catch (err: any) {
       res.status(500).json({ message: err.message || "Failed to fetch users" });
+    }
+  });
+
+  app.get("/api/admin/r2-health", async (req, res) => {
+    const adminUsername = process.env.ADMIN_USERNAME;
+    if (!req.user || (req.user as any).username !== adminUsername) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    try {
+      const allVideos = await storage.getAllVideos();
+      const r2Videos = allVideos.filter(v => v.sourceUrl && isR2Key(v.sourceUrl));
+      const results = await Promise.all(r2Videos.map(async v => ({
+        id: v.id,
+        title: v.title,
+        playerName: v.playerName,
+        isProVideo: v.isProVideo,
+        key: v.sourceUrl!,
+        exists: await checkR2Exists(v.sourceUrl!),
+      })));
+      res.json({
+        total: results.length,
+        missing: results.filter(r => !r.exists).length,
+        ok: results.filter(r => r.exists).length,
+        videos: results,
+      });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to check R2 health" });
     }
   });
 

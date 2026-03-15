@@ -54,7 +54,7 @@ interface MlbLookupResult {
 export default function Admin() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<"videos" | "users" | "players">("videos");
+  const [activeTab, setActiveTab] = useState<"videos" | "users" | "players" | "health">("videos");
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [playingVideo, setPlayingVideo] = useState<{ title: string; url: string } | null>(null);
 
@@ -87,6 +87,16 @@ export default function Admin() {
       return res.json();
     },
     enabled: activeTab === "users",
+  });
+
+  const { data: r2Health, isLoading: r2Loading, refetch: refetchHealth } = useQuery({
+    queryKey: ["/api/admin/r2-health"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/r2-health");
+      if (!res.ok) throw new Error("Failed to check R2 health");
+      return res.json() as Promise<{ total: number; missing: number; ok: number; videos: { id: string; title: string; playerName: string | null; isProVideo: boolean; key: string; exists: boolean }[] }>;
+    },
+    enabled: activeTab === "health",
   });
 
   const deleteMutation = useMutation({
@@ -229,6 +239,17 @@ export default function Admin() {
           <Users className="w-4 h-4 inline mr-2" />
           Players
         </button>
+        <button
+          onClick={() => setActiveTab("health")}
+          className={`px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors ${
+            activeTab === "health"
+              ? "border-primary text-primary"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <AlertCircle className="w-4 h-4 inline mr-2" />
+          R2 Health
+        </button>
       </div>
 
       {/* ── VIDEOS TAB ── */}
@@ -359,12 +380,17 @@ export default function Admin() {
             <StatCard label="With Uploads" value={adminUsers.filter((u: any) => u.uploadCount > 0).length} />
             <StatCard label="Total Uploads" value={adminUsers.reduce((sum: number, u: any) => sum + u.uploadCount, 0)} />
           </div>
-          <div className="border border-border rounded-xl overflow-hidden">
+          <div className="border border-border rounded-xl overflow-hidden overflow-x-auto">
+            <div className="min-w-[900px]">
             <div className="bg-secondary/50 p-3 text-xs font-semibold text-muted-foreground grid grid-cols-12 gap-2 uppercase tracking-wider">
-              <div className="col-span-3">Username</div>
-              <div className="col-span-2">Tier</div>
-              <div className="col-span-3">Profile</div>
-              <div className="col-span-2">Location</div>
+              <div className="col-span-2">Username</div>
+              <div className="col-span-1">Tier</div>
+              <div className="col-span-2">Skill Level</div>
+              <div className="col-span-1">Bats</div>
+              <div className="col-span-1">Throws</div>
+              <div className="col-span-1">Age</div>
+              <div className="col-span-1">City</div>
+              <div className="col-span-1">State</div>
               <div className="col-span-1 text-center">Uploads</div>
               <div className="col-span-1 text-right">Actions</div>
             </div>
@@ -373,33 +399,26 @@ export default function Admin() {
                 <div className="p-8 text-center text-muted-foreground">No users yet.</div>
               ) : adminUsers.map((u: any) => (
                 <>
-                  <div key={u.id} className="grid grid-cols-12 gap-2 p-3 items-center hover:bg-secondary/20">
-                    <div className="col-span-3 text-sm font-semibold flex items-center gap-2">
+                  <div key={u.id} className="grid grid-cols-12 gap-2 p-3 items-center hover:bg-secondary/20 min-w-[900px]">
+                    <div className="col-span-2 text-sm font-semibold flex items-center gap-2 min-w-0">
                       <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0 text-xs font-bold text-primary uppercase">
                         {u.username[0]}
                       </div>
                       <span className="truncate">{u.username}</span>
                     </div>
-                    <div className="col-span-2">
+                    <div className="col-span-1">
                       <span className={`text-xs px-2 py-0.5 rounded font-semibold ${u.subscriptionTier === "paid" ? "bg-primary/20 text-primary" : "bg-secondary text-muted-foreground"}`}>
                         {u.subscriptionTier === "paid" ? "Pro" : "Free"}
                       </span>
                     </div>
-                    <div className="col-span-3 text-xs text-muted-foreground space-y-0.5">
-                      <div>{[u.skillLevel?.replace(/_/g, " "), u.bats ? `Bats ${u.bats}` : null, u.throws ? `Throws ${u.throws}` : null].filter(Boolean).join(" · ") || "—"}</div>
-                      {(u.age || u.heightInches || u.weightLbs) && (
-                        <div className="text-muted-foreground/70">
-                          {[
-                            u.age ? `Age ${u.age}` : null,
-                            u.heightInches ? `${Math.floor(u.heightInches / 12)}'${u.heightInches % 12}"` : null,
-                            u.weightLbs ? `${u.weightLbs} lbs` : null,
-                          ].filter(Boolean).join(" · ")}
-                        </div>
-                      )}
+                    <div className="col-span-2 text-xs text-muted-foreground truncate capitalize">
+                      {u.skillLevel?.replace(/_/g, " ") || "—"}
                     </div>
-                    <div className="col-span-2 text-xs text-muted-foreground truncate">
-                      {[u.city, u.state].filter(Boolean).join(", ") || "—"}
-                    </div>
+                    <div className="col-span-1 text-xs text-muted-foreground">{u.bats || "—"}</div>
+                    <div className="col-span-1 text-xs text-muted-foreground">{u.throws || "—"}</div>
+                    <div className="col-span-1 text-xs text-muted-foreground">{u.age || "—"}</div>
+                    <div className="col-span-1 text-xs text-muted-foreground truncate">{u.city || "—"}</div>
+                    <div className="col-span-1 text-xs text-muted-foreground">{u.state || "—"}</div>
                     <div className="col-span-1 text-center">
                       <span className={`text-xs font-bold ${u.uploadCount > 0 ? "text-foreground" : "text-muted-foreground"}`}>
                         {u.uploadCount}
@@ -486,6 +505,7 @@ export default function Admin() {
                 </>
               ))}
             </div>
+            </div>
           </div>
 
           {/* Video Player Dialog */}
@@ -570,6 +590,60 @@ export default function Admin() {
             </div>
           </div>
         </>
+      )}
+
+      {/* ── R2 HEALTH TAB ── */}
+      {activeTab === "health" && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex gap-4">
+              <StatCard label="R2 Videos" value={r2Health?.total ?? 0} />
+              <StatCard label="OK" value={r2Health?.ok ?? 0} />
+              <StatCard label="Missing" value={r2Health?.missing ?? 0} />
+            </div>
+            <Button variant="outline" size="sm" onClick={() => refetchHealth()} disabled={r2Loading}>
+              {r2Loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Search className="w-4 h-4 mr-2" />}
+              {r2Loading ? "Checking..." : "Run Check"}
+            </Button>
+          </div>
+
+          {!r2Health && !r2Loading && (
+            <div className="border border-border rounded-xl p-10 text-center text-muted-foreground text-sm">
+              Click "Run Check" to scan all R2-stored videos for missing files.
+            </div>
+          )}
+
+          {r2Health && (
+            <div className="border border-border rounded-xl overflow-hidden">
+              <div className="bg-secondary/50 p-3 text-xs font-semibold text-muted-foreground grid grid-cols-12 gap-2 uppercase tracking-wider">
+                <div className="col-span-1">Status</div>
+                <div className="col-span-4">Title</div>
+                <div className="col-span-3">Player</div>
+                <div className="col-span-1">Type</div>
+                <div className="col-span-3">R2 Key</div>
+              </div>
+              <div className="divide-y divide-border/50 max-h-[600px] overflow-y-auto">
+                {r2Health.videos.map(v => (
+                  <div key={v.id} className="grid grid-cols-12 gap-2 p-3 items-center text-sm">
+                    <div className="col-span-1">
+                      {v.exists
+                        ? <CheckCircle2 className="w-4 h-4 text-green-500" />
+                        : <AlertCircle className="w-4 h-4 text-destructive" />}
+                    </div>
+                    <div className={`col-span-4 font-medium truncate ${!v.exists ? "text-destructive" : ""}`}>{v.title}</div>
+                    <div className="col-span-3 text-xs text-muted-foreground truncate">{v.playerName || "—"}</div>
+                    <div className="col-span-1">
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${v.isProVideo ? "bg-primary/20 text-primary" : "bg-secondary text-muted-foreground"}`}>
+                        {v.isProVideo ? "Pro" : "User"}
+                      </span>
+                    </div>
+                    <div className="col-span-3 text-xs text-muted-foreground font-mono truncate">{v.key}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       )}
     </Layout>
   );

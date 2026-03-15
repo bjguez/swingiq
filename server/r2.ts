@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { randomUUID } from "crypto";
 import path from "path";
@@ -47,4 +47,14 @@ export async function deleteFromR2(key: string): Promise<void> {
 /** Returns true if a sourceUrl value is an R2 key (not a legacy /uploads/ path) */
 export function isR2Key(sourceUrl: string): boolean {
   return sourceUrl.startsWith("videos/");
+}
+
+/** Returns true if the file exists in R2, false if missing */
+export async function checkR2Exists(key: string): Promise<boolean> {
+  try {
+    await r2.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
+    return true;
+  } catch {
+    return false;
+  }
 }

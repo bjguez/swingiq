@@ -36,7 +36,7 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected }: Vi
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
-  const { data: allVideos = [] } = useQuery({ queryKey: ["/api/videos"], queryFn: () => fetchVideos() });
+  const { data: allVideos = [] } = useQuery({ queryKey: ["/api/videos"], queryFn: () => fetchVideos(), enabled: mode === "pro" || !!user });
   const { data: players = [] } = useQuery({ queryKey: ["/api/players"], queryFn: fetchPlayers });
 
   const userVideos = (allVideos as Video[]).filter(v => !v.isProVideo && v.sourceUrl);
