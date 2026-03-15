@@ -48,6 +48,12 @@ interface MlbLookupResult {
   batSpeed: number | null;
   attackAngle: number | null;
   rotationalAccel: number | null;
+  battingAvg: number | null;
+  homeRuns: number | null;
+  rbi: number | null;
+  obp: number | null;
+  slg: number | null;
+  ops: number | null;
   savantAvailable: boolean;
 }
 
@@ -1427,6 +1433,7 @@ function AddPlayerForm({ onClose, onSuccess }: { onClose: () => void; onSuccess:
     avgExitVeloPercentile: "", maxExitVeloPercentile: "",
     barrelPctPercentile: "", hardHitPctPercentile: "",
     batSpeed: "", attackAngle: "", rotationalAccel: "",
+    battingAvg: "", homeRuns: "", rbi: "", obp: "", slg: "", ops: "",
   });
 
   // Debounced search
@@ -1493,6 +1500,12 @@ function AddPlayerForm({ onClose, onSuccess }: { onClose: () => void; onSuccess:
         batSpeed:              data.batSpeed != null ? String(data.batSpeed) : "",
         attackAngle:           "",
         rotationalAccel:       "",
+        battingAvg:  data.battingAvg != null ? String(data.battingAvg) : "",
+        homeRuns:    data.homeRuns != null ? String(data.homeRuns) : "",
+        rbi:         data.rbi != null ? String(data.rbi) : "",
+        obp:         data.obp != null ? String(data.obp) : "",
+        slg:         data.slg != null ? String(data.slg) : "",
+        ops:         data.ops != null ? String(data.ops) : "",
       });
     } catch {
       toast({ title: "Failed to fetch player details", variant: "destructive" });
@@ -1533,6 +1546,12 @@ function AddPlayerForm({ onClose, onSuccess }: { onClose: () => void; onSuccess:
           batSpeed:              toFloat(formData.batSpeed),
           attackAngle:           toFloat(formData.attackAngle),
           rotationalAccel:       toFloat(formData.rotationalAccel),
+          battingAvg:            toFloat(formData.battingAvg),
+          homeRuns:              toInt(formData.homeRuns),
+          rbi:                   toInt(formData.rbi),
+          obp:                   toFloat(formData.obp),
+          slg:                   toFloat(formData.slg),
+          ops:                   toFloat(formData.ops),
         }),
       });
       if (!res.ok) throw new Error("Create failed");
@@ -1677,6 +1696,37 @@ function AddPlayerForm({ onClose, onSuccess }: { onClose: () => void; onSuccess:
           <div>
             <label className="text-xs text-muted-foreground block mb-1">Rotational Accel</label>
             <Input type="number" step="0.1" value={formData.rotationalAccel} onChange={set("rotationalAccel")} placeholder="22.1" className="bg-background" />
+          </div>
+        </div>
+      </div>
+
+      {/* Traditional Stats */}
+      <div>
+        <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Career Batting Stats</div>
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+          <div>
+            <label className="text-xs text-muted-foreground block mb-1">AVG</label>
+            <Input type="number" step="0.001" min="0" max="1" value={formData.battingAvg} onChange={set("battingAvg")} placeholder=".285" className="bg-background" />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground block mb-1">HR</label>
+            <Input type="number" min="0" value={formData.homeRuns} onChange={set("homeRuns")} placeholder="62" className="bg-background" />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground block mb-1">RBI</label>
+            <Input type="number" min="0" value={formData.rbi} onChange={set("rbi")} placeholder="131" className="bg-background" />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground block mb-1">OBP</label>
+            <Input type="number" step="0.001" min="0" max="1" value={formData.obp} onChange={set("obp")} placeholder=".376" className="bg-background" />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground block mb-1">SLG</label>
+            <Input type="number" step="0.001" min="0" max="4" value={formData.slg} onChange={set("slg")} placeholder=".686" className="bg-background" />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground block mb-1">OPS</label>
+            <Input type="number" step="0.001" min="0" max="5" value={formData.ops} onChange={set("ops")} placeholder=".1062" className="bg-background" />
           </div>
         </div>
       </div>

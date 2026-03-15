@@ -36,6 +36,7 @@ export default function DataDashboard({ player, onSelectVideo, onSelectProVideo,
   return (
     <div className="space-y-6">
       <PlayerHeader player={player} />
+      <PlayerStatsSection player={player} />
       <PlayerClipsSection player={player} allVideos={allVideos} onSelectProVideo={onSelectProVideo} />
       {userVideos.length > 0 && <UserVideosSection videos={userVideos} onSelectVideo={onSelectVideo} />}
       <PlayerCardGrid onPlayerSelected={onPlayerSelected} />
@@ -243,6 +244,40 @@ function PlayerHeader({ player }: { player: MlbPlayer }) {
           {player.height && ` · ${player.height}`}
           {player.weight && `, ${player.weight} lbs`}
         </p>
+      </div>
+    </div>
+  );
+}
+
+// ─── Player Stats ─────────────────────────────────────────────────────────────
+
+function StatTile({ label, value, decimals = 0 }: { label: string; value: number | null | undefined; decimals?: number }) {
+  if (value == null) return null;
+  const display = decimals > 0 ? value.toFixed(decimals) : String(value);
+  return (
+    <div className="bg-secondary/40 rounded-lg p-3 flex flex-col gap-1">
+      <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-semibold leading-tight">{label}</p>
+      <p className="text-2xl font-bold font-mono leading-none">{display}</p>
+    </div>
+  );
+}
+
+function PlayerStatsSection({ player }: { player: MlbPlayer }) {
+  const hasStats = player.battingAvg != null || player.homeRuns != null || player.rbi != null ||
+    player.obp != null || player.slg != null || player.ops != null;
+
+  if (!hasStats) return null;
+
+  return (
+    <div className="bg-card border border-border rounded-xl p-5 space-y-3">
+      <h3 className="font-display font-bold text-xl uppercase text-muted-foreground">Career Stats</h3>
+      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+        <StatTile label="AVG" value={player.battingAvg} decimals={3} />
+        <StatTile label="HR" value={player.homeRuns} />
+        <StatTile label="RBI" value={player.rbi} />
+        <StatTile label="OBP" value={player.obp} decimals={3} />
+        <StatTile label="SLG" value={player.slg} decimals={3} />
+        <StatTile label="OPS" value={player.ops} decimals={3} />
       </div>
     </div>
   );

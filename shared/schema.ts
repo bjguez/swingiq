@@ -42,6 +42,13 @@ export const mlbPlayers = pgTable("mlb_players", {
   batSpeed: real("bat_speed"),
   attackAngle: real("attack_angle"),
   rotationalAccel: real("rotational_accel"),
+  // Traditional batting stats
+  battingAvg: real("batting_avg"),
+  homeRuns: integer("home_runs"),
+  rbi: integer("rbi"),
+  obp: real("obp"),
+  slg: real("slg"),
+  ops: real("ops"),
 });
 
 export const videos = pgTable("videos", {

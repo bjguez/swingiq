@@ -774,6 +774,22 @@ export async function registerRoutes(
         bt = btRows.find(r => r.id === savantId) ?? null;
       }
 
+      // Fetch career batting stats from MLB Stats API
+      let careerStat: any = null;
+      try {
+        const careerRes = await fetch(
+          `https://statsapi.mlb.com/api/v1/people/${savantId}/stats?stats=career&group=hitting`,
+          { signal: AbortSignal.timeout(6000) }
+        );
+        if (careerRes.ok) {
+          const careerData = await careerRes.json() as any;
+          careerStat = careerData.stats?.[0]?.splits?.[0]?.stat ?? null;
+        }
+      } catch { /* non-fatal */ }
+
+      const toStatNum = (v: any) => (v != null && v !== "" ? parseFloat(v) || null : null);
+      const toStatInt = (v: any) => (v != null && v !== "" ? parseInt(v, 10) || null : null);
+
       res.json({
         savantId,
         name:     p.fullName,
@@ -794,6 +810,12 @@ export async function registerRoutes(
         batSpeed:              bt ? parseFloat(bt.avg_bat_speed) || null : null,
         attackAngle:           null,
         rotationalAccel:       null,
+        battingAvg:            toStatNum(careerStat?.avg),
+        homeRuns:              toStatInt(careerStat?.homeRuns),
+        rbi:                   toStatInt(careerStat?.rbi),
+        obp:                   toStatNum(careerStat?.obp),
+        slg:                   toStatNum(careerStat?.slg),
+        ops:                   toStatNum(careerStat?.ops),
         savantAvailable:       !!(sc || bt),
       });
     } catch (err: any) {
