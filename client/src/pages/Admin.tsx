@@ -103,23 +103,52 @@ export default function Admin() {
     enabled: activeTab === "health",
   });
 
-  const transcodeMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch("/api/admin/transcode-mov", { method: "POST" });
-      if (!res.ok) throw new Error("Transcode request failed");
-      return res.json() as Promise<{ total: number; converted: number; failed: number; errors: string[] }>;
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/videos"] });
-      refetchHealth();
-      if (data.failed > 0) {
-        toast({ title: `Transcoded ${data.converted}/${data.total} videos. ${data.failed} failed.`, variant: "destructive" });
-      } else {
-        toast({ title: `Transcoded ${data.converted} video${data.converted !== 1 ? "s" : ""} to mp4` });
+  const [transcodeProgress, setTranscodeProgress] = useState<{
+    running: boolean;
+    total: number;
+    done: number;
+    failed: number;
+    current: string | null;
+    errors: string[];
+  } | null>(null);
+
+  async function startTranscode() {
+    const res = await fetch("/api/admin/transcode-mov/pending");
+    if (!res.ok) { toast({ title: "Failed to fetch pending videos", variant: "destructive" }); return; }
+    const { pending } = await res.json() as { pending: { id: string; title: string }[]; total: number };
+    if (pending.length === 0) { toast({ title: "No videos need transcoding" }); return; }
+
+    setTranscodeProgress({ running: true, total: pending.length, done: 0, failed: 0, current: pending[0].title, errors: [] });
+
+    let done = 0, failed = 0;
+    const errors: string[] = [];
+    for (const video of pending) {
+      setTranscodeProgress(prev => prev ? { ...prev, current: video.title } : prev);
+      try {
+        const r = await fetch(`/api/admin/transcode-mov/${video.id}`, { method: "POST" });
+        if (!r.ok) {
+          const err = await r.json().catch(() => ({ message: "Unknown error" }));
+          errors.push(`${video.title}: ${err.message}`);
+          failed++;
+        } else {
+          done++;
+        }
+      } catch {
+        errors.push(`${video.title}: Network error`);
+        failed++;
       }
-    },
-    onError: () => toast({ title: "Transcode failed", variant: "destructive" }),
-  });
+      setTranscodeProgress(prev => prev ? { ...prev, done, failed, errors: [...errors] } : prev);
+    }
+
+    queryClient.invalidateQueries({ queryKey: ["/api/videos"] });
+    refetchHealth();
+    setTranscodeProgress(prev => prev ? { ...prev, running: false, current: null } : prev);
+    if (failed > 0) {
+      toast({ title: `Transcoded ${done}/${pending.length}. ${failed} failed.`, variant: "destructive" });
+    } else {
+      toast({ title: `Transcoded ${done} video${done !== 1 ? "s" : ""} to mp4` });
+    }
+  }
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -678,15 +707,11 @@ export default function Admin() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => {
-                  if (confirm("This will transcode all .mov/.avi/.webm videos in R2 to mp4. This may take a while. Continue?")) {
-                    transcodeMutation.mutate();
-                  }
-                }}
-                disabled={transcodeMutation.isPending}
+                onClick={startTranscode}
+                disabled={!!transcodeProgress?.running}
               >
-                {transcodeMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                {transcodeMutation.isPending ? "Transcoding..." : "Transcode .mov → mp4"}
+                {transcodeProgress?.running ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                {transcodeProgress?.running ? `Transcoding ${transcodeProgress.done + transcodeProgress.failed + 1}/${transcodeProgress.total}…` : "Transcode .mov → mp4"}
               </Button>
               <Button variant="outline" size="sm" onClick={() => refetchHealth()} disabled={r2Loading}>
                 {r2Loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Search className="w-4 h-4 mr-2" />}
@@ -695,7 +720,31 @@ export default function Admin() {
             </div>
           </div>
 
-          {!r2Health && !r2Loading && (
+          {transcodeProgress && (
+            <div className="border border-border rounded-xl p-4 space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-medium">
+                  {transcodeProgress.running ? `Transcoding: ${transcodeProgress.current}` : "Transcode complete"}
+                </span>
+                <span className="text-muted-foreground font-mono">
+                  {transcodeProgress.done} done · {transcodeProgress.failed} failed · {transcodeProgress.total} total
+                </span>
+              </div>
+              <div className="w-full h-2 bg-secondary rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-primary transition-all duration-300"
+                  style={{ width: `${((transcodeProgress.done + transcodeProgress.failed) / transcodeProgress.total) * 100}%` }}
+                />
+              </div>
+              {transcodeProgress.errors.length > 0 && (
+                <div className="text-xs text-destructive space-y-0.5 max-h-24 overflow-y-auto">
+                  {transcodeProgress.errors.map((e, i) => <div key={i}>{e}</div>)}
+                </div>
+              )}
+            </div>
+          )}
+
+          {!r2Health && !r2Loading && !transcodeProgress && (
             <div className="border border-border rounded-xl p-10 text-center text-muted-foreground text-sm">
               Click "Run Check" to scan all R2-stored videos for missing files.
             </div>
