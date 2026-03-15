@@ -334,9 +334,9 @@ function statColor(stat: StatKey, value: string | number | null | undefined): st
     case "avg": return n >= 0.300 ? "text-green-400" : n >= 0.275 ? "text-orange-400" : "";
     case "hr":  return n >= 30   ? "text-green-400" : n >= 20    ? "text-orange-400" : "";
     case "rbi": return n >= 100  ? "text-green-400" : n >= 75    ? "text-orange-400" : "";
-    case "obp": return n >= 0.370 ? "text-green-400" : n >= 0.340 ? "text-orange-400" : "";
-    case "slg": return n >= 0.500 ? "text-green-400" : n >= 0.460 ? "text-orange-400" : "";
-    case "ops": return n >= 0.821 ? "text-green-400" : n >= 0.780 ? "text-orange-400" : "";
+    case "obp": return n >= 0.400 ? "text-green-400" : n >= 0.350 ? "text-orange-400" : "";
+    case "slg": return n >= 0.550 ? "text-green-400" : n >= 0.475 ? "text-orange-400" : "";
+    case "ops": return n >= 0.900 ? "text-green-400" : n >= 0.800 ? "text-orange-400" : "";
   }
 }
 
@@ -484,9 +484,9 @@ function PlayerStatsSection({ player, awards = [] }: { player: MlbPlayer; awards
             <span>AVG <span className="text-orange-400">.275+</span> / <span className="text-green-400">.300+</span></span>
             <span>HR <span className="text-orange-400">20+</span> / <span className="text-green-400">30+</span></span>
             <span>RBI <span className="text-orange-400">75+</span> / <span className="text-green-400">100+</span></span>
-            <span>OBP <span className="text-orange-400">.340+</span> / <span className="text-green-400">.370+</span></span>
-            <span>SLG <span className="text-orange-400">.460+</span> / <span className="text-green-400">.500+</span></span>
-            <span>OPS <span className="text-orange-400">.780+</span> / <span className="text-green-400">.821+</span></span>
+            <span>OBP <span className="text-orange-400">.350+</span> / <span className="text-green-400">.400+</span></span>
+            <span>SLG <span className="text-orange-400">.475+</span> / <span className="text-green-400">.550+</span></span>
+            <span>OPS <span className="text-orange-400">.800+</span> / <span className="text-green-400">.900+</span></span>
           </div>
           {awards.length > 0 && (
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
