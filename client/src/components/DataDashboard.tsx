@@ -66,7 +66,7 @@ function useVisibleCount() {
 function PlayerCardGrid({ onPlayerSelected }: { onPlayerSelected?: (name: string) => void }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [batsFilter, setBatsFilter] = useState<"" | "L" | "R">("");
+  const [batsFilter, setBatsFilter] = useState<"" | "L" | "R" | "S">("");
   const visibleCount = useVisibleCount();
 
   // Stable random seed per session — different order every visit
@@ -113,7 +113,7 @@ function PlayerCardGrid({ onPlayerSelected }: { onPlayerSelected?: (name: string
           />
         </div>
         <div className="flex gap-1 shrink-0">
-          {(["", "L", "R"] as const).map(v => (
+          {(["", "L", "R", "S"] as const).map(v => (
             <button
               key={v}
               onClick={() => setBatsFilter(v)}

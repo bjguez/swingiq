@@ -28,7 +28,7 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected }: Vi
   const [authGateOpen, setAuthGateOpen] = useState(false);
   const [pendingProVideo, setPendingProVideo] = useState<Video | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [handFilter, setHandFilter] = useState<"all" | "L" | "R">("all");
+  const [handFilter, setHandFilter] = useState<"all" | "L" | "R" | "S">("all");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
 
@@ -182,7 +182,7 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected }: Vi
                   />
                 </div>
                 <div className="flex items-center gap-0.5 bg-secondary/50 border border-border rounded-md p-1 shrink-0">
-                  {(["all", "L", "R"] as const).map(h => (
+                  {(["all", "L", "R", "S"] as const).map(h => (
                     <button
                       key={h}
                       onClick={() => setHandFilter(h)}
@@ -191,7 +191,7 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected }: Vi
                           ? "bg-primary text-primary-foreground"
                           : "text-muted-foreground hover:text-foreground hover:bg-secondary"
                       }`}
-                      title={h === "all" ? "All hitters" : h === "L" ? "Left-handed" : "Right-handed"}
+                      title={h === "all" ? "All hitters" : h === "L" ? "Left-handed" : h === "R" ? "Right-handed" : "Switch hitters"}
                     >
                       {h === "all" ? "All" : `Bats ${h}`}
                     </button>

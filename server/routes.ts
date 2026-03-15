@@ -47,7 +47,40 @@ export async function registerRoutes(
       if (!r2Configured()) {
         return res.status(503).json({ message: "Storage not configured. Set R2 environment variables." });
       }
-      const key = await uploadToR2(req.file.buffer, req.file.originalname, req.file.mimetype);
+
+      // Transcode non-mp4 files (e.g. .mov, .avi, .webm) to H.264 mp4 for broad browser compatibility
+      let uploadBuffer = req.file.buffer;
+      let uploadName = req.file.originalname;
+      const uploadExt = path.extname(req.file.originalname).toLowerCase();
+      if (uploadExt !== ".mp4") {
+        const tmpIn = path.join(uploadDir, `upload-in-${Date.now()}${uploadExt}`);
+        const tmpOut = path.join(uploadDir, `upload-out-${Date.now()}.mp4`);
+        try {
+          fs.writeFileSync(tmpIn, uploadBuffer);
+          await new Promise<void>((resolve, reject) => {
+            execFile("ffmpeg", [
+              "-i", tmpIn,
+              "-c:v", "libx264",
+              "-preset", "fast",
+              "-crf", "23",
+              "-c:a", "aac",
+              "-movflags", "+faststart",
+              "-y",
+              tmpOut,
+            ], (error, _stdout, stderr) => {
+              if (error) { console.error("FFmpeg transcode error:", stderr); reject(new Error("Transcoding failed")); }
+              else resolve();
+            });
+          });
+          uploadBuffer = fs.readFileSync(tmpOut);
+          uploadName = uploadName.replace(/\.[^.]+$/, ".mp4");
+        } finally {
+          try { fs.unlinkSync(tmpIn); } catch {}
+          try { fs.unlinkSync(tmpOut); } catch {}
+        }
+      }
+
+      const key = await uploadToR2(uploadBuffer, uploadName, "video/mp4");
       const presignedUrl = await getPresignedUrl(key);
       const title = (req.body.title || req.file.originalname).replace(/\.[^.]+$/, "");
       const userId = (req.user as any)?.id ?? null;
@@ -241,6 +274,78 @@ export async function registerRoutes(
       });
     } catch (err: any) {
       res.status(500).json({ message: err.message || "Failed to check R2 health" });
+    }
+  });
+
+  app.post("/api/admin/transcode-mov", async (req, res) => {
+    const adminUsername = process.env.ADMIN_USERNAME;
+    if (!req.user || (req.user as any).username !== adminUsername) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    try {
+      const allVideos = await storage.getAllVideos();
+      const movVideos = allVideos.filter(v => v.sourceUrl && isR2Key(v.sourceUrl) && /\.(mov|avi|webm)$/i.test(v.sourceUrl));
+
+      if (movVideos.length === 0) {
+        return res.json({ message: "No .mov/.avi/.webm videos found", converted: 0, failed: 0 });
+      }
+
+      const { GetObjectCommand } = await import("@aws-sdk/client-s3");
+      const { r2 } = await import("./r2");
+
+      let converted = 0;
+      let failed = 0;
+      const errors: string[] = [];
+
+      for (const video of movVideos) {
+        const oldKey = video.sourceUrl!;
+        const ext = path.extname(oldKey).toLowerCase();
+        const tmpIn = path.join(uploadDir, `migrate-in-${Date.now()}${ext}`);
+        const tmpOut = path.join(uploadDir, `migrate-out-${Date.now()}.mp4`);
+        try {
+          // Download from R2
+          const obj = await r2.send(new GetObjectCommand({ Bucket: process.env.R2_BUCKET_NAME!, Key: oldKey }));
+          const chunks: Buffer[] = [];
+          for await (const chunk of obj.Body as AsyncIterable<Uint8Array>) {
+            chunks.push(Buffer.from(chunk));
+          }
+          fs.writeFileSync(tmpIn, Buffer.concat(chunks));
+
+          // Transcode to H.264 mp4
+          await new Promise<void>((resolve, reject) => {
+            execFile("ffmpeg", [
+              "-i", tmpIn,
+              "-c:v", "libx264",
+              "-preset", "fast",
+              "-crf", "23",
+              "-c:a", "aac",
+              "-movflags", "+faststart",
+              "-y",
+              tmpOut,
+            ], (error, _stdout, stderr) => {
+              if (error) { console.error(`FFmpeg error for ${oldKey}:`, stderr); reject(new Error("Transcoding failed")); }
+              else resolve();
+            });
+          });
+
+          const mp4Buffer = fs.readFileSync(tmpOut);
+          const newKey = await uploadToR2(mp4Buffer, `migrated.mp4`, "video/mp4");
+          await storage.updateVideo(video.id, { sourceUrl: newKey });
+          try { await deleteFromR2(oldKey); } catch {}
+          converted++;
+        } catch (err: any) {
+          console.error(`Migration failed for video ${video.id}:`, err);
+          errors.push(`${video.id} (${video.title}): ${err.message}`);
+          failed++;
+        } finally {
+          try { fs.unlinkSync(tmpIn); } catch {}
+          try { fs.unlinkSync(tmpOut); } catch {}
+        }
+      }
+
+      res.json({ total: movVideos.length, converted, failed, errors });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Migration failed" });
     }
   });
 

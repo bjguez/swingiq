@@ -60,7 +60,11 @@ export default function Admin() {
 
   // Video state
   const [filterCategory, setFilterCategory] = useState("All");
+  const [filterBats, setFilterBats] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
+  // Player state (tab)
+  const [playerSearch, setPlayerSearch] = useState("");
+  const [playerBatsFilter, setPlayerBatsFilter] = useState("All");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editData, setEditData] = useState<Partial<Video>>({});
   const [trimmingId, setTrimmingId] = useState<string | null>(null);
@@ -97,6 +101,24 @@ export default function Admin() {
       return res.json() as Promise<{ total: number; missing: number; ok: number; videos: { id: string; title: string; playerName: string | null; isProVideo: boolean; key: string; exists: boolean }[] }>;
     },
     enabled: activeTab === "health",
+  });
+
+  const transcodeMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/admin/transcode-mov", { method: "POST" });
+      if (!res.ok) throw new Error("Transcode request failed");
+      return res.json() as Promise<{ total: number; converted: number; failed: number; errors: string[] }>;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/videos"] });
+      refetchHealth();
+      if (data.failed > 0) {
+        toast({ title: `Transcoded ${data.converted}/${data.total} videos. ${data.failed} failed.`, variant: "destructive" });
+      } else {
+        toast({ title: `Transcoded ${data.converted} video${data.converted !== 1 ? "s" : ""} to mp4` });
+      }
+    },
+    onError: () => toast({ title: "Transcode failed", variant: "destructive" }),
   });
 
   const deleteMutation = useMutation({
@@ -150,13 +172,19 @@ export default function Admin() {
     },
   });
 
+  const playerBatsMap = new Map<string, string>(
+    (players as MlbPlayer[]).map(p => [p.name.toLowerCase(), p.bats ?? ""])
+  );
+
   const filtered = allVideos.filter((v: Video) => {
     if (!v.isProVideo) return false;
     const matchCat = filterCategory === "All" || v.category === filterCategory;
     const matchSearch = !searchQuery ||
       v.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (v.playerName?.toLowerCase().includes(searchQuery.toLowerCase()));
-    return matchCat && matchSearch;
+    const matchBats = filterBats === "All" || !v.playerName ||
+      playerBatsMap.get(v.playerName.toLowerCase()) === filterBats;
+    return matchCat && matchSearch && matchBats;
   });
 
   const userUploads = (allVideos as Video[]).filter(v => !v.isProVideo);
@@ -295,6 +323,22 @@ export default function Admin() {
                 data-testid="input-admin-search"
               />
             </div>
+            <div className="flex items-center gap-0.5 bg-secondary/50 border border-border rounded-md p-1 shrink-0">
+              {(["All", "L", "R", "S"] as const).map(h => (
+                <button
+                  key={h}
+                  onClick={() => setFilterBats(h)}
+                  className={`px-2.5 py-1 rounded text-xs font-semibold transition-colors ${
+                    filterBats === h
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+                  }`}
+                  title={h === "All" ? "All hitters" : h === "L" ? "Left-handed" : h === "R" ? "Right-handed" : "Switch hitters"}
+                >
+                  {h === "All" ? "All" : `Bats ${h}`}
+                </button>
+              ))}
+            </div>
             <div className="flex gap-2 overflow-x-auto pb-1">
               <FilterPill label="All" active={filterCategory === "All"} onClick={() => setFilterCategory("All")} count={allVideos.length} />
               {allCategories.map(cat => {
@@ -307,11 +351,9 @@ export default function Admin() {
           {/* Videos Table */}
           <div className="border border-border rounded-xl overflow-hidden">
             <div className="bg-secondary/50 p-3 text-xs font-semibold text-muted-foreground grid grid-cols-12 gap-2 uppercase tracking-wider items-center">
-              <div className="col-span-3">Title</div>
-              <div className="col-span-2">Player</div>
+              <div className="col-span-4">Title</div>
+              <div className="col-span-3">Player</div>
               <div className="col-span-1">Category</div>
-              <div className="col-span-1">Source</div>
-              <div className="col-span-1">FPS</div>
               <div className="col-span-1">Duration</div>
               <div className="col-span-1">File</div>
               <div className="col-span-2 text-right">Actions</div>
@@ -557,6 +599,35 @@ export default function Admin() {
             />
           )}
 
+          {/* Players Filters */}
+          <div className="flex flex-col sm:flex-row gap-3 mb-4">
+            <div className="relative flex-1 max-w-sm">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search players..."
+                className="pl-9 bg-secondary/30 border-border"
+                value={playerSearch}
+                onChange={(e) => setPlayerSearch(e.target.value)}
+              />
+            </div>
+            <div className="flex items-center gap-0.5 bg-secondary/50 border border-border rounded-md p-1 shrink-0">
+              {(["All", "L", "R", "S"] as const).map(h => (
+                <button
+                  key={h}
+                  onClick={() => setPlayerBatsFilter(h)}
+                  className={`px-2.5 py-1 rounded text-xs font-semibold transition-colors ${
+                    playerBatsFilter === h
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+                  }`}
+                  title={h === "All" ? "All hitters" : h === "L" ? "Left-handed" : h === "R" ? "Right-handed" : "Switch hitters"}
+                >
+                  {h === "All" ? "All" : `Bats ${h}`}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Players Table */}
           <div className="border border-border rounded-xl overflow-hidden">
             <div className="bg-secondary/50 p-3 text-xs font-semibold text-muted-foreground grid grid-cols-12 gap-2 uppercase tracking-wider items-center">
@@ -571,7 +642,11 @@ export default function Admin() {
               <div className="col-span-1 text-right">Del</div>
             </div>
             <div className="divide-y divide-border/50 max-h-[600px] overflow-y-auto">
-              {players.map((player: MlbPlayer) => (
+              {players.filter((p: MlbPlayer) => {
+                const matchSearch = !playerSearch || p.name.toLowerCase().includes(playerSearch.toLowerCase()) || (p.team?.toLowerCase().includes(playerSearch.toLowerCase()) ?? false);
+                const matchBats = playerBatsFilter === "All" || p.bats === playerBatsFilter;
+                return matchSearch && matchBats;
+              }).map((player: MlbPlayer) => (
                 <PlayerRow
                   key={player.id}
                   player={player}
@@ -600,11 +675,27 @@ export default function Admin() {
               <StatCard label="R2 Videos" value={r2Health?.total ?? 0} />
               <StatCard label="OK" value={r2Health?.ok ?? 0} />
               <StatCard label="Missing" value={r2Health?.missing ?? 0} />
+              <StatCard label="Needs Transcode" value={r2Health?.videos.filter(v => /\.(mov|avi|webm)$/i.test(v.key)).length ?? 0} />
             </div>
-            <Button variant="outline" size="sm" onClick={() => refetchHealth()} disabled={r2Loading}>
-              {r2Loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Search className="w-4 h-4 mr-2" />}
-              {r2Loading ? "Checking..." : "Run Check"}
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (confirm("This will transcode all .mov/.avi/.webm videos in R2 to mp4. This may take a while. Continue?")) {
+                    transcodeMutation.mutate();
+                  }
+                }}
+                disabled={transcodeMutation.isPending}
+              >
+                {transcodeMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                {transcodeMutation.isPending ? "Transcoding..." : "Transcode .mov → mp4"}
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => refetchHealth()} disabled={r2Loading}>
+                {r2Loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Search className="w-4 h-4 mr-2" />}
+                {r2Loading ? "Checking..." : "Run Check"}
+              </Button>
+            </div>
           </div>
 
           {!r2Health && !r2Loading && (
@@ -681,7 +772,7 @@ function FilterPill({ label, active, onClick, count }: { label: string; active: 
 function VideoRow({ video, onEdit, onTrim, onDelete, deleting }: { video: Video; onEdit: () => void; onTrim: () => void; onDelete: () => void; deleting: boolean }) {
   return (
     <div className="p-3 grid grid-cols-12 gap-2 items-center hover:bg-secondary/20 transition-colors text-sm" data-testid={`admin-row-${video.id}`}>
-      <div className="col-span-3 font-medium flex items-center gap-2 min-w-0">
+      <div className="col-span-4 font-medium flex items-center gap-2 min-w-0">
         <div className="w-8 h-8 rounded bg-secondary flex items-center justify-center shrink-0">
           {video.sourceUrl ? (
             <PlayCircle className="w-4 h-4 text-primary" />
@@ -691,12 +782,10 @@ function VideoRow({ video, onEdit, onTrim, onDelete, deleting }: { video: Video;
         </div>
         <span className="truncate">{video.title}</span>
       </div>
-      <div className="col-span-2 text-muted-foreground truncate">{video.playerName || "—"}</div>
+      <div className="col-span-3 text-muted-foreground truncate">{video.playerName || "—"}</div>
       <div className="col-span-1">
         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-primary/10 text-primary">{video.category}</span>
       </div>
-      <div className="col-span-1 text-muted-foreground text-xs">{video.source}</div>
-      <div className="col-span-1 text-muted-foreground text-xs font-mono">{video.fps || "—"}</div>
       <div className="col-span-1 text-muted-foreground text-xs font-mono">{video.duration || "—"}</div>
       <div className="col-span-1">
         {video.sourceUrl ? (
