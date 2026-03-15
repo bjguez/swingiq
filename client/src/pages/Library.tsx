@@ -133,6 +133,7 @@ export default function Library() {
                     src={item.sourceUrl}
                     className="w-full h-full object-cover"
                     muted
+                    playsInline
                     preload="metadata"
                     onLoadedMetadata={(e) => { e.currentTarget.currentTime = 0.5; }}
                   />

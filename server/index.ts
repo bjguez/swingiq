@@ -4,6 +4,7 @@ import { serveStatic } from "./static";
 import { setupAuth } from "./auth";
 import { createServer } from "http";
 import { pool } from "./db";
+import { r2Configured, configureR2Cors } from "./r2";
 
 const app = express();
 const httpServer = createServer(app);
@@ -127,6 +128,8 @@ app.use((req, res, next) => {
   await pool.query(`
     UPDATE videos SET category = 'Full Swing' WHERE category = 'Full Swings'
   `);
+
+  if (r2Configured()) await configureR2Cors();
 
   await registerRoutes(httpServer, app);
 

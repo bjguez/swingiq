@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand, PutBucketCorsCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { randomUUID } from "crypto";
 import path from "path";
@@ -47,6 +47,28 @@ export async function deleteFromR2(key: string): Promise<void> {
 /** Returns true if a sourceUrl value is an R2 key (not a legacy /uploads/ path) */
 export function isR2Key(sourceUrl: string): boolean {
   return sourceUrl.startsWith("videos/");
+}
+
+/** Configures CORS on the R2 bucket to allow browser video/canvas access from any origin */
+export async function configureR2Cors(): Promise<void> {
+  try {
+    await r2.send(new PutBucketCorsCommand({
+      Bucket: bucket,
+      CORSConfiguration: {
+        CORSRules: [
+          {
+            AllowedOrigins: ["*"],
+            AllowedMethods: ["GET", "HEAD"],
+            AllowedHeaders: ["*"],
+            ExposeHeaders: ["Content-Length", "Content-Type", "ETag"],
+            MaxAgeSeconds: 86400,
+          },
+        ],
+      },
+    }));
+  } catch (err) {
+    console.warn("[R2] Could not configure CORS (may not be supported on this endpoint):", err);
+  }
 }
 
 /** Returns true if the file exists in R2, false if missing */

@@ -312,7 +312,9 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected }: Vi
                               <video
                                 src={video.sourceUrl ?? undefined}
                                 className="w-full h-full object-cover"
-                                muted preload="metadata"
+                                muted
+                                playsInline
+                                preload="metadata"
                                 onLoadedMetadata={(e) => { e.currentTarget.currentTime = 0.5; }}
                               />
                               <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
