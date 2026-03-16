@@ -87,12 +87,15 @@ export function setupAuth(app: Express) {
   app.use(passport.session());
 
   passport.use(
-    new LocalStrategy(async (username, password, done) => {
+    new LocalStrategy({ usernameField: "username" }, async (usernameOrEmail, password, done) => {
       try {
-        const user = await storage.getUserByUsername(username);
-        if (!user) return done(null, false, { message: "Invalid username or password" });
+        // Accept either email or legacy username
+        const user = usernameOrEmail.includes("@")
+          ? await storage.getUserByEmail(usernameOrEmail.toLowerCase())
+          : await storage.getUserByUsername(usernameOrEmail);
+        if (!user) return done(null, false, { message: "Invalid email or password" });
         const valid = await comparePasswords(password, user.password);
-        if (!valid) return done(null, false, { message: "Invalid username or password" });
+        if (!valid) return done(null, false, { message: "Invalid email or password" });
         if (!user.email) return done(null, false, { message: "EMAIL_REQUIRED" });
         if (!user.emailVerified) return done(null, false, { message: "EMAIL_NOT_VERIFIED" });
         return done(null, user);
@@ -118,18 +121,23 @@ export function setupAuth(app: Express) {
       const parsed = insertUserSchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ message: "Invalid registration data" });
 
-      const { username, password, email } = parsed.data;
+      const { password, email } = parsed.data;
 
       if (!email) return res.status(400).json({ message: "Email is required" });
 
-      const existingUsername = await storage.getUserByUsername(username);
-      if (existingUsername) return res.status(400).json({ message: "Username already taken" });
-
-      const existingEmail = await storage.getUserByEmail(email);
+      const existingEmail = await storage.getUserByEmail(email.toLowerCase());
       if (existingEmail) return res.status(400).json({ message: "An account with this email already exists" });
 
+      // Derive a unique username from the email local part
+      const baseUsername = email.split("@")[0].toLowerCase().replace(/[^a-z0-9]/g, "");
+      let username = baseUsername;
+      let suffix = 1;
+      while (await storage.getUserByUsername(username)) {
+        username = `${baseUsername}${suffix++}`;
+      }
+
       const user = await storage.createUser({
-        username: username.toLowerCase(),
+        username,
         password: await hashPassword(password),
         email: email.toLowerCase(),
       });

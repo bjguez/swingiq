@@ -104,7 +104,7 @@ export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,
   email: true,
-});
+}).partial({ username: true });
 
 export type EmailVerification = typeof emailVerifications.$inferSelect;
 

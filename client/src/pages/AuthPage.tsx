@@ -12,8 +12,8 @@ export default function AuthPage() {
   const [, navigate] = useLocation();
   const { login, register, isLoggingIn, isRegistering, loginError, registerError } = useAuth();
 
-  const [loginForm, setLoginForm] = useState({ username: "", password: "" });
-  const [registerForm, setRegisterForm] = useState({ username: "", email: "", password: "", confirmPassword: "" });
+  const [loginForm, setLoginForm] = useState({ email: "", password: "" });
+  const [registerForm, setRegisterForm] = useState({ email: "", password: "", confirmPassword: "" });
   const [registerValidationError, setRegisterValidationError] = useState<string | null>(null);
 
   // Add-email flow for existing accounts that predate email verification
@@ -27,7 +27,7 @@ export default function AuthPage() {
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     try {
-      await login(loginForm);
+      await login({ username: loginForm.email, password: loginForm.password });
       navigate("/");
     } catch {
       // errors displayed via loginError
@@ -42,7 +42,7 @@ export default function AuthPage() {
       const res = await fetch("/api/auth/add-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: loginForm.username, password: loginForm.password, email: addEmailForm.email }),
+        body: JSON.stringify({ username: loginForm.email, password: loginForm.password, email: addEmailForm.email }),
       });
       const data = await res.json();
       if (!res.ok) { setAddEmailError(data.message); return; }
@@ -63,7 +63,7 @@ export default function AuthPage() {
       return;
     }
     try {
-      await register({ username: registerForm.username, email: registerForm.email, password: registerForm.password });
+      await register({ email: registerForm.email, password: registerForm.password });
       sessionStorage.setItem("pendingVerificationEmail", registerForm.email);
       navigate("/check-email");
     } catch {
@@ -115,23 +115,20 @@ export default function AuthPage() {
                     <Button type="submit" className="w-full" disabled={addEmailLoading}>
                       {addEmailLoading ? "Sending..." : "Add Email & Verify"}
                     </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="w-full"
-                      onClick={() => setLoginForm({ username: "", password: "" })}
-                    >
+                    <Button type="button" variant="ghost" className="w-full" onClick={() => setLoginForm({ email: "", password: "" })}>
                       Use a different account
                     </Button>
                   </form>
                 ) : (
                   <form onSubmit={handleLogin} className="space-y-4">
                     <div className="space-y-1">
-                      <Label htmlFor="login-username">Username</Label>
+                      <Label htmlFor="login-email">Email</Label>
                       <Input
-                        id="login-username"
-                        value={loginForm.username}
-                        onChange={(e) => setLoginForm((f) => ({ ...f, username: e.target.value }))}
+                        id="login-email"
+                        type="email"
+                        placeholder="you@example.com"
+                        value={loginForm.email}
+                        onChange={(e) => setLoginForm((f) => ({ ...f, email: e.target.value }))}
                         required
                       />
                     </div>
@@ -149,13 +146,7 @@ export default function AuthPage() {
                       <div className="space-y-2">
                         <p className="text-sm text-destructive">{loginError.message}</p>
                         {isEmailNotVerified && (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="w-full"
-                            onClick={() => navigate("/check-email")}
-                          >
+                          <Button type="button" variant="outline" size="sm" className="w-full" onClick={() => navigate("/check-email")}>
                             Resend verification email
                           </Button>
                         )}
@@ -178,15 +169,6 @@ export default function AuthPage() {
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleRegister} className="space-y-4">
-                  <div className="space-y-1">
-                    <Label htmlFor="reg-username">Username</Label>
-                    <Input
-                      id="reg-username"
-                      value={registerForm.username}
-                      onChange={(e) => setRegisterForm((f) => ({ ...f, username: e.target.value }))}
-                      required
-                    />
-                  </div>
                   <div className="space-y-1">
                     <Label htmlFor="reg-email">Email</Label>
                     <Input
