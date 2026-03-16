@@ -25,19 +25,14 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
   ({ src, onTimeUpdate, onLoadedMetadata, className, placeholder, rotation = 0 }, ref) => {
     const videoRef = useRef<HTMLVideoElement>(null);
     const [loadError, setLoadError] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
     const firstFrameSeekDone = useRef(false);
-    const prevSrcRef = useRef(src);
-    if (prevSrcRef.current !== src) {
-      prevSrcRef.current = src;
-      setLoadError(false);
-      firstFrameSeekDone.current = false;
-    }
 
-    // Explicitly call load() when src changes — some mobile browsers don't auto-load
-    // when React updates the src attribute
     useEffect(() => {
-      if (src && videoRef.current) {
-        videoRef.current.load();
+      if (src) {
+        setLoadError(false);
+        setIsLoading(true);
+        firstFrameSeekDone.current = false;
       }
     }, [src]);
 
@@ -93,7 +88,7 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
       ...(rotation === 90 || rotation === 270 ? { width: "100%", height: "100%", maxWidth: "unset" } : {}),
     } : {};
 
-    const handleReady = () => {
+    const handleFirstFrame = () => {
       if (videoRef.current && !firstFrameSeekDone.current) {
         firstFrameSeekDone.current = true;
         videoRef.current.currentTime = 0.001;
@@ -101,26 +96,36 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
     };
 
     return (
-      <video
-        ref={videoRef}
-        src={src}
-        className={className}
-        style={rotationStyle}
-        playsInline
-        muted
-        preload="metadata"
-        onError={() => setLoadError(true)}
-        onLoadedMetadata={() => {
-          handleReady();
-          if (videoRef.current) onLoadedMetadata?.(videoRef.current.duration);
-        }}
-        onCanPlay={handleReady}
-        onTimeUpdate={() => {
-          if (videoRef.current) {
-            onTimeUpdate?.(videoRef.current.currentTime, videoRef.current.duration);
-          }
-        }}
-      />
+      <div className={`relative ${className}`}>
+        {isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black z-10 pointer-events-none">
+            <div className="w-8 h-8 border-2 border-white/20 border-t-white/70 rounded-full animate-spin" />
+          </div>
+        )}
+        <video
+          ref={videoRef}
+          src={src}
+          className="w-full h-full object-contain"
+          style={rotationStyle}
+          playsInline
+          muted
+          preload="metadata"
+          onError={() => { setLoadError(true); setIsLoading(false); }}
+          onLoadedMetadata={() => {
+            handleFirstFrame();
+            if (videoRef.current) onLoadedMetadata?.(videoRef.current.duration);
+          }}
+          onCanPlay={() => {
+            setIsLoading(false);
+            handleFirstFrame();
+          }}
+          onTimeUpdate={() => {
+            if (videoRef.current) {
+              onTimeUpdate?.(videoRef.current.currentTime, videoRef.current.duration);
+            }
+          }}
+        />
+      </div>
     );
   }
 );
