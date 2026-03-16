@@ -25,10 +25,12 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
   ({ src, onTimeUpdate, onLoadedMetadata, className, placeholder, rotation = 0 }, ref) => {
     const videoRef = useRef<HTMLVideoElement>(null);
     const [loadError, setLoadError] = useState(false);
+    const firstFrameSeekDone = useRef(false);
     const prevSrcRef = useRef(src);
     if (prevSrcRef.current !== src) {
       prevSrcRef.current = src;
       setLoadError(false);
+      firstFrameSeekDone.current = false;
     }
 
     // Explicitly call load() when src changes — some mobile browsers don't auto-load
@@ -92,7 +94,10 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
     } : {};
 
     const handleReady = () => {
-      if (videoRef.current) videoRef.current.currentTime = 0.001;
+      if (videoRef.current && !firstFrameSeekDone.current) {
+        firstFrameSeekDone.current = true;
+        videoRef.current.currentTime = 0.001;
+      }
     };
 
     return (
