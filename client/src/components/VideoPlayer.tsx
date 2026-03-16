@@ -1,4 +1,4 @@
-import { useRef, useImperativeHandle, forwardRef, useState } from "react";
+import { useRef, useImperativeHandle, forwardRef, useState, useEffect } from "react";
 
 export interface VideoPlayerHandle {
   play: () => void;
@@ -30,6 +30,14 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
       prevSrcRef.current = src;
       setLoadError(false);
     }
+
+    // Explicitly call load() when src changes — some mobile browsers don't auto-load
+    // when React updates the src attribute
+    useEffect(() => {
+      if (src && videoRef.current) {
+        videoRef.current.load();
+      }
+    }, [src]);
 
     useImperativeHandle(ref, () => ({
       play: () => videoRef.current?.play(),
@@ -83,6 +91,10 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
       ...(rotation === 90 || rotation === 270 ? { width: "100%", height: "100%", maxWidth: "unset" } : {}),
     } : {};
 
+    const handleReady = () => {
+      if (videoRef.current) videoRef.current.currentTime = 0.001;
+    };
+
     return (
       <video
         ref={videoRef}
@@ -90,17 +102,16 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
         className={className}
         style={rotationStyle}
         playsInline
-        preload="auto"
+        preload="metadata"
         onError={() => setLoadError(true)}
+        onLoadedMetadata={() => {
+          handleReady();
+          if (videoRef.current) onLoadedMetadata?.(videoRef.current.duration);
+        }}
+        onCanPlay={handleReady}
         onTimeUpdate={() => {
           if (videoRef.current) {
             onTimeUpdate?.(videoRef.current.currentTime, videoRef.current.duration);
-          }
-        }}
-        onLoadedMetadata={() => {
-          if (videoRef.current) {
-            videoRef.current.currentTime = 0.001;
-            onLoadedMetadata?.(videoRef.current.duration);
           }
         }}
       />
