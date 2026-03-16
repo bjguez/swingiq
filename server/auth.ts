@@ -93,6 +93,7 @@ export function setupAuth(app: Express) {
         if (!user) return done(null, false, { message: "Invalid username or password" });
         const valid = await comparePasswords(password, user.password);
         if (!valid) return done(null, false, { message: "Invalid username or password" });
+        if (!user.email) return done(null, false, { message: "EMAIL_REQUIRED" });
         if (!user.emailVerified) return done(null, false, { message: "EMAIL_NOT_VERIFIED" });
         return done(null, user);
       } catch (err) {
@@ -152,10 +153,16 @@ export function setupAuth(app: Express) {
     passport.authenticate("local", (err: any, user: User | false, info: any) => {
       if (err) return next(err);
       if (!user) {
-        const message = info?.message === "EMAIL_NOT_VERIFIED"
-          ? "Please verify your email before logging in."
-          : (info?.message || "Invalid credentials");
-        return res.status(401).json({ message, emailNotVerified: info?.message === "EMAIL_NOT_VERIFIED" });
+        const code = info?.message;
+        const message =
+          code === "EMAIL_NOT_VERIFIED" ? "Please verify your email before logging in." :
+          code === "EMAIL_REQUIRED" ? "Please add an email address to your account." :
+          (info?.message || "Invalid credentials");
+        return res.status(401).json({
+          message,
+          emailNotVerified: code === "EMAIL_NOT_VERIFIED",
+          emailRequired: code === "EMAIL_REQUIRED",
+        });
       }
       req.login(user, (err) => {
         if (err) return next(err);
@@ -195,6 +202,40 @@ export function setupAuth(app: Express) {
         if (err) return next(err);
         res.json({ message: "Email verified successfully", user: serializeUser(user) });
       });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // Add email to an existing account that was created without one
+  app.post("/api/auth/add-email", async (req, res, next) => {
+    try {
+      const { username, password, email } = req.body;
+      if (!username || !password || !email) {
+        return res.status(400).json({ message: "Username, password, and email are required" });
+      }
+
+      const user = await storage.getUserByUsername(username);
+      if (!user) return res.status(401).json({ message: "Invalid username or password" });
+
+      const valid = await comparePasswords(password, user.password);
+      if (!valid) return res.status(401).json({ message: "Invalid username or password" });
+
+      if (user.email) return res.status(400).json({ message: "This account already has an email address" });
+
+      const existingEmail = await storage.getUserByEmail(email.toLowerCase());
+      if (existingEmail) return res.status(400).json({ message: "An account with this email already exists" });
+
+      await storage.updateUser(user.id, { email: email.toLowerCase() });
+
+      try {
+        const token = await createVerificationToken(user.id);
+        await sendVerificationEmail(email.toLowerCase(), token);
+      } catch (emailErr) {
+        console.error("Failed to send verification email:", emailErr);
+      }
+
+      res.json({ message: "Verification email sent. Please check your inbox." });
     } catch (err) {
       next(err);
     }

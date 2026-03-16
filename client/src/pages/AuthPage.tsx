@@ -15,15 +15,43 @@ export default function AuthPage() {
   const [loginForm, setLoginForm] = useState({ username: "", password: "" });
   const [registerForm, setRegisterForm] = useState({ username: "", email: "", password: "", confirmPassword: "" });
   const [registerValidationError, setRegisterValidationError] = useState<string | null>(null);
-  const [registerSuccess, setRegisterSuccess] = useState(false);
+
+  // Add-email flow for existing accounts that predate email verification
+  const [addEmailForm, setAddEmailForm] = useState({ email: "" });
+  const [addEmailError, setAddEmailError] = useState<string | null>(null);
+  const [addEmailLoading, setAddEmailLoading] = useState(false);
+
+  const isEmailNotVerified = (loginError as any)?.emailNotVerified;
+  const isEmailRequired = (loginError as any)?.emailRequired;
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     try {
       await login(loginForm);
       navigate("/");
-    } catch (err: any) {
-      // emailNotVerified is returned in the error body — handled via loginError display
+    } catch {
+      // errors displayed via loginError
+    }
+  }
+
+  async function handleAddEmail(e: React.FormEvent) {
+    e.preventDefault();
+    setAddEmailError(null);
+    setAddEmailLoading(true);
+    try {
+      const res = await fetch("/api/auth/add-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: loginForm.username, password: loginForm.password, email: addEmailForm.email }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setAddEmailError(data.message); return; }
+      sessionStorage.setItem("pendingVerificationEmail", addEmailForm.email);
+      navigate("/check-email");
+    } catch {
+      setAddEmailError("Something went wrong. Please try again.");
+    } finally {
+      setAddEmailLoading(false);
     }
   }
 
@@ -42,8 +70,6 @@ export default function AuthPage() {
       // error shown via registerError
     }
   }
-
-  const isEmailNotVerified = (loginError as any)?.emailNotVerified;
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -68,46 +94,78 @@ export default function AuthPage() {
                 <CardDescription>Sign in to your Swing Studio account</CardDescription>
               </CardHeader>
               <CardContent>
-                <form onSubmit={handleLogin} className="space-y-4">
-                  <div className="space-y-1">
-                    <Label htmlFor="login-username">Username</Label>
-                    <Input
-                      id="login-username"
-                      value={loginForm.username}
-                      onChange={(e) => setLoginForm((f) => ({ ...f, username: e.target.value }))}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="login-password">Password</Label>
-                    <Input
-                      id="login-password"
-                      type="password"
-                      value={loginForm.password}
-                      onChange={(e) => setLoginForm((f) => ({ ...f, password: e.target.value }))}
-                      required
-                    />
-                  </div>
-                  {loginError && (
-                    <div className="space-y-2">
-                      <p className="text-sm text-destructive">{loginError.message}</p>
-                      {isEmailNotVerified && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="w-full"
-                          onClick={() => navigate("/check-email")}
-                        >
-                          Resend verification email
-                        </Button>
-                      )}
+                {isEmailRequired ? (
+                  <form onSubmit={handleAddEmail} className="space-y-4">
+                    <p className="text-sm text-muted-foreground">
+                      We now require an email address for account security. Please add yours to continue.
+                    </p>
+                    <div className="space-y-1">
+                      <Label htmlFor="add-email">Email address</Label>
+                      <Input
+                        id="add-email"
+                        type="email"
+                        placeholder="you@example.com"
+                        value={addEmailForm.email}
+                        onChange={(e) => setAddEmailForm({ email: e.target.value })}
+                        required
+                        autoFocus
+                      />
                     </div>
-                  )}
-                  <Button type="submit" className="w-full" disabled={isLoggingIn}>
-                    {isLoggingIn ? "Signing in..." : "Sign In"}
-                  </Button>
-                </form>
+                    {addEmailError && <p className="text-sm text-destructive">{addEmailError}</p>}
+                    <Button type="submit" className="w-full" disabled={addEmailLoading}>
+                      {addEmailLoading ? "Sending..." : "Add Email & Verify"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="w-full"
+                      onClick={() => setLoginForm({ username: "", password: "" })}
+                    >
+                      Use a different account
+                    </Button>
+                  </form>
+                ) : (
+                  <form onSubmit={handleLogin} className="space-y-4">
+                    <div className="space-y-1">
+                      <Label htmlFor="login-username">Username</Label>
+                      <Input
+                        id="login-username"
+                        value={loginForm.username}
+                        onChange={(e) => setLoginForm((f) => ({ ...f, username: e.target.value }))}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="login-password">Password</Label>
+                      <Input
+                        id="login-password"
+                        type="password"
+                        value={loginForm.password}
+                        onChange={(e) => setLoginForm((f) => ({ ...f, password: e.target.value }))}
+                        required
+                      />
+                    </div>
+                    {loginError && (
+                      <div className="space-y-2">
+                        <p className="text-sm text-destructive">{loginError.message}</p>
+                        {isEmailNotVerified && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="w-full"
+                            onClick={() => navigate("/check-email")}
+                          >
+                            Resend verification email
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                    <Button type="submit" className="w-full" disabled={isLoggingIn}>
+                      {isLoggingIn ? "Signing in..." : "Sign In"}
+                    </Button>
+                  </form>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

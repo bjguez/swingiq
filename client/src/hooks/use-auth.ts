@@ -46,6 +46,7 @@ export function useAuth() {
         const err = await res.json();
         const error = new Error(err.message || "Login failed") as any;
         error.emailNotVerified = err.emailNotVerified ?? false;
+        error.emailRequired = err.emailRequired ?? false;
         throw error;
       }
       return res.json() as Promise<AuthUser>;
