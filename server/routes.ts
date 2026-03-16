@@ -80,6 +80,41 @@ export async function registerRoutes(
         }
       }
 
+      // Trim to user-selected window (required when video exceeds max duration)
+      const startTime = parseFloat(req.body.startTime ?? "");
+      const endTime = parseFloat(req.body.endTime ?? "");
+      if (!isNaN(startTime) && !isNaN(endTime) && endTime > startTime) {
+        const clipDuration = endTime - startTime;
+        if (clipDuration > 5) {
+          return res.status(400).json({ message: "Clip must be 5 seconds or less." });
+        }
+        const tmpTrimIn = path.join(uploadDir, `trim-in-${Date.now()}.mp4`);
+        const tmpTrimOut = path.join(uploadDir, `trim-out-${Date.now()}.mp4`);
+        try {
+          fs.writeFileSync(tmpTrimIn, uploadBuffer);
+          await new Promise<void>((resolve, reject) => {
+            execFile("ffmpeg", [
+              "-ss", startTime.toString(),
+              "-i", tmpTrimIn,
+              "-t", clipDuration.toString(),
+              "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+              "-c:a", "aac",
+              "-movflags", "+faststart",
+              "-avoid_negative_ts", "make_zero",
+              "-y", tmpTrimOut,
+            ], { maxBuffer: 100 * 1024 * 1024 }, (err, _stdout, stderr) => {
+              if (err) { console.error("Trim error:", stderr); reject(new Error("Trim failed")); }
+              else resolve();
+            });
+          });
+          uploadBuffer = fs.readFileSync(tmpTrimOut);
+          uploadName = uploadName.replace(/\.[^.]+$/, ".mp4");
+        } finally {
+          try { fs.unlinkSync(tmpTrimIn); } catch {}
+          try { fs.unlinkSync(tmpTrimOut); } catch {}
+        }
+      }
+
       const key = await uploadToR2(uploadBuffer, uploadName, "video/mp4");
       const presignedUrl = await getVideoUrl(key);
       const title = (req.body.title || req.file.originalname).replace(/\.[^.]+$/, "");

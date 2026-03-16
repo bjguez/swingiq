@@ -1,9 +1,9 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useLazySrc } from "@/hooks/use-lazy-src";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, Upload, PlayCircle, Loader2, AlertCircle, Lock } from "lucide-react";
+import { Search, Upload, PlayCircle, Loader2, AlertCircle, Lock, Scissors, Play, Pause } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchVideos, fetchPlayers, fetchVideoPresignedUrl } from "@/lib/api";
 import type { Video, MlbPlayer } from "@shared/schema";
@@ -26,6 +26,7 @@ function ModalThumb({ src }: { src: string }) {
 }
 
 const FREE_UPLOAD_LIMIT = 5;
+const MAX_CLIP_DURATION = 5;
 
 interface VideoLibraryModalProps {
   trigger: React.ReactNode;
@@ -34,7 +35,17 @@ interface VideoLibraryModalProps {
   onCompSelected?: (url: string, label?: string) => void;
 }
 
-type UploadState = "idle" | "uploading" | "error" | "limit_reached";
+type UploadState = "idle" | "trim_required" | "uploading" | "error" | "limit_reached";
+
+function getVideoDuration(url: string): Promise<number> {
+  return new Promise((resolve) => {
+    const v = document.createElement("video");
+    v.preload = "metadata";
+    v.onloadedmetadata = () => { resolve(v.duration); v.src = ""; };
+    v.onerror = () => resolve(0);
+    v.src = url;
+  });
+}
 
 export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected }: VideoLibraryModalProps) {
   const { user } = useAuth();
@@ -52,12 +63,22 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected }: Vi
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
+  // Trim state
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [trimObjectUrl, setTrimObjectUrl] = useState<string | null>(null);
+  const [trimDuration, setTrimDuration] = useState(0);
+  const [trimStart, setTrimStart] = useState(0);
+  const [trimEnd, setTrimEnd] = useState(MAX_CLIP_DURATION);
+  const [trimPlaying, setTrimPlaying] = useState(false);
+  const trimVideoRef = useRef<HTMLVideoElement>(null);
+  const trimTrackRef = useRef<HTMLDivElement>(null);
+  const draggingRef = useRef<"start" | "end" | null>(null);
+
   const { data: allVideos = [] } = useQuery({ queryKey: ["/api/videos"], queryFn: () => fetchVideos(), enabled: mode === "pro" || !!user });
   const { data: players = [] } = useQuery({ queryKey: ["/api/players"], queryFn: fetchPlayers });
 
   const userVideos = (allVideos as Video[]).filter(v => !v.isProVideo && v.sourceUrl);
 
-  // Build a name→bats lookup for filtering by handedness
   const playerBatsMap = new Map<string, string>(
     (players as MlbPlayer[]).map(p => [p.name.toLowerCase(), p.bats ?? ""])
   );
@@ -75,22 +96,7 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected }: Vi
     return true;
   });
 
-  const handleUploadClick = () => {
-    if (!user) {
-      setAuthGateOpen(true);
-      return;
-    }
-    if (!isPaid && userVideos.length >= FREE_UPLOAD_LIMIT) {
-      setUploadState("limit_reached");
-      return;
-    }
-    fileInputRef.current?.click();
-  };
-
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  const doUpload = useCallback(async (file: File, startTime?: number, endTime?: number) => {
     setUploadState("uploading");
     setUploadProgress(0);
     setUploadError(null);
@@ -98,6 +104,10 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected }: Vi
     const formData = new FormData();
     formData.append("video", file);
     formData.append("title", file.name);
+    if (startTime !== undefined && endTime !== undefined) {
+      formData.append("startTime", startTime.toString());
+      formData.append("endTime", endTime.toString());
+    }
 
     try {
       const xhr = new XMLHttpRequest();
@@ -129,6 +139,33 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected }: Vi
     }
 
     if (fileInputRef.current) fileInputRef.current.value = "";
+  }, [onVideoSelected, queryClient]);
+
+  const handleUploadClick = () => {
+    if (!user) { setAuthGateOpen(true); return; }
+    if (!isPaid && userVideos.length >= FREE_UPLOAD_LIMIT) { setUploadState("limit_reached"); return; }
+    fileInputRef.current?.click();
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (fileInputRef.current) fileInputRef.current.value = "";
+
+    const objectUrl = URL.createObjectURL(file);
+    const duration = await getVideoDuration(objectUrl);
+
+    if (duration > MAX_CLIP_DURATION) {
+      setPendingFile(file);
+      setTrimObjectUrl(objectUrl);
+      setTrimDuration(duration);
+      setTrimStart(0);
+      setTrimEnd(MAX_CLIP_DURATION);
+      setUploadState("trim_required");
+    } else {
+      URL.revokeObjectURL(objectUrl);
+      await doUpload(file);
+    }
   };
 
   const handleSelectExistingVideo = (video: Video) => {
@@ -148,12 +185,73 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected }: Vi
   };
 
   const handleSelectProVideo = (video: Video) => {
-    if (!user) {
-      setPendingProVideo(video);
-      setAuthGateOpen(true);
-    } else {
-      doImportProVideo(video);
+    if (!user) { setPendingProVideo(video); setAuthGateOpen(true); }
+    else doImportProVideo(video);
+  };
+
+  // Trim drag handlers
+  const handleTrimPointerDown = (handle: "start" | "end") => (e: React.PointerEvent) => {
+    e.preventDefault();
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    draggingRef.current = handle;
+
+    const onMove = (ev: PointerEvent) => {
+      if (!draggingRef.current || !trimTrackRef.current) return;
+      const rect = trimTrackRef.current.getBoundingClientRect();
+      const ratio = Math.max(0, Math.min(1, (ev.clientX - rect.left) / rect.width));
+      const t = ratio * trimDuration;
+
+      if (draggingRef.current === "start") {
+        const newStart = Math.max(0, Math.min(t, trimEnd - 0.1));
+        setTrimStart(newStart);
+        // If window would exceed max, slide end
+        if (trimEnd - newStart > MAX_CLIP_DURATION) setTrimEnd(newStart + MAX_CLIP_DURATION);
+        if (trimVideoRef.current) trimVideoRef.current.currentTime = newStart;
+      } else {
+        const newEnd = Math.min(trimDuration, Math.max(t, trimStart + 0.1));
+        // Clamp to max clip duration
+        const clampedEnd = Math.min(newEnd, trimStart + MAX_CLIP_DURATION);
+        setTrimEnd(clampedEnd);
+        if (trimVideoRef.current && trimVideoRef.current.currentTime > clampedEnd) {
+          trimVideoRef.current.currentTime = trimStart;
+        }
+      }
+    };
+
+    const onUp = () => {
+      draggingRef.current = null;
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerup", onUp);
+    };
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerup", onUp);
+  };
+
+  // Keep trim video within bounds during playback
+  const handleTrimTimeUpdate = () => {
+    const v = trimVideoRef.current;
+    if (!v) return;
+    if (v.currentTime >= trimEnd) { v.pause(); v.currentTime = trimStart; setTrimPlaying(false); }
+  };
+
+  const toggleTrimPlay = () => {
+    const v = trimVideoRef.current;
+    if (!v) return;
+    if (trimPlaying) { v.pause(); setTrimPlaying(false); }
+    else {
+      if (v.currentTime < trimStart || v.currentTime >= trimEnd) v.currentTime = trimStart;
+      v.play(); setTrimPlaying(true);
     }
+  };
+
+  const pct = (t: number) => trimDuration > 0 ? (t / trimDuration) * 100 : 0;
+  const clipDuration = trimEnd - trimStart;
+
+  const formatTime = (s: number) => {
+    const m = Math.floor(s / 60);
+    const sec = Math.floor(s % 60);
+    const ms = Math.floor((s % 1) * 100);
+    return `${m}:${sec.toString().padStart(2, "0")}.${ms.toString().padStart(2, "0")}`;
   };
 
   useEffect(() => {
@@ -163,10 +261,13 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected }: Vi
         setUploadProgress(0);
         setUploadError(null);
         setSearchQuery("");
+        if (trimObjectUrl) { URL.revokeObjectURL(trimObjectUrl); setTrimObjectUrl(null); }
+        setPendingFile(null);
+        setTrimPlaying(false);
       }, 300);
       return () => clearTimeout(t);
     }
-  }, [isOpen]);
+  }, [isOpen, trimObjectUrl]);
 
   return (
     <>
@@ -175,7 +276,7 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected }: Vi
       <DialogContent className="max-w-2xl bg-card border-border text-foreground">
         <DialogHeader>
           <DialogTitle className="font-display text-2xl uppercase tracking-wider">
-            {mode === "pro" ? "Pro Library" : "Upload Your Swing"}
+            {mode === "pro" ? "Pro Library" : uploadState === "trim_required" ? "Trim Your Clip" : "Upload Your Swing"}
           </DialogTitle>
           <DialogDescription className="sr-only">
             {mode === "pro" ? "Browse the pro video library" : "Upload your swing video"}
@@ -183,7 +284,7 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected }: Vi
         </DialogHeader>
 
         <div className="mt-2">
-          {/* ── PRO MODE: Library Browser ── */}
+          {/* ── PRO MODE ── */}
           {mode === "pro" && (
             <div className="space-y-3">
               <div className="flex gap-2">
@@ -273,7 +374,88 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected }: Vi
                 </div>
               )}
 
-              {/* Step 1: Upload */}
+              {/* Trim required */}
+              {uploadState === "trim_required" && trimObjectUrl && (
+                <div className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    Your video is <span className="text-foreground font-semibold">{formatTime(trimDuration)}</span> long. Select a <span className="text-primary font-semibold">5-second clip</span> to upload.
+                  </p>
+
+                  <div className="bg-black rounded-lg overflow-hidden aspect-video relative">
+                    <video
+                      ref={trimVideoRef}
+                      src={trimObjectUrl}
+                      className="w-full h-full object-contain"
+                      playsInline
+                      muted
+                      preload="auto"
+                      onTimeUpdate={handleTrimTimeUpdate}
+                    />
+                    <button
+                      onClick={toggleTrimPlay}
+                      className="absolute bottom-3 left-3 bg-black/60 hover:bg-black/80 rounded-full p-2 transition-colors"
+                    >
+                      {trimPlaying
+                        ? <Pause className="w-4 h-4 text-white" />
+                        : <Play className="w-4 h-4 text-white" />}
+                    </button>
+                  </div>
+
+                  {/* Trim track */}
+                  <div
+                    ref={trimTrackRef}
+                    className="relative h-12 bg-secondary rounded-lg overflow-hidden select-none"
+                  >
+                    {/* Selected region */}
+                    <div
+                      className="absolute inset-y-0 bg-primary/20 border-x-2 border-primary"
+                      style={{ left: `${pct(trimStart)}%`, width: `${pct(trimEnd) - pct(trimStart)}%` }}
+                    />
+                    {/* Start handle */}
+                    <div
+                      className="absolute top-0 bottom-0 w-4 cursor-col-resize z-20 flex items-center justify-center group"
+                      style={{ left: `calc(${pct(trimStart)}% - 8px)` }}
+                      onPointerDown={handleTrimPointerDown("start")}
+                    >
+                      <div className="w-1.5 h-8 bg-primary rounded-full group-hover:bg-primary/80 shadow-lg" />
+                    </div>
+                    {/* End handle */}
+                    <div
+                      className="absolute top-0 bottom-0 w-4 cursor-col-resize z-20 flex items-center justify-center group"
+                      style={{ left: `calc(${pct(trimEnd)}% - 8px)` }}
+                      onPointerDown={handleTrimPointerDown("end")}
+                    >
+                      <div className="w-1.5 h-8 bg-primary rounded-full group-hover:bg-primary/80 shadow-lg" />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs font-mono">
+                    <div className="flex gap-3">
+                      <span className="text-muted-foreground">Start: <span className="text-foreground">{formatTime(trimStart)}</span></span>
+                      <span className="text-muted-foreground">End: <span className="text-foreground">{formatTime(trimEnd)}</span></span>
+                    </div>
+                    <span className={`font-bold ${clipDuration > MAX_CLIP_DURATION ? "text-destructive" : "text-primary"}`}>
+                      Clip: {formatTime(clipDuration)}
+                    </span>
+                  </div>
+
+                  <div className="flex gap-2 justify-end">
+                    <Button variant="outline" onClick={() => { setUploadState("idle"); if (trimObjectUrl) URL.revokeObjectURL(trimObjectUrl); setTrimObjectUrl(null); setPendingFile(null); }}>
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={() => pendingFile && doUpload(pendingFile, trimStart, trimEnd)}
+                      disabled={clipDuration > MAX_CLIP_DURATION || !pendingFile}
+                      className="gap-2"
+                    >
+                      <Scissors className="w-4 h-4" />
+                      Upload {formatTime(clipDuration)} Clip
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Idle: upload drop zone + previous swings */}
               {uploadState === "idle" && (
                 <div className="flex flex-col gap-4">
                   <input
@@ -306,12 +488,12 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected }: Vi
                     </div>
                     <h3 className="font-display font-bold text-xl mb-1">Upload New Swing</h3>
                     <p className="text-muted-foreground text-sm max-w-xs mb-4">
-                      Drag and drop or click to select a video file.
+                      Drag and drop or click to select a video file. Max 5 seconds.
                     </p>
                     <Button onClick={(e) => { e.stopPropagation(); handleUploadClick(); }}>
                       Select File
                     </Button>
-                    <p className="text-xs text-muted-foreground mt-3">MP4, MOV, WebM up to 500MB</p>
+                    <p className="text-xs text-muted-foreground mt-3">MP4, MOV, WebM · Max 5 seconds</p>
                   </div>
 
                   {userVideos.length > 0 && (
