@@ -128,6 +128,22 @@ app.use((req, res, next) => {
   await pool.query(`
     UPDATE videos SET category = 'Full Swing' WHERE category = 'Full Swings'
   `);
+  // Email verification columns and table
+  await pool.query(`
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT UNIQUE
+  `);
+  await pool.query(`
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT false
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS email_verifications (
+      id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id VARCHAR NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      token TEXT NOT NULL UNIQUE,
+      expires_at TIMESTAMP NOT NULL,
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
 
   if (r2Configured()) await configureR2Cors();
 
