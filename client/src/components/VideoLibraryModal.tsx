@@ -209,11 +209,13 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected }: Vi
         if (trimVideoRef.current) trimVideoRef.current.currentTime = newStart;
       } else {
         const newEnd = Math.min(trimDuration, Math.max(t, trimStart + 0.1));
-        // Clamp to max clip duration
-        const clampedEnd = Math.min(newEnd, trimStart + MAX_CLIP_DURATION);
-        setTrimEnd(clampedEnd);
-        if (trimVideoRef.current && trimVideoRef.current.currentTime > clampedEnd) {
-          trimVideoRef.current.currentTime = trimStart;
+        setTrimEnd(newEnd);
+        // If window exceeds max, slide start forward
+        if (newEnd - trimStart > MAX_CLIP_DURATION) {
+          setTrimStart(Math.max(0, newEnd - MAX_CLIP_DURATION));
+        }
+        if (trimVideoRef.current && trimVideoRef.current.currentTime > newEnd) {
+          trimVideoRef.current.currentTime = Math.max(0, newEnd - MAX_CLIP_DURATION);
         }
       }
     };
