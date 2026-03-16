@@ -952,12 +952,12 @@ export async function registerRoutes(
   });
 
   // Get available prices (for the pricing page)
-  app.get("/api/stripe/prices", (_req, res) => {
+  app.get("/api/billing/plans", (_req, res) => {
     res.json(PRICES);
   });
 
   // Create checkout session
-  app.post("/api/stripe/checkout", async (req, res) => {
+  app.post("/api/billing/checkout", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
     const { priceId } = req.body;
     if (!priceId) return res.status(400).json({ message: "priceId required" });
@@ -974,7 +974,7 @@ export async function registerRoutes(
   });
 
   // Open Stripe customer portal (manage/cancel subscription)
-  app.post("/api/stripe/portal", async (req, res) => {
+  app.post("/api/billing/portal", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
     try {
       const url = await createPortalSession((req.user as any).id);

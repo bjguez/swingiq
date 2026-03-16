@@ -76,7 +76,7 @@ export default function PricingPage() {
   const [, navigate] = useLocation();
 
   const { data: prices } = useQuery<Record<string, string>>({
-    queryKey: ["/api/stripe/prices"],
+    queryKey: ["/api/billing/plans"],
   });
 
   const annualSavings = (monthly: number) =>
@@ -99,7 +99,7 @@ export default function PricingPage() {
 
     setLoading(tier.key);
     try {
-      const res = await apiRequest("POST", "/api/stripe/checkout", { priceId });
+      const res = await apiRequest("POST", "/api/billing/checkout", { priceId });
       const { url } = await res.json();
       window.location.href = url;
     } finally {
@@ -110,7 +110,7 @@ export default function PricingPage() {
   async function handleManage() {
     setLoading("manage");
     try {
-      const res = await apiRequest("POST", "/api/stripe/portal", {});
+      const res = await apiRequest("POST", "/api/billing/portal", {});
       const { url } = await res.json();
       window.location.href = url;
     } finally {
