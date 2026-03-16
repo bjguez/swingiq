@@ -8,6 +8,22 @@ import { fetchVideos } from "@/lib/api";
 import { useState } from "react";
 import { useLocation } from "wouter";
 import type { Video } from "@shared/schema";
+import { useLazySrc } from "@/hooks/use-lazy-src";
+
+function LibraryThumb({ src }: { src: string }) {
+  const { ref, lazySrc } = useLazySrc(src);
+  return (
+    <video
+      ref={ref}
+      src={lazySrc}
+      className="w-full h-full object-cover"
+      muted
+      playsInline
+      preload="metadata"
+      onLoadedMetadata={(e) => { e.currentTarget.currentTime = 0.5; }}
+    />
+  );
+}
 
 const categories = ["All", "Gather > Touchdown", "Touchdown > Finish", "Hand Path", "Head Position", "Scissor Kick", "Thrust", "Full Swing"];
 
@@ -129,14 +145,7 @@ export default function Library() {
               {/* Thumbnail */}
               <div className="relative aspect-video bg-black overflow-hidden cursor-pointer" onClick={() => setPreviewVideo(item)}>
                 {item.sourceUrl ? (
-                  <video
-                    src={item.sourceUrl}
-                    className="w-full h-full object-cover"
-                    muted
-                    playsInline
-                    preload="metadata"
-                    onLoadedMetadata={(e) => { e.currentTarget.currentTime = 0.5; }}
-                  />
+                  <LibraryThumb src={item.sourceUrl} />
                 ) : (
                   <div className="w-full h-full bg-linear-to-br from-secondary/80 to-background flex items-center justify-center">
                     <PlayCircle className="w-16 h-16 text-muted-foreground/30" />

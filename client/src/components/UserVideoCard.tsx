@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { renameVideo, deleteVideo } from "@/lib/api";
 import VideoTrimmer from "./VideoTrimmer";
 import type { Video } from "@shared/schema";
+import { useLazySrc } from "@/hooks/use-lazy-src";
 
 interface UserVideoCardProps {
   video: Video;
@@ -30,6 +31,7 @@ export function UserVideoCard({
   playLabel,
 }: UserVideoCardProps) {
   const queryClient = useQueryClient();
+  const { ref: thumbRef, lazySrc: thumbSrc } = useLazySrc(video.sourceUrl);
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(video.title);
   const [saving, setSaving] = useState(false);
@@ -85,7 +87,8 @@ export function UserVideoCard({
       {/* Thumbnail */}
       <div className="aspect-video bg-black relative flex items-center justify-center overflow-hidden">
         <video
-          src={video.sourceUrl ?? undefined}
+          ref={thumbRef}
+          src={thumbSrc}
           className="w-full h-full object-cover"
           muted
           playsInline

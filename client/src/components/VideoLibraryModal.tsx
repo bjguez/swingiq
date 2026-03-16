@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { useLazySrc } from "@/hooks/use-lazy-src";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +9,21 @@ import { fetchVideos, fetchPlayers, fetchVideoPresignedUrl } from "@/lib/api";
 import type { Video, MlbPlayer } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
 import { AuthGateModal } from "@/components/AuthGateModal";
+
+function ModalThumb({ src }: { src: string }) {
+  const { ref, lazySrc } = useLazySrc(src);
+  return (
+    <video
+      ref={ref}
+      src={lazySrc}
+      className="w-full h-full object-cover"
+      muted
+      playsInline
+      preload="metadata"
+      onLoadedMetadata={(e) => { e.currentTarget.currentTime = 0.5; }}
+    />
+  );
+}
 
 const FREE_UPLOAD_LIMIT = 5;
 
@@ -309,14 +325,7 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected }: Vi
                             className="text-left bg-secondary/30 border border-border rounded-lg overflow-hidden hover:border-primary/50 transition-colors group"
                           >
                             <div className="aspect-video bg-black relative flex items-center justify-center">
-                              <video
-                                src={video.sourceUrl ?? undefined}
-                                className="w-full h-full object-cover"
-                                muted
-                                playsInline
-                                preload="metadata"
-                                onLoadedMetadata={(e) => { e.currentTarget.currentTime = 0.5; }}
-                              />
+                              {video.sourceUrl && <ModalThumb src={video.sourceUrl} />}
                               <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <div className="bg-primary rounded-full p-1.5">
                                   <PlayCircle className="w-4 h-4 text-primary-foreground" />
