@@ -3,8 +3,9 @@ import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
-import { Check, Video, Zap } from "lucide-react";
+import { Check, Zap } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
+import Layout from "@/components/Layout";
 
 type Interval = "monthly" | "annual";
 
@@ -119,20 +120,8 @@ export default function PricingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="border-b border-border">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center gap-3">
-          <button onClick={() => navigate("/")} className="flex items-center gap-2 text-primary font-bold text-xl tracking-tighter">
-            <div className="w-7 h-7 rounded-md bg-primary flex items-center justify-center text-primary-foreground">
-              <Video size={16} />
-            </div>
-            Swing Studio
-          </button>
-        </div>
-      </div>
-
-      <div className="max-w-5xl mx-auto px-4 py-16">
+    <Layout>
+      <div className="max-w-5xl mx-auto w-full py-8">
         {/* Hero */}
         <div className="text-center mb-12">
           <h1 className="font-display text-4xl uppercase tracking-wider mb-3">
@@ -258,6 +247,6 @@ export default function PricingPage() {
           All plans include a 30-day money-back guarantee. No contracts — cancel anytime from your account.
         </p>
       </div>
-    </div>
+    </Layout>
   );
 }

@@ -26,7 +26,7 @@ function ModalThumb({ src }: { src: string }) {
   );
 }
 
-const FREE_UPLOAD_LIMIT = 10;
+const FREE_UPLOAD_LIMIT = 5;
 const MAX_CLIP_DURATION = 5;
 
 interface VideoLibraryModalProps {
