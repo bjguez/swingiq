@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useLocation } from "wouter";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,7 +39,8 @@ function similarityScore(
 
 export default function Biometrics() {
   const { user, updateProfile, isUpdatingProfile } = useAuth();
-  const isPaid = user?.subscriptionTier === "paid";
+  const isPaid = user?.subscriptionTier === "player" || user?.subscriptionTier === "pro";
+  const [, navigate] = useLocation();
   const [authGateOpen, setAuthGateOpen] = useState(false);
 
   const [heightFt, setHeightFt] = useState(() => user?.heightInches ? String(Math.floor(user.heightInches / 12)) : "");
@@ -102,11 +104,11 @@ export default function Biometrics() {
             </p>
           </div>
           <div className="flex flex-col sm:flex-row gap-3">
-            <Button size="lg" onClick={() => setAuthGateOpen(true)}>
+            <Button size="lg" onClick={() => navigate("/pricing")}>
               Upgrade to Unlock
             </Button>
             {!user && (
-              <Button size="lg" variant="outline" onClick={() => setAuthGateOpen(true)}>
+              <Button size="lg" variant="outline" onClick={() => navigate("/auth")}>
                 Sign In
               </Button>
             )}

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useLocation } from "wouter";
 import { useLazySrc } from "@/hooks/use-lazy-src";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -25,7 +26,7 @@ function ModalThumb({ src }: { src: string }) {
   );
 }
 
-const FREE_UPLOAD_LIMIT = 5;
+const FREE_UPLOAD_LIMIT = 10;
 const MAX_CLIP_DURATION = 5;
 
 interface VideoLibraryModalProps {
@@ -49,7 +50,8 @@ function getVideoDuration(url: string): Promise<number> {
 
 export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected }: VideoLibraryModalProps) {
   const { user } = useAuth();
-  const isPaid = user?.subscriptionTier === "paid";
+  const [, navigate] = useLocation();
+  const isPaid = user?.subscriptionTier === "player" || user?.subscriptionTier === "pro";
 
   const [isOpen, setIsOpen] = useState(false);
   const [authGateOpen, setAuthGateOpen] = useState(false);
@@ -383,7 +385,10 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected }: Vi
                   <Lock className="w-12 h-12 text-yellow-500 mb-4" />
                   <h3 className="font-display font-bold text-xl mb-2">Free Limit Reached</h3>
                   <p className="text-muted-foreground text-sm mb-4">You've used all {FREE_UPLOAD_LIMIT} free swing uploads. Upgrade to continue uploading and unlock all features.</p>
-                  <Button onClick={() => setUploadState("idle")}>Go Back</Button>
+                  <div className="flex gap-2">
+                    <Button onClick={() => navigate("/pricing")}>Upgrade</Button>
+                    <Button variant="outline" onClick={() => setUploadState("idle")}>Go Back</Button>
+                  </div>
                 </div>
               )}
 

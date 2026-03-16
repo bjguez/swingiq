@@ -8,6 +8,7 @@ import fs from "fs";
 import express from "express";
 import { execFile } from "child_process";
 import { uploadToR2, getVideoUrl, deleteFromR2, isR2Key, r2Configured, checkR2Exists } from "./r2";
+import { createCheckoutSession, createPortalSession, handleWebhook, PRICES } from "./stripe";
 
 const uploadDir = path.resolve("uploads");
 if (!fs.existsSync(uploadDir)) {
@@ -933,6 +934,53 @@ export async function registerRoutes(
     } catch (err: any) {
       console.error("MLB lookup error:", err);
       res.status(500).json({ message: "Lookup failed" });
+    }
+  });
+
+  // ── Stripe ──────────────────────────────────────────────────────────────
+
+  // Webhook — must use raw body, registered before express.json parses it
+  app.post("/api/stripe/webhook", express.raw({ type: "application/json" }), async (req, res) => {
+    const sig = req.headers["stripe-signature"] as string;
+    try {
+      await handleWebhook(req.body as Buffer, sig);
+      res.json({ received: true });
+    } catch (err: any) {
+      console.error("Stripe webhook error:", err.message);
+      res.status(400).json({ message: err.message });
+    }
+  });
+
+  // Get available prices (for the pricing page)
+  app.get("/api/stripe/prices", (_req, res) => {
+    res.json(PRICES);
+  });
+
+  // Create checkout session
+  app.post("/api/stripe/checkout", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    const { priceId } = req.body;
+    if (!priceId) return res.status(400).json({ message: "priceId required" });
+    try {
+      const url = await createCheckoutSession(
+        (req.user as any).id,
+        (req.user as any).email,
+        priceId,
+      );
+      res.json({ url });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // Open Stripe customer portal (manage/cancel subscription)
+  app.post("/api/stripe/portal", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    try {
+      const url = await createPortalSession((req.user as any).id);
+      res.json({ url });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
     }
   });
 

@@ -14,6 +14,7 @@ import AuthPage from "@/pages/AuthPage";
 import OnboardingPage from "@/pages/OnboardingPage";
 import CheckEmailPage from "@/pages/CheckEmailPage";
 import VerifyEmailPage from "@/pages/VerifyEmailPage";
+import PricingPage from "@/pages/PricingPage";
 import { useAuth } from "@/hooks/use-auth";
 
 function AdminRoute() {
@@ -41,6 +42,7 @@ function Router() {
       <Route path="/biometrics" component={Biometrics} />
       <Route path="/development" component={Development} />
       <Route path="/library" component={Library} />
+      <Route path="/pricing" component={PricingPage} />
       <Route path="/my-swings" component={MySwings} />
       <Route path="/admin" component={AdminRoute} />
       <Route component={NotFound} />

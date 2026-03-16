@@ -4,6 +4,7 @@ import { PlayCircle, Target, CheckCircle2, Dumbbell, Loader2, Lock } from "lucid
 import { useQuery } from "@tanstack/react-query";
 import { fetchDrills, fetchVideos } from "@/lib/api";
 import { useState } from "react";
+import { useLocation } from "wouter";
 import type { Drill, Video } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
 import { AuthGateModal } from "@/components/AuthGateModal";
@@ -13,7 +14,8 @@ const detailPhases = ["Hand Path", "Head Position", "Scissor Kick", "Thrust"];
 
 export default function Development() {
   const { user } = useAuth();
-  const isPaid = user?.subscriptionTier === "paid";
+  const isPaid = user?.subscriptionTier === "pro";
+  const [, navigate] = useLocation();
   const [authGateOpen, setAuthGateOpen] = useState(false);
   const [focusPhase, setFocusPhase] = useState("Gather > Touchdown");
   
@@ -45,11 +47,11 @@ export default function Development() {
             </p>
           </div>
           <div className="flex flex-col sm:flex-row gap-3">
-            <Button size="lg" onClick={() => setAuthGateOpen(true)}>
+            <Button size="lg" onClick={() => navigate("/pricing")}>
               Upgrade to Unlock
             </Button>
             {!user && (
-              <Button size="lg" variant="outline" onClick={() => setAuthGateOpen(true)}>
+              <Button size="lg" variant="outline" onClick={() => navigate("/auth")}>
                 Sign In
               </Button>
             )}

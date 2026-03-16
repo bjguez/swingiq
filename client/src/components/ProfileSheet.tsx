@@ -25,7 +25,7 @@ const US_STATES = [
   "SD","TN","TX","UT","VT","VA","WA","WV","WI","WY","DC",
 ];
 
-const FREE_UPLOAD_LIMIT = 5;
+const FREE_UPLOAD_LIMIT = 10;
 
 interface ProfileSheetProps {
   open: boolean;

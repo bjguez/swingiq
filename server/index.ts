@@ -128,6 +128,16 @@ app.use((req, res, next) => {
   await pool.query(`
     UPDATE videos SET category = 'Full Swing' WHERE category = 'Full Swings'
   `);
+  // Stripe subscription columns
+  await pool.query(`
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT
+  `);
+  await pool.query(`
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_subscription_id TEXT
+  `);
+  await pool.query(`
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_status TEXT
+  `);
   // Email verification columns and table
   await pool.query(`
     ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT UNIQUE

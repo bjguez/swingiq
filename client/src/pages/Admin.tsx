@@ -452,7 +452,7 @@ export default function Admin() {
         <>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <StatCard label="Total Users" value={adminUsers.length} />
-            <StatCard label="Paid" value={adminUsers.filter((u: any) => u.subscriptionTier === "paid").length} />
+            <StatCard label="Paid" value={adminUsers.filter((u: any) => u.subscriptionTier === "player" || u.subscriptionTier === "pro").length} />
             <StatCard label="With Uploads" value={adminUsers.filter((u: any) => u.uploadCount > 0).length} />
             <StatCard label="Total Uploads" value={adminUsers.reduce((sum: number, u: any) => sum + u.uploadCount, 0)} />
           </div>
@@ -483,8 +483,8 @@ export default function Admin() {
                       <span className="truncate">{u.username}</span>
                     </div>
                     <div className="col-span-1">
-                      <span className={`text-xs px-2 py-0.5 rounded font-semibold ${u.subscriptionTier === "paid" ? "bg-primary/20 text-primary" : "bg-secondary text-muted-foreground"}`}>
-                        {u.subscriptionTier === "paid" ? "Pro" : "Free"}
+                      <span className={`text-xs px-2 py-0.5 rounded font-semibold ${u.subscriptionTier === "pro" ? "bg-primary/20 text-primary" : u.subscriptionTier === "player" ? "bg-blue-500/10 text-blue-400" : "bg-secondary text-muted-foreground"}`}>
+                        {u.subscriptionTier === "pro" ? "Pro" : u.subscriptionTier === "player" ? "Player" : "Rookie"}
                       </span>
                     </div>
                     <div className="col-span-2 text-xs text-muted-foreground truncate capitalize">
@@ -516,7 +516,7 @@ export default function Admin() {
                       {/* Full profile fields */}
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
                         {[
-                          { label: "Tier", value: u.subscriptionTier === "paid" ? "Pro" : "Free" },
+                          { label: "Tier", value: u.subscriptionTier === "pro" ? "Pro" : u.subscriptionTier === "player" ? "Player" : "Rookie" },
                           { label: "Bats", value: u.bats || "—" },
                           { label: "Throws", value: u.throws || "—" },
                           { label: "Skill", value: u.skillLevel?.replace(/_/g, " ") || "—" },

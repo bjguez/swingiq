@@ -20,8 +20,11 @@ export const users = pgTable("users", {
   heightInches: integer("height_inches"),
   weightLbs: integer("weight_lbs"),
   profileComplete: boolean("profile_complete").default(false).notNull(),
-  // Subscription
+  // Subscription — tiers: "free" | "player" | "pro"
   subscriptionTier: text("subscription_tier").default("free").notNull(),
+  stripeCustomerId: text("stripe_customer_id"),
+  stripeSubscriptionId: text("stripe_subscription_id"),
+  subscriptionStatus: text("subscription_status"), // active | canceled | past_due | trialing
 });
 
 export const emailVerifications = pgTable("email_verifications", {
