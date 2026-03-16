@@ -72,7 +72,8 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected }: Vi
   const [trimPlaying, setTrimPlaying] = useState(false);
   const trimVideoRef = useRef<HTMLVideoElement>(null);
   const trimTrackRef = useRef<HTMLDivElement>(null);
-  const draggingRef = useRef<"start" | "end" | null>(null);
+  const draggingRef = useRef<"start" | "end" | "middle" | null>(null);
+  const dragAnchorRef = useRef<{ x: number; start: number; end: number } | null>(null);
 
   const { data: allVideos = [] } = useQuery({ queryKey: ["/api/videos"], queryFn: () => fetchVideos(), enabled: mode === "pro" || !!user });
   const { data: players = [] } = useQuery({ queryKey: ["/api/players"], queryFn: fetchPlayers });
@@ -190,13 +191,15 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected }: Vi
   };
 
   // Trim drag handlers
-  const handleTrimPointerDown = (handle: "start" | "end") => (e: React.PointerEvent) => {
+  const handleTrimPointerDown = (handle: "start" | "end" | "middle") => (e: React.PointerEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     draggingRef.current = handle;
+    dragAnchorRef.current = { x: e.clientX, start: trimStart, end: trimEnd };
 
     const onMove = (ev: PointerEvent) => {
-      if (!draggingRef.current || !trimTrackRef.current) return;
+      if (!draggingRef.current || !trimTrackRef.current || !dragAnchorRef.current) return;
       const rect = trimTrackRef.current.getBoundingClientRect();
       const ratio = Math.max(0, Math.min(1, (ev.clientX - rect.left) / rect.width));
       const t = ratio * trimDuration;
@@ -204,24 +207,32 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected }: Vi
       if (draggingRef.current === "start") {
         const newStart = Math.max(0, Math.min(t, trimEnd - 0.1));
         setTrimStart(newStart);
-        // If window would exceed max, slide end
         if (trimEnd - newStart > MAX_CLIP_DURATION) setTrimEnd(newStart + MAX_CLIP_DURATION);
         if (trimVideoRef.current) trimVideoRef.current.currentTime = newStart;
-      } else {
+      } else if (draggingRef.current === "end") {
         const newEnd = Math.min(trimDuration, Math.max(t, trimStart + 0.1));
         setTrimEnd(newEnd);
-        // If window exceeds max, slide start forward
         if (newEnd - trimStart > MAX_CLIP_DURATION) {
           setTrimStart(Math.max(0, newEnd - MAX_CLIP_DURATION));
         }
         if (trimVideoRef.current && trimVideoRef.current.currentTime > newEnd) {
           trimVideoRef.current.currentTime = Math.max(0, newEnd - MAX_CLIP_DURATION);
         }
+      } else {
+        // Middle drag: slide the entire window
+        const delta = ((ev.clientX - dragAnchorRef.current.x) / rect.width) * trimDuration;
+        const windowSize = dragAnchorRef.current.end - dragAnchorRef.current.start;
+        const newStart = Math.max(0, Math.min(trimDuration - windowSize, dragAnchorRef.current.start + delta));
+        const newEnd = newStart + windowSize;
+        setTrimStart(newStart);
+        setTrimEnd(newEnd);
+        if (trimVideoRef.current) trimVideoRef.current.currentTime = newStart;
       }
     };
 
     const onUp = () => {
       draggingRef.current = null;
+      dragAnchorRef.current = null;
       document.removeEventListener("pointermove", onMove);
       document.removeEventListener("pointerup", onUp);
     };
@@ -408,10 +419,11 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected }: Vi
                     ref={trimTrackRef}
                     className="relative h-12 bg-secondary rounded-lg overflow-hidden select-none"
                   >
-                    {/* Selected region */}
+                    {/* Selected region — draggable middle */}
                     <div
-                      className="absolute inset-y-0 bg-primary/20 border-x-2 border-primary"
+                      className="absolute inset-y-0 bg-primary/20 border-x-2 border-primary cursor-grab active:cursor-grabbing z-10"
                       style={{ left: `${pct(trimStart)}%`, width: `${pct(trimEnd) - pct(trimStart)}%` }}
+                      onPointerDown={handleTrimPointerDown("middle")}
                     />
                     {/* Start handle */}
                     <div
