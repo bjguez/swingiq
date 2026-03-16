@@ -112,11 +112,17 @@ export async function registerRoutes(
       if (!video || !video.sourceUrl) {
         return res.status(404).json({ message: "Video not found" });
       }
-      if (!isR2Key(video.sourceUrl)) {
-        // Legacy local file — return as-is
+      // Normalize full URL (CDN or presigned) back to R2 key
+      let key = video.sourceUrl;
+      if (key.startsWith("https://")) {
+        const match = key.match(/videos\/[^?#]+/);
+        if (match) key = match[0];
+      }
+      if (!isR2Key(key)) {
+        // Legacy local file or external URL — return as-is
         return res.json({ url: video.sourceUrl });
       }
-      const url = await getVideoUrl(video.sourceUrl);
+      const url = await getVideoUrl(key);
       res.json({ url });
     } catch (err: any) {
       console.error("Presigned URL error:", err);

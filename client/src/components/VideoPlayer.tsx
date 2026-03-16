@@ -99,6 +99,7 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
         }}
         onLoadedMetadata={() => {
           if (videoRef.current) {
+            videoRef.current.currentTime = 0.001;
             onLoadedMetadata?.(videoRef.current.duration);
           }
         }}
