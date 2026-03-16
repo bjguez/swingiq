@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,15 +33,16 @@ const US_STATES = [
 
 export function AuthGateModal({ open, onOpenChange, reason, onSuccess }: AuthGateModalProps) {
   const { login, register, updateProfile, isLoggingIn, isRegistering, isUpdatingProfile, loginError, registerError } = useAuth();
+  const [, navigate] = useLocation();
   const [step, setStep] = useState<Step>("gate");
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [profile, setProfile] = useState({ age: "", city: "", state: "", skillLevel: "", bats: "", throws: "" });
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await login({ username, password });
+      await login({ username: email, password });
       onSuccess?.();
       onOpenChange(false);
     } catch {}
@@ -49,8 +51,10 @@ export function AuthGateModal({ open, onOpenChange, reason, onSuccess }: AuthGat
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await register({ username, password });
-      setStep("profile");
+      await register({ email, password });
+      sessionStorage.setItem("pendingVerificationEmail", email);
+      onOpenChange(false);
+      navigate("/check-email");
     } catch {}
   };
 
@@ -73,7 +77,7 @@ export function AuthGateModal({ open, onOpenChange, reason, onSuccess }: AuthGat
 
   const resetState = () => {
     setStep("gate");
-    setUsername("");
+    setEmail("");
     setPassword("");
     setProfile({ age: "", city: "", state: "", skillLevel: "", bats: "", throws: "" });
   };
@@ -114,10 +118,11 @@ export function AuthGateModal({ open, onOpenChange, reason, onSuccess }: AuthGat
           <form onSubmit={handleLogin} className="space-y-3">
             <div className="space-y-2">
               <Input
-                placeholder="Username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                autoComplete="username"
+                type="email"
+                placeholder="Email address"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                autoComplete="email"
                 required
               />
               <Input
@@ -144,10 +149,11 @@ export function AuthGateModal({ open, onOpenChange, reason, onSuccess }: AuthGat
           <form onSubmit={handleRegister} className="space-y-3">
             <div className="space-y-2">
               <Input
-                placeholder="Choose a username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                autoComplete="username"
+                type="email"
+                placeholder="Email address"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                autoComplete="email"
                 required
               />
               <Input
