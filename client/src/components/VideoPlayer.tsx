@@ -102,6 +102,7 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
         className={className}
         style={rotationStyle}
         playsInline
+        muted
         preload="metadata"
         onError={() => setLoadError(true)}
         onLoadedMetadata={() => {
