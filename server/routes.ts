@@ -565,8 +565,15 @@ export async function registerRoutes(
   async function resolveVideoUrls(vids: any[]) {
     return Promise.all(
       vids.map(async (v) => {
-        if (v.sourceUrl && isR2Key(v.sourceUrl)) {
-          return { ...v, sourceUrl: await getVideoUrl(v.sourceUrl) };
+        if (!v.sourceUrl) return v;
+        let key = v.sourceUrl;
+        // Normalize full URLs (CDN or presigned) back to R2 key
+        if (key.startsWith("https://")) {
+          const match = key.match(/videos\/[^?#]+/);
+          if (match) key = match[0];
+        }
+        if (isR2Key(key)) {
+          return { ...v, sourceUrl: await getVideoUrl(key) };
         }
         return v;
       })
@@ -622,7 +629,13 @@ export async function registerRoutes(
     const parsed = insertVideoSchema.partial().safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
     try {
-      const video = await storage.updateVideo(req.params.id, parsed.data);
+      // Normalize sourceUrl: if a full URL was sent (CDN or presigned), extract just the R2 key
+      const data = { ...parsed.data };
+      if (data.sourceUrl && data.sourceUrl.startsWith("https://")) {
+        const match = data.sourceUrl.match(/videos\/[^?#]+/);
+        if (match) data.sourceUrl = match[0];
+      }
+      const video = await storage.updateVideo(req.params.id, data);
       if (!video) return res.status(404).json({ message: "Video not found" });
       res.json(video);
     } catch (err) {
