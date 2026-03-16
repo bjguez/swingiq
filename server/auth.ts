@@ -6,9 +6,11 @@ import { Strategy as LocalStrategy } from "passport-local";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { storage } from "./storage";
-import { pool } from "./db";
-import { insertUserSchema } from "@shared/schema";
+import { pool, db } from "./db";
+import { insertUserSchema, emailVerifications } from "@shared/schema";
 import type { User } from "@shared/schema";
+import { sendVerificationEmail } from "./email";
+import { eq, and, gt } from "drizzle-orm";
 
 const scryptAsync = promisify(scrypt);
 
@@ -25,6 +27,13 @@ async function comparePasswords(supplied: string, stored: string): Promise<boole
   return timingSafeEqual(hashedBuf, suppliedBuf);
 }
 
+async function createVerificationToken(userId: string): Promise<string> {
+  const token = randomBytes(32).toString("hex");
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
+  await db.insert(emailVerifications).values({ userId, token, expiresAt });
+  return token;
+}
+
 declare global {
   namespace Express {
     // eslint-disable-next-line @typescript-eslint/no-empty-interface
@@ -32,6 +41,27 @@ declare global {
   }
 }
 type SchemaUser = import("@shared/schema").User;
+
+function serializeUser(user: User) {
+  const adminUsername = process.env.ADMIN_USERNAME;
+  return {
+    id: user.id,
+    username: user.username,
+    email: user.email,
+    emailVerified: user.emailVerified,
+    isAdmin: adminUsername ? user.username === adminUsername : false,
+    age: user.age,
+    city: user.city,
+    state: user.state,
+    skillLevel: user.skillLevel,
+    bats: user.bats,
+    throws: user.throws,
+    heightInches: user.heightInches,
+    weightLbs: user.weightLbs,
+    profileComplete: user.profileComplete,
+    subscriptionTier: user.subscriptionTier ?? "free",
+  };
+}
 
 export function setupAuth(app: Express) {
   const PgSession = connectPgSimple(session);
@@ -63,6 +93,7 @@ export function setupAuth(app: Express) {
         if (!user) return done(null, false, { message: "Invalid username or password" });
         const valid = await comparePasswords(password, user.password);
         if (!valid) return done(null, false, { message: "Invalid username or password" });
+        if (!user.emailVerified) return done(null, false, { message: "EMAIL_NOT_VERIFIED" });
         return done(null, user);
       } catch (err) {
         return done(err);
@@ -80,37 +111,117 @@ export function setupAuth(app: Express) {
     }
   });
 
+  // Register
   app.post("/api/auth/register", async (req, res, next) => {
     try {
       const parsed = insertUserSchema.safeParse(req.body);
-      if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
+      if (!parsed.success) return res.status(400).json({ message: "Invalid registration data" });
 
-      const existing = await storage.getUserByUsername(parsed.data.username);
-      if (existing) return res.status(400).json({ message: "Username already taken" });
+      const { username, password, email } = parsed.data;
+
+      if (!email) return res.status(400).json({ message: "Email is required" });
+
+      const existingUsername = await storage.getUserByUsername(username);
+      if (existingUsername) return res.status(400).json({ message: "Username already taken" });
+
+      const existingEmail = await storage.getUserByEmail(email);
+      if (existingEmail) return res.status(400).json({ message: "An account with this email already exists" });
 
       const user = await storage.createUser({
-        username: parsed.data.username.toLowerCase(),
-        password: await hashPassword(parsed.data.password),
+        username: username.toLowerCase(),
+        password: await hashPassword(password),
+        email: email.toLowerCase(),
       });
 
+      // Send verification email (non-blocking — don't fail registration if email fails)
+      try {
+        const token = await createVerificationToken(user.id);
+        await sendVerificationEmail(user.email!, token);
+      } catch (emailErr) {
+        console.error("Failed to send verification email:", emailErr);
+      }
+
+      res.status(201).json({ message: "Account created. Please check your email to verify your account." });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // Login
+  app.post("/api/auth/login", (req, res, next) => {
+    passport.authenticate("local", (err: any, user: User | false, info: any) => {
+      if (err) return next(err);
+      if (!user) {
+        const message = info?.message === "EMAIL_NOT_VERIFIED"
+          ? "Please verify your email before logging in."
+          : (info?.message || "Invalid credentials");
+        return res.status(401).json({ message, emailNotVerified: info?.message === "EMAIL_NOT_VERIFIED" });
+      }
       req.login(user, (err) => {
         if (err) return next(err);
-        res.status(201).json({ id: user.id, username: user.username });
+        res.json(serializeUser(user));
+      });
+    })(req, res, next);
+  });
+
+  // Verify email
+  app.get("/api/auth/verify-email", async (req, res, next) => {
+    try {
+      const { token } = req.query;
+      if (!token || typeof token !== "string") {
+        return res.status(400).json({ message: "Invalid token" });
+      }
+
+      const [record] = await db
+        .select()
+        .from(emailVerifications)
+        .where(
+          and(
+            eq(emailVerifications.token, token),
+            gt(emailVerifications.expiresAt, new Date())
+          )
+        );
+
+      if (!record) return res.status(400).json({ message: "This link is invalid or has expired." });
+
+      await storage.updateUser(record.userId, { emailVerified: true });
+      await db.delete(emailVerifications).where(eq(emailVerifications.token, token));
+
+      const user = await storage.getUser(record.userId);
+      if (!user) return res.status(400).json({ message: "User not found" });
+
+      // Log them in automatically
+      req.login(user, (err) => {
+        if (err) return next(err);
+        res.json({ message: "Email verified successfully", user: serializeUser(user) });
       });
     } catch (err) {
       next(err);
     }
   });
 
-  app.post("/api/auth/login", (req, res, next) => {
-    passport.authenticate("local", (err: any, user: User | false, info: any) => {
-      if (err) return next(err);
-      if (!user) return res.status(401).json({ message: info?.message || "Invalid credentials" });
-      req.login(user, (err) => {
-        if (err) return next(err);
-        res.json({ id: user.id, username: user.username });
-      });
-    })(req, res, next);
+  // Resend verification email
+  app.post("/api/auth/resend-verification", async (req, res, next) => {
+    try {
+      const { email } = req.body;
+      if (!email) return res.status(400).json({ message: "Email is required" });
+
+      const user = await storage.getUserByEmail(email.toLowerCase());
+      // Always respond 200 to avoid user enumeration
+      if (!user || user.emailVerified) {
+        return res.json({ message: "If that email exists and is unverified, we've sent a new link." });
+      }
+
+      // Delete old tokens for this user
+      await db.delete(emailVerifications).where(eq(emailVerifications.userId, user.id));
+
+      const token = await createVerificationToken(user.id);
+      await sendVerificationEmail(user.email!, token);
+
+      res.json({ message: "If that email exists and is unverified, we've sent a new link." });
+    } catch (err) {
+      next(err);
+    }
   });
 
   app.post("/api/auth/logout", (req, res, next) => {
@@ -122,17 +233,7 @@ export function setupAuth(app: Express) {
 
   app.get("/api/auth/me", (req, res) => {
     if (!req.user) return res.status(401).json({ message: "Not authenticated" });
-    const user = req.user as User;
-    const adminUsername = process.env.ADMIN_USERNAME;
-    const isAdmin = adminUsername ? user.username === adminUsername : false;
-    res.json({
-      id: user.id, username: user.username, isAdmin,
-      age: user.age, city: user.city, state: user.state,
-      skillLevel: user.skillLevel, bats: user.bats, throws: user.throws,
-      heightInches: user.heightInches, weightLbs: user.weightLbs,
-      profileComplete: user.profileComplete,
-      subscriptionTier: user.subscriptionTier ?? "free",
-    });
+    res.json(serializeUser(req.user as User));
   });
 
   app.put("/api/auth/profile", async (req, res, next) => {
@@ -151,16 +252,7 @@ export function setupAuth(app: Express) {
         profileComplete: true,
       });
       if (!updated) return res.status(404).json({ message: "User not found" });
-      const adminUsername = process.env.ADMIN_USERNAME;
-      const isAdmin = adminUsername ? updated.username === adminUsername : false;
-      res.json({
-        id: updated.id, username: updated.username, isAdmin,
-        age: updated.age, city: updated.city, state: updated.state,
-        skillLevel: updated.skillLevel, bats: updated.bats, throws: updated.throws,
-        heightInches: updated.heightInches, weightLbs: updated.weightLbs,
-        profileComplete: updated.profileComplete,
-        subscriptionTier: updated.subscriptionTier ?? "free",
-      });
+      res.json(serializeUser(updated));
     } catch (err) { next(err); }
   });
 }

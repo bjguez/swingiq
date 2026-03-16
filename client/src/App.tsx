@@ -12,6 +12,8 @@ import MySwings from "@/pages/MySwings";
 import Admin from "@/pages/Admin";
 import AuthPage from "@/pages/AuthPage";
 import OnboardingPage from "@/pages/OnboardingPage";
+import CheckEmailPage from "@/pages/CheckEmailPage";
+import VerifyEmailPage from "@/pages/VerifyEmailPage";
 import { useAuth } from "@/hooks/use-auth";
 
 function AdminRoute() {
@@ -33,6 +35,8 @@ function Router() {
       <Route path="/onboarding">
         {!isLoading && !user ? <Redirect to="/auth" /> : <OnboardingPage />}
       </Route>
+      <Route path="/check-email" component={CheckEmailPage} />
+      <Route path="/verify" component={VerifyEmailPage} />
       <Route path="/" component={Home} />
       <Route path="/biometrics" component={Biometrics} />
       <Route path="/development" component={Development} />

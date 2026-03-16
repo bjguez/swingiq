@@ -13,13 +13,18 @@ export default function AuthPage() {
   const { login, register, isLoggingIn, isRegistering, loginError, registerError } = useAuth();
 
   const [loginForm, setLoginForm] = useState({ username: "", password: "" });
-  const [registerForm, setRegisterForm] = useState({ username: "", password: "", confirmPassword: "" });
+  const [registerForm, setRegisterForm] = useState({ username: "", email: "", password: "", confirmPassword: "" });
   const [registerValidationError, setRegisterValidationError] = useState<string | null>(null);
+  const [registerSuccess, setRegisterSuccess] = useState(false);
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
-    await login(loginForm);
-    navigate("/");
+    try {
+      await login(loginForm);
+      navigate("/");
+    } catch (err: any) {
+      // emailNotVerified is returned in the error body — handled via loginError display
+    }
   }
 
   async function handleRegister(e: React.FormEvent) {
@@ -29,9 +34,16 @@ export default function AuthPage() {
       setRegisterValidationError("Passwords do not match");
       return;
     }
-    await register({ username: registerForm.username, password: registerForm.password });
-    navigate("/onboarding");
+    try {
+      await register({ username: registerForm.username, email: registerForm.email, password: registerForm.password });
+      sessionStorage.setItem("pendingVerificationEmail", registerForm.email);
+      navigate("/check-email");
+    } catch {
+      // error shown via registerError
+    }
   }
+
+  const isEmailNotVerified = (loginError as any)?.emailNotVerified;
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -77,7 +89,20 @@ export default function AuthPage() {
                     />
                   </div>
                   {loginError && (
-                    <p className="text-sm text-destructive">{loginError.message}</p>
+                    <div className="space-y-2">
+                      <p className="text-sm text-destructive">{loginError.message}</p>
+                      {isEmailNotVerified && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="w-full"
+                          onClick={() => navigate("/check-email")}
+                        >
+                          Resend verification email
+                        </Button>
+                      )}
+                    </div>
                   )}
                   <Button type="submit" className="w-full" disabled={isLoggingIn}>
                     {isLoggingIn ? "Signing in..." : "Sign In"}
@@ -101,6 +126,17 @@ export default function AuthPage() {
                       id="reg-username"
                       value={registerForm.username}
                       onChange={(e) => setRegisterForm((f) => ({ ...f, username: e.target.value }))}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="reg-email">Email</Label>
+                    <Input
+                      id="reg-email"
+                      type="email"
+                      placeholder="you@example.com"
+                      value={registerForm.email}
+                      onChange={(e) => setRegisterForm((f) => ({ ...f, email: e.target.value }))}
                       required
                     />
                   </div>

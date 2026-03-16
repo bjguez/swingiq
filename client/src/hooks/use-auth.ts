@@ -3,6 +3,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 export type AuthUser = {
   id: string;
   username: string;
+  email?: string | null;
+  emailVerified?: boolean;
   isAdmin: boolean;
   age?: number | null;
   city?: string | null;
@@ -42,7 +44,9 @@ export function useAuth() {
       });
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.message || "Login failed");
+        const error = new Error(err.message || "Login failed") as any;
+        error.emailNotVerified = err.emailNotVerified ?? false;
+        throw error;
       }
       return res.json() as Promise<AuthUser>;
     },
@@ -53,7 +57,7 @@ export function useAuth() {
   });
 
   const registerMutation = useMutation({
-    mutationFn: async (credentials: { username: string; password: string }) => {
+    mutationFn: async (credentials: { username: string; password: string; email: string }) => {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -63,11 +67,7 @@ export function useAuth() {
         const err = await res.json();
         throw new Error(err.message || "Registration failed");
       }
-      return res.json() as Promise<AuthUser>;
-    },
-    onSuccess: (user) => {
-      queryClient.setQueryData(["/api/auth/me"], user);
-      queryClient.invalidateQueries({ queryKey: ["/api/videos"] });
+      return res.json(); // returns { message } — not a user (email verification required)
     },
   });
 

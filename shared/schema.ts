@@ -7,18 +7,29 @@ export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
+  // Auth
+  email: text("email").unique(),
+  emailVerified: boolean("email_verified").default(false).notNull(),
   // Profile
   age: integer("age"),
   city: text("city"),
   state: text("state"),
-  skillLevel: text("skill_level"), // 'little_league' | 'select' | 'high_school' | 'college' | 'pro'
-  bats: text("bats"), // 'L' | 'R'
-  throws: text("throws"), // 'L' | 'R'
+  skillLevel: text("skill_level"),
+  bats: text("bats"),
+  throws: text("throws"),
   heightInches: integer("height_inches"),
   weightLbs: integer("weight_lbs"),
   profileComplete: boolean("profile_complete").default(false).notNull(),
   // Subscription
   subscriptionTier: text("subscription_tier").default("free").notNull(),
+});
+
+export const emailVerifications = pgTable("email_verifications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  token: text("token").notNull().unique(),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 export const mlbPlayers = pgTable("mlb_players", {
@@ -92,7 +103,10 @@ export const sessions = pgTable("sessions", {
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,
+  email: true,
 });
+
+export type EmailVerification = typeof emailVerifications.$inferSelect;
 
 export const insertMlbPlayerSchema = createInsertSchema(mlbPlayers).omit({ id: true });
 export const insertVideoSchema = createInsertSchema(videos).omit({ id: true, createdAt: true });
