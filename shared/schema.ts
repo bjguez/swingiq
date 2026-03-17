@@ -80,6 +80,9 @@ export const videos = pgTable("videos", {
   isProVideo: boolean("is_pro_video").default(false),
   season: integer("season"),
   createdAt: timestamp("created_at").defaultNow(),
+  // Swing Notes
+  notes: text("notes"),
+  tags: text("tags").array(),
 });
 
 export const drills = pgTable("drills", {

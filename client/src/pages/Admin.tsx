@@ -13,10 +13,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
-const allCategories = [
-  "Gather > Touchdown", "Touchdown > Finish",
-  "Hand Path", "Head Position", "Scissor Kick", "Thrust", "Full Swing"
-];
+const allCategories = ["Full Swing", "Game Swing", "Gather", "Launch", "Swing"];
 
 const sourceOptions = ["MLB.com", "YouTube", "Upload", "Baseball Savant", "Other"];
 

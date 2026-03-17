@@ -127,9 +127,13 @@ export async function registerRoutes(
         return res.status(201).json({ sourceUrl: key, presignedUrl });
       }
 
+      const allowedUserCategories = ["Full Swing", "Game Swing", "Gather", "Launch", "Swing"];
+      const requestedCategory = req.body.category;
+      const category = allowedUserCategories.includes(requestedCategory) ? requestedCategory : "Full Swing";
+
       const video = await storage.createVideo({
         title,
-        category: "Upload",
+        category,
         source: "User Upload",
         sourceUrl: key,
         isProVideo: false,

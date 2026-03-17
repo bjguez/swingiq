@@ -9,15 +9,14 @@ import type { Drill, Video } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
 import { AuthGateModal } from "@/components/AuthGateModal";
 
-const corePhases = ["Gather > Touchdown", "Touchdown > Finish"];
-const detailPhases = ["Hand Path", "Head Position", "Scissor Kick", "Thrust"];
+const phases = ["Gather", "Launch", "Swing"];
 
 export default function Development() {
   const { user } = useAuth();
   const isPaid = user?.subscriptionTier === "pro";
   const [, navigate] = useLocation();
   const [authGateOpen, setAuthGateOpen] = useState(false);
-  const [focusPhase, setFocusPhase] = useState("Gather > Touchdown");
+  const [focusPhase, setFocusPhase] = useState("Gather");
   
   const { data: allDrills = [], isLoading: drillsLoading } = useQuery({
     queryKey: ["/api/drills"],
@@ -79,30 +78,16 @@ export default function Development() {
         </div>
       </div>
 
-      {/* Progress Overview */}
+      {/* Phase selector */}
       <div className="mt-4">
-        <h3 className="font-display font-bold text-xl mb-3">Core Phases</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {corePhases.map(phase => (
-            <PhaseCard 
-              key={phase} 
-              title={phase} 
+        <h3 className="font-display font-bold text-xl mb-3">Swing Phases</h3>
+        <div className="grid grid-cols-3 gap-4">
+          {phases.map(phase => (
+            <PhaseCard
+              key={phase}
+              title={phase}
               active={focusPhase === phase}
-              onClick={() => setFocusPhase(phase)} 
-            />
-          ))}
-        </div>
-      </div>
-
-      <div className="mt-6">
-        <h3 className="font-display font-bold text-xl mb-3">Swing Details</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {detailPhases.map(phase => (
-            <PhaseCard 
-              key={phase} 
-              title={phase} 
-              active={focusPhase === phase}
-              onClick={() => setFocusPhase(phase)} 
+              onClick={() => setFocusPhase(phase)}
             />
           ))}
         </div>

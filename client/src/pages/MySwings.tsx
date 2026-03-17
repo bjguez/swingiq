@@ -5,8 +5,9 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchVideos, deleteVideo } from "@/lib/api";
 import { VideoLibraryModal } from "@/components/VideoLibraryModal";
 import { UserVideoCard } from "@/components/UserVideoCard";
-import { Trash2, Upload, CheckSquare, Square, Film } from "lucide-react";
+import { Trash2, Upload, Film, Search } from "lucide-react";
 import type { Video } from "@shared/schema";
+import { ALL_USER_CATEGORIES } from "@/lib/categories";
 
 export default function MySwings() {
   const queryClient = useQueryClient();
@@ -17,9 +18,21 @@ export default function MySwings() {
 
   const userVideos = (allVideos as Video[]).filter(v => !v.isProVideo && v.sourceUrl);
 
+  const filteredVideos = userVideos.filter(v => {
+    const matchCategory = activeCategory === "All" || v.category === activeCategory;
+    const q = searchQuery.toLowerCase();
+    const matchSearch = !q ||
+      v.title.toLowerCase().includes(q) ||
+      ((v as any).notes?.toLowerCase().includes(q)) ||
+      ((v as any).tags?.some((t: string) => t.toLowerCase().includes(q)));
+    return matchCategory && matchSearch;
+  });
+
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState<Set<string>>(new Set());
   const [bulkMode, setBulkMode] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [activeCategory, setActiveCategory] = useState("All");
 
   const toggleSelect = (id: string) => {
     setSelected(prev => {
@@ -29,7 +42,7 @@ export default function MySwings() {
     });
   };
 
-  const selectAll = () => setSelected(new Set(userVideos.map(v => v.id)));
+  const selectAll = () => setSelected(new Set(filteredVideos.map(v => v.id)));
   const clearSelection = () => setSelected(new Set());
 
   const handleBulkDelete = async () => {
@@ -53,7 +66,7 @@ export default function MySwings() {
           <h1 className="text-3xl md:text-4xl font-bold font-display uppercase">My Swings</h1>
           <p className="text-muted-foreground">Your uploaded swing videos.</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {userVideos.length > 0 && (
             <Button
               variant="outline"
@@ -92,6 +105,32 @@ export default function MySwings() {
         </div>
       </div>
 
+      {/* Search + category filter */}
+      {userVideos.length > 0 && (
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search title, notes, tags…"
+              className="w-full pl-9 pr-3 py-2 text-sm bg-secondary/30 border border-border rounded-lg focus:outline-none focus:border-primary text-foreground placeholder:text-muted-foreground"
+            />
+          </div>
+          <div className="flex gap-1.5 flex-wrap">
+            {["All", ...ALL_USER_CATEGORIES].map(cat => (
+              <button
+                key={cat}
+                onClick={() => setActiveCategory(cat)}
+                className={`px-3 py-1.5 rounded-md text-xs font-semibold border transition-colors ${activeCategory === cat ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:text-foreground"}`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {isLoading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mt-4">
           {[1, 2, 3, 4].map(i => (
@@ -114,15 +153,19 @@ export default function MySwings() {
             <p className="text-muted-foreground text-sm mt-1">Upload a swing from the Analysis page or use the button above.</p>
           </div>
         </div>
+      ) : filteredVideos.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-12 gap-3 text-center">
+          <p className="text-muted-foreground text-sm">No swings match your search.</p>
+          <button onClick={() => { setSearchQuery(""); setActiveCategory("All"); }} className="text-xs text-primary hover:underline">Clear filters</button>
+        </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mt-4">
           {bulkMode && (
             <div className="col-span-full flex items-center gap-2 text-sm text-muted-foreground">
-              <CheckSquare className="w-4 h-4 text-primary" />
-              {selected.size} of {userVideos.length} selected
+              {selected.size} of {filteredVideos.length} selected
             </div>
           )}
-          {userVideos.map((video: Video) => (
+          {filteredVideos.map((video: Video) => (
             <UserVideoCard
               key={video.id}
               video={video}

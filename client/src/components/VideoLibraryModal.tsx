@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useLocation } from "wouter";
+import { FREE_CATEGORIES, PRO_CATEGORIES } from "@/lib/categories";
 import { useLazySrc } from "@/hooks/use-lazy-src";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -64,6 +65,12 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected }: Vi
   const [uploadState, setUploadState] = useState<UploadState>("idle");
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadCategory, setUploadCategory] = useState("Full Swing");
+
+  const availableCategories = [
+    ...FREE_CATEGORIES,
+    ...(user?.subscriptionTier === "pro" ? PRO_CATEGORIES : []),
+  ];
 
   // Trim state
   const [pendingFile, setPendingFile] = useState<File | null>(null);
@@ -107,6 +114,7 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected }: Vi
     const formData = new FormData();
     formData.append("video", file);
     formData.append("title", file.name);
+    formData.append("category", uploadCategory);
     if (startTime !== undefined && endTime !== undefined) {
       formData.append("startTime", startTime.toString());
       formData.append("endTime", endTime.toString());
@@ -485,6 +493,23 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected }: Vi
                     onChange={handleFileSelect}
                     data-testid="input-file-upload"
                   />
+                  {/* Category picker */}
+                  <div className="mb-3">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Swing Type</p>
+                    <div className="flex flex-wrap gap-2">
+                      {availableCategories.map(cat => (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => setUploadCategory(cat)}
+                          className={`px-3 py-1.5 rounded-md text-xs font-semibold border transition-colors ${uploadCategory === cat ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:text-foreground"}`}
+                        >
+                          {cat}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
                   <div
                     onClick={handleUploadClick}
                     className="border-2 border-dashed border-border rounded-xl p-10 flex flex-col items-center justify-center text-center bg-secondary/10 hover:bg-secondary/20 transition-colors cursor-pointer"

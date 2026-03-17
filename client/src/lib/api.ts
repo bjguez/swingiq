@@ -64,3 +64,12 @@ export async function renameVideo(videoId: string, title: string): Promise<void>
   });
   if (!res.ok) throw new Error("Failed to rename video");
 }
+
+export async function updateVideoNotes(videoId: string, notes: string, tags: string[]): Promise<void> {
+  const res = await fetch(`/api/videos/${videoId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ notes, tags }),
+  });
+  if (!res.ok) throw new Error("Failed to update notes");
+}

@@ -25,7 +25,7 @@ function LibraryThumb({ src }: { src: string }) {
   );
 }
 
-const categories = ["All", "Gather > Touchdown", "Touchdown > Finish", "Hand Path", "Head Position", "Scissor Kick", "Thrust", "Full Swing"];
+const categories = ["All", "Full Swing", "Game Swing"];
 
 export default function Library() {
   const [activeCategory, setActiveCategory] = useState("All");

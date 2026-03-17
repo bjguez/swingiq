@@ -128,6 +128,12 @@ app.use((req, res, next) => {
   await pool.query(`
     UPDATE videos SET category = 'Full Swing' WHERE category = 'Full Swings'
   `);
+  // Swing Notes columns
+  await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS notes TEXT`);
+  await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS tags TEXT[]`);
+  // Remap legacy video categories to new naming
+  await pool.query(`UPDATE videos SET category = 'Full Swing' WHERE is_pro_video = true AND category != 'Full Swing'`);
+  await pool.query(`UPDATE videos SET category = 'Full Swing' WHERE category = 'Upload'`);
   // Stripe subscription columns
   await pool.query(`
     ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT

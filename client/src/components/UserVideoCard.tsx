@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
-import { Play, Pencil, Check, X, Trash2, Scissors, Film } from "lucide-react";
+import { Play, Pencil, Check, X, Trash2, Scissors, Film, StickyNote, Tag, ChevronDown } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { renameVideo, deleteVideo } from "@/lib/api";
+import { renameVideo, deleteVideo, updateVideoNotes } from "@/lib/api";
 import VideoTrimmer from "./VideoTrimmer";
 import type { Video } from "@shared/schema";
 import { useLazySrc } from "@/hooks/use-lazy-src";
@@ -37,6 +37,13 @@ export function UserVideoCard({
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Swing Notes
+  const [notesOpen, setNotesOpen] = useState(false);
+  const [notes, setNotes] = useState((video as any).notes || "");
+  const [tagInput, setTagInput] = useState("");
+  const [tags, setTags] = useState<string[]>((video as any).tags || []);
+  const [savingNotes, setSavingNotes] = useState(false);
 
   useEffect(() => {
     if (editing) inputRef.current?.focus();
@@ -76,6 +83,28 @@ export function UserVideoCard({
       setDeleting(false);
     }
   };
+
+  const handleSaveNotes = async () => {
+    setSavingNotes(true);
+    try {
+      await updateVideoNotes(video.id, notes, tags);
+      queryClient.invalidateQueries({ queryKey: ["/api/videos"] });
+      setNotesOpen(false);
+    } finally {
+      setSavingNotes(false);
+    }
+  };
+
+  const handleAddTag = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" || e.key === ",") {
+      e.preventDefault();
+      const tag = tagInput.trim().toLowerCase();
+      if (tag && !tags.includes(tag)) setTags(prev => [...prev, tag]);
+      setTagInput("");
+    }
+  };
+
+  const removeTag = (tag: string) => setTags(prev => prev.filter(t => t !== tag));
 
   return (
     <div
@@ -161,8 +190,15 @@ export function UserVideoCard({
             )}
           </div>
 
-          {!bulkMode && (showTrim || showDelete) && (
+          {!bulkMode && (
             <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+              <button
+                onClick={(e) => { e.stopPropagation(); setNotesOpen(o => !o); }}
+                className={`p-1.5 rounded transition-colors ${notesOpen ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-primary hover:bg-primary/10"}`}
+                title="Swing Notes"
+              >
+                <StickyNote className="w-3.5 h-3.5" />
+              </button>
               {showTrim && video.sourceUrl && (
                 <VideoTrimmer
                   videoId={video.id}
@@ -187,6 +223,58 @@ export function UserVideoCard({
             </div>
           )}
         </div>
+
+        {/* Existing tags preview (collapsed) */}
+        {!notesOpen && tags.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-1.5">
+            {tags.map(tag => (
+              <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-medium">#{tag}</span>
+            ))}
+          </div>
+        )}
+        {!notesOpen && notes && (
+          <p className="text-xs text-muted-foreground mt-1 line-clamp-1 italic">{notes}</p>
+        )}
+
+        {/* Swing Notes panel */}
+        {notesOpen && !bulkMode && (
+          <div className="mt-2 space-y-2 border-t border-border pt-2" onClick={(e) => e.stopPropagation()}>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Add a note about this swing..."
+              className="w-full text-xs bg-secondary/30 border border-border rounded-md px-2 py-1.5 resize-none focus:outline-none focus:border-primary text-foreground placeholder:text-muted-foreground"
+              rows={2}
+            />
+            <div>
+              <div className="flex flex-wrap gap-1 mb-1">
+                {tags.map(tag => (
+                  <span key={tag} className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-medium">
+                    #{tag}
+                    <button onClick={() => removeTag(tag)} className="hover:text-destructive ml-0.5"><X className="w-2.5 h-2.5" /></button>
+                  </span>
+                ))}
+              </div>
+              <input
+                value={tagInput}
+                onChange={(e) => setTagInput(e.target.value)}
+                onKeyDown={handleAddTag}
+                placeholder="Add tag, press Enter"
+                className="w-full text-xs bg-secondary/30 border border-border rounded-md px-2 py-1.5 focus:outline-none focus:border-primary text-foreground placeholder:text-muted-foreground"
+              />
+            </div>
+            <div className="flex gap-1.5 justify-end">
+              <button onClick={() => setNotesOpen(false)} className="text-xs text-muted-foreground hover:text-foreground px-2 py-1">Cancel</button>
+              <button
+                onClick={handleSaveNotes}
+                disabled={savingNotes}
+                className="text-xs bg-primary text-primary-foreground px-2.5 py-1 rounded-md font-semibold disabled:opacity-50"
+              >
+                {savingNotes ? "Saving…" : "Save"}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
