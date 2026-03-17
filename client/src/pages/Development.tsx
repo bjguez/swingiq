@@ -13,7 +13,7 @@ const phases = ["Gather", "Launch", "Swing"];
 
 export default function Development() {
   const { user } = useAuth();
-  const isPaid = user?.subscriptionTier === "pro";
+  const isPaid = user?.isAdmin || user?.subscriptionTier === "pro";
   const [, navigate] = useLocation();
   const [authGateOpen, setAuthGateOpen] = useState(false);
   const [focusPhase, setFocusPhase] = useState("Gather");

@@ -52,7 +52,7 @@ function getVideoDuration(url: string): Promise<number> {
 export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected }: VideoLibraryModalProps) {
   const { user } = useAuth();
   const [, navigate] = useLocation();
-  const isPaid = user?.subscriptionTier === "player" || user?.subscriptionTier === "pro";
+  const isPaid = user?.isAdmin || user?.subscriptionTier === "player" || user?.subscriptionTier === "pro";
 
   const [isOpen, setIsOpen] = useState(false);
   const [authGateOpen, setAuthGateOpen] = useState(false);
@@ -69,7 +69,7 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected }: Vi
 
   const availableCategories = [
     ...FREE_CATEGORIES,
-    ...(user?.subscriptionTier === "pro" ? PRO_CATEGORIES : []),
+    ...(user?.isAdmin || user?.subscriptionTier === "pro" ? PRO_CATEGORIES : []),
   ];
 
   // Trim state

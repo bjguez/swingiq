@@ -39,7 +39,7 @@ function similarityScore(
 
 export default function Biometrics() {
   const { user, updateProfile, isUpdatingProfile } = useAuth();
-  const isPaid = user?.subscriptionTier === "player" || user?.subscriptionTier === "pro";
+  const isPaid = user?.isAdmin || user?.subscriptionTier === "player" || user?.subscriptionTier === "pro";
   const [, navigate] = useLocation();
   const [authGateOpen, setAuthGateOpen] = useState(false);
 
