@@ -16,14 +16,19 @@ export function setupCoachRoutes(app: Express) {
       const coach = req.user as User | undefined;
       if (!coach) return res.status(401).json({ message: "Not authenticated" });
 
-      let teams = await db.select().from(coachTeams).where(eq(coachTeams.coachId, coach.id));
-
-      // Auto-seed from organization on first call if empty
-      if (teams.length === 0 && coach.organization) {
-        const [created] = await db.insert(coachTeams)
-          .values({ coachId: coach.id, name: coach.organization })
-          .returning();
-        teams = [created];
+      let teams: typeof coachTeams.$inferSelect[] = [];
+      try {
+        teams = await db.select().from(coachTeams).where(eq(coachTeams.coachId, coach.id));
+        // Auto-seed from organization on first call if empty
+        if (teams.length === 0 && coach.organization) {
+          const [created] = await db.insert(coachTeams)
+            .values({ coachId: coach.id, name: coach.organization })
+            .returning();
+          teams = [created];
+        }
+      } catch {
+        // Table may not exist yet (migration pending) — return empty
+        return res.json([]);
       }
 
       res.json(teams);
@@ -39,9 +44,13 @@ export function setupCoachRoutes(app: Express) {
       const { name } = req.body;
       if (!name?.trim()) return res.status(400).json({ message: "Team name is required" });
 
-      // Check for duplicate
-      const existing = await db.select().from(coachTeams)
-        .where(and(eq(coachTeams.coachId, coach.id), eq(coachTeams.name, name.trim())));
+      let existing: typeof coachTeams.$inferSelect[] = [];
+      try {
+        existing = await db.select().from(coachTeams)
+          .where(and(eq(coachTeams.coachId, coach.id), eq(coachTeams.name, name.trim())));
+      } catch {
+        return res.status(503).json({ message: "Teams feature is still initializing — please try again in a moment." });
+      }
       if (existing.length > 0) return res.status(400).json({ message: "Team already exists" });
 
       const [team] = await db.insert(coachTeams)
@@ -58,8 +67,13 @@ export function setupCoachRoutes(app: Express) {
       const coach = req.user as User | undefined;
       if (!coach) return res.status(401).json({ message: "Not authenticated" });
 
-      const [team] = await db.select().from(coachTeams)
-        .where(and(eq(coachTeams.id, req.params.id), eq(coachTeams.coachId, coach.id)));
+      let team: typeof coachTeams.$inferSelect | undefined;
+      try {
+        [team] = await db.select().from(coachTeams)
+          .where(and(eq(coachTeams.id, req.params.id), eq(coachTeams.coachId, coach.id)));
+      } catch {
+        return res.status(503).json({ message: "Teams feature is still initializing." });
+      }
       if (!team) return res.status(404).json({ message: "Team not found" });
 
       // Unassign players from this team
@@ -67,8 +81,7 @@ export function setupCoachRoutes(app: Express) {
         .set({ teamName: null })
         .where(and(eq(coachPlayers.coachId, coach.id), eq(coachPlayers.teamName, team.name)));
 
-      await db.delete(coachTeams)
-        .where(eq(coachTeams.id, req.params.id));
+      await db.delete(coachTeams).where(eq(coachTeams.id, req.params.id));
 
       res.json({ message: "Team deleted" });
     } catch (err) { next(err); }

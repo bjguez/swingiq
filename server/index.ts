@@ -223,6 +223,19 @@ app.use((req, res, next) => {
     )
   `);
 
+  // team_name column on coach_players
+  await pool.query(`ALTER TABLE coach_players ADD COLUMN IF NOT EXISTS team_name TEXT`);
+  // coach_teams table
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS coach_teams (
+      id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+      coach_id VARCHAR NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      created_at TIMESTAMP DEFAULT NOW(),
+      UNIQUE(coach_id, name)
+    )
+  `);
+
   if (r2Configured()) await configureR2Cors();
 
   await registerRoutes(httpServer, app);
