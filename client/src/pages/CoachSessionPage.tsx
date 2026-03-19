@@ -183,6 +183,13 @@ export default function CoachSessionPage() {
     const videoH = H - headerH - footerH;
 
     function drawVid(vid: HTMLVideoElement, dx: number, dy: number, dw: number, dh: number, flipH: boolean, zoom: number, panX: number, panY: number, rotation: 0 | 90 | 180 | 270 = 0) {
+      const vw = vid.videoWidth || dw;
+      const vh = vid.videoHeight || dh;
+      // Match CSS object-contain: scale video to fit panel while preserving aspect ratio
+      const containScale = Math.min(dw / vw, dh / vh);
+      const containW = vw * containScale;
+      const containH = vh * containScale;
+
       ctx.save();
       ctx.beginPath();
       ctx.rect(dx, dy, dw, dh);
@@ -190,15 +197,16 @@ export default function CoachSessionPage() {
       ctx.translate(dx + dw / 2, dy + dh / 2);
       if (rotation !== 0) ctx.rotate((rotation * Math.PI) / 180);
       if (flipH) ctx.scale(-1, 1);
-      const drawW = rotation === 90 || rotation === 270 ? dh : dw;
-      const drawH = rotation === 90 || rotation === 270 ? dw : dh;
+      // After rotation, swap dimensions if 90/270
+      const drawW = rotation === 90 || rotation === 270 ? containH : containW;
+      const drawH = rotation === 90 || rotation === 270 ? containW : containH;
       if (zoom !== 1 || panX !== 0 || panY !== 0) {
-        const sw = (vid.videoWidth || drawW) / zoom;
-        const sh = (vid.videoHeight || drawH) / zoom;
-        const pxSrc = panX * ((vid.videoWidth || drawW) / drawW) / zoom;
-        const pySrc = panY * ((vid.videoHeight || drawH) / drawH) / zoom;
-        const sx = Math.max(0, ((vid.videoWidth || drawW) - sw) / 2 - pxSrc);
-        const sy = Math.max(0, ((vid.videoHeight || drawH) - sh) / 2 - pySrc);
+        const sw = vw / zoom;
+        const sh = vh / zoom;
+        const pxSrc = panX * (vw / containW) / zoom;
+        const pySrc = panY * (vh / containH) / zoom;
+        const sx = Math.max(0, (vw - sw) / 2 - pxSrc);
+        const sy = Math.max(0, (vh - sh) / 2 - pySrc);
         ctx.drawImage(vid, sx, sy, sw, sh, -drawW / 2, -drawH / 2, drawW, drawH);
       } else {
         ctx.drawImage(vid, -drawW / 2, -drawH / 2, drawW, drawH);
@@ -372,7 +380,7 @@ export default function CoachSessionPage() {
           <h2 className="font-display text-2xl uppercase tracking-wider">Session Shared</h2>
           <p className="text-muted-foreground">The player has been notified via email and in-app notification.</p>
           <div className="flex gap-3 justify-center pt-2">
-            <Button variant="outline" onClick={() => navigate("/coach")}>Back to My Players</Button>
+            <Button variant="outline" onClick={() => navigate("/coach")}>Back to My Teams</Button>
             <Button onClick={() => {
               setShared(false); setNotes(""); setVoiceoverKey("");
               setRecordingState("idle"); setShowHighlight(false);

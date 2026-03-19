@@ -48,7 +48,7 @@ export default function Layout({ children, showScoreTicker = false }: { children
   const navLinks = isCoach ? [
     { href: "/", icon: <Video className="w-4 h-4 mr-2" />, label: "Analysis" },
     { href: "/library", icon: <Library className="w-4 h-4 mr-2" />, label: "Pro Library" },
-    { href: "/coach", icon: <Users className="w-4 h-4 mr-2" />, label: "My Players" },
+    { href: "/coach", icon: <Users className="w-4 h-4 mr-2" />, label: "My Teams" },
   ] : [
     { href: "/", icon: <Video className="w-4 h-4 mr-2" />, label: "Analysis" },
     { href: "/library", icon: <Library className="w-4 h-4 mr-2" />, label: "Pro Library" },

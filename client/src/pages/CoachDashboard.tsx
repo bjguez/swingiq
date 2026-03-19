@@ -6,9 +6,23 @@ import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { UserPlus, Trash2, Clock, CheckCircle, Mail, ChevronRight, Video, ArrowLeft, MessageSquare } from "lucide-react";
+import { UserPlus, Trash2, Clock, CheckCircle, Mail, ChevronRight, Video, ArrowLeft, MessageSquare, FileVideo, Mic } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import type { Video as VideoType } from "@shared/schema";
+
+type CoachSession = {
+  id: string;
+  playerId: string;
+  playerVideoId: string | null;
+  proVideoId: string | null;
+  notes: string | null;
+  voiceoverUrl: string | null;
+  sharedAt: string;
+  createdAt: string;
+  playerFirstName: string | null;
+  playerLastName: string | null;
+  playerUsername: string | null;
+};
 
 type PlayerRow = {
   id: string;
@@ -36,6 +50,7 @@ export default function CoachDashboard() {
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteSuccess, setInviteSuccess] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerRow | null>(null);
+  const [playerTab, setPlayerTab] = useState<"swings" | "sessions">("swings");
 
   const { data: players = [], isLoading } = useQuery<PlayerRow[]>({
     queryKey: ["/api/coach/players"],
@@ -47,6 +62,16 @@ export default function CoachDashboard() {
     queryFn: async () => {
       const res = await fetch(`/api/coaching/players/${selectedPlayer!.playerId}/videos`);
       if (!res.ok) throw new Error("Failed to load videos");
+      return res.json();
+    },
+    enabled: !!selectedPlayer?.playerId,
+  });
+
+  const { data: coachSessions = [], isLoading: sessionsLoading } = useQuery<CoachSession[]>({
+    queryKey: ["/api/coaching/sessions", selectedPlayer?.playerId],
+    queryFn: async () => {
+      const res = await fetch(`/api/coaching/sessions?playerId=${selectedPlayer!.playerId}`);
+      if (!res.ok) throw new Error("Failed to load sessions");
       return res.json();
     },
     enabled: !!selectedPlayer?.playerId,
@@ -89,7 +114,7 @@ export default function CoachDashboard() {
       <Layout>
         <div className="max-w-3xl mx-auto w-full py-8 space-y-6">
           <div className="flex items-center gap-3">
-            <button onClick={() => setSelectedPlayer(null)} className="text-muted-foreground hover:text-foreground transition-colors">
+            <button onClick={() => { setSelectedPlayer(null); setPlayerTab("swings"); }} className="text-muted-foreground hover:text-foreground transition-colors">
               <ArrowLeft size={18} />
             </button>
             <div>
@@ -114,42 +139,109 @@ export default function CoachDashboard() {
             </div>
           </div>
 
-          <div>
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Their Swings</p>
-            {videosLoading ? (
-              <p className="text-sm text-muted-foreground">Loading...</p>
-            ) : playerVideos.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground border border-dashed border-border rounded-xl">
-                <Video size={32} className="mx-auto mb-2 opacity-30" />
-                <p className="text-sm">This player hasn't uploaded any swings yet.</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {playerVideos.map(v => (
-                  <button
-                    key={v.id}
-                    onClick={() => navigate(`/coach/session?playerId=${selectedPlayer.playerId}&videoId=${v.id}`)}
-                    className="group relative aspect-video rounded-lg overflow-hidden border border-border bg-secondary hover:border-primary/50 transition-colors text-left"
-                  >
-                    {v.thumbnailUrl ? (
-                      <img src={v.thumbnailUrl} alt={v.title} className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <Video size={24} className="text-muted-foreground opacity-40" />
-                      </div>
-                    )}
-                    <div className="absolute inset-x-0 bottom-0 bg-linear-to-t from-black/80 to-transparent p-2">
-                      <p className="text-xs text-white font-semibold truncate">{v.title}</p>
-                      {v.category && <p className="text-xs text-white/60">{v.category}</p>}
-                    </div>
-                    <div className="absolute inset-0 bg-primary/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <span className="text-xs font-bold text-white bg-primary px-2 py-1 rounded">Start Session</span>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
+          {/* Tab bar */}
+          <div className="flex gap-1 border-b border-border">
+            <button
+              onClick={() => setPlayerTab("swings")}
+              className={`px-4 py-2 text-sm font-semibold border-b-2 transition-colors ${playerTab === "swings" ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+            >
+              Player Swings
+            </button>
+            <button
+              onClick={() => setPlayerTab("sessions")}
+              className={`px-4 py-2 text-sm font-semibold border-b-2 transition-colors flex items-center gap-1.5 ${playerTab === "sessions" ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+            >
+              Coaching Sessions
+              {coachSessions.length > 0 && (
+                <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-bold">{coachSessions.length}</span>
+              )}
+            </button>
           </div>
+
+          {/* Their Swings tab */}
+          {playerTab === "swings" && (
+            <div>
+              {videosLoading ? (
+                <p className="text-sm text-muted-foreground">Loading...</p>
+              ) : playerVideos.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground border border-dashed border-border rounded-xl">
+                  <Video size={32} className="mx-auto mb-2 opacity-30" />
+                  <p className="text-sm">This player hasn't uploaded any swings yet.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {playerVideos.map(v => (
+                    <button
+                      key={v.id}
+                      onClick={() => navigate(`/coach/session?playerId=${selectedPlayer.playerId}&videoId=${v.id}`)}
+                      className="group relative aspect-video rounded-lg overflow-hidden border border-border bg-secondary hover:border-primary/50 transition-colors text-left"
+                    >
+                      {v.thumbnailUrl ? (
+                        <img src={v.thumbnailUrl} alt={v.title} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Video size={24} className="text-muted-foreground opacity-40" />
+                        </div>
+                      )}
+                      <div className="absolute inset-x-0 bottom-0 bg-linear-to-t from-black/80 to-transparent p-2">
+                        <p className="text-xs text-white font-semibold truncate">{v.title}</p>
+                        {v.category && <p className="text-xs text-white/60">{v.category}</p>}
+                      </div>
+                      <div className="absolute inset-0 bg-primary/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <span className="text-xs font-bold text-white bg-primary px-2 py-1 rounded">Start Session</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Coaching Sessions tab */}
+          {playerTab === "sessions" && (
+            <div>
+              {sessionsLoading ? (
+                <p className="text-sm text-muted-foreground">Loading...</p>
+              ) : coachSessions.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground border border-dashed border-border rounded-xl">
+                  <FileVideo size={32} className="mx-auto mb-2 opacity-30" />
+                  <p className="text-sm">No coaching sessions sent yet.</p>
+                  <p className="text-xs mt-1">Click "New Session" to create one.</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {coachSessions.map(s => (
+                    <div key={s.id} className="flex items-start gap-3 p-4 rounded-lg border border-border bg-card">
+                      <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0 mt-0.5">
+                        <FileVideo size={16} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-semibold">
+                            {new Date(s.sharedAt || s.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+                          </p>
+                          {s.voiceoverUrl && (
+                            <span className="flex items-center gap-1 text-xs text-primary bg-primary/10 px-1.5 py-0.5 rounded">
+                              <Mic size={10} /> Voiceover
+                            </span>
+                          )}
+                          {s.playerVideoId && (
+                            <span className="text-xs text-muted-foreground bg-secondary px-1.5 py-0.5 rounded">Player video</span>
+                          )}
+                          {s.proVideoId && (
+                            <span className="text-xs text-muted-foreground bg-secondary px-1.5 py-0.5 rounded">Pro comparison</span>
+                          )}
+                        </div>
+                        {s.notes && (
+                          <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{s.notes}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </Layout>
     );
@@ -160,7 +252,7 @@ export default function CoachDashboard() {
     <Layout>
       <div className="max-w-3xl mx-auto w-full py-8 space-y-8">
         <div>
-          <h1 className="font-display text-3xl uppercase tracking-wider">My Players</h1>
+          <h1 className="font-display text-3xl uppercase tracking-wider">My Teams</h1>
           <p className="text-muted-foreground mt-1">{activeCount} connected · {pendingCount} pending</p>
         </div>
 

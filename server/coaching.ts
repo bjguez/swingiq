@@ -122,15 +122,24 @@ export function setupCoachingRoutes(app: Express) {
     } catch (err) { next(err); }
   });
 
-  // GET /api/coaching/sessions — coach's sent sessions
+  // GET /api/coaching/sessions — coach's sent sessions, optional ?playerId= filter
   app.get("/api/coaching/sessions", async (req, res, next) => {
     try {
       const coach = req.user as User | undefined;
       if (!coach) return res.status(401).json({ message: "Not authenticated" });
 
+      const filterPlayerId = req.query.playerId as string | undefined;
+      const condition = filterPlayerId
+        ? and(eq(coachSessions.coachId, coach.id), eq(coachSessions.playerId, filterPlayerId))
+        : eq(coachSessions.coachId, coach.id);
+
       const rows = await db.select({
         id: coachSessions.id,
+        playerId: coachSessions.playerId,
+        playerVideoId: coachSessions.playerVideoId,
+        proVideoId: coachSessions.proVideoId,
         notes: coachSessions.notes,
+        voiceoverUrl: coachSessions.voiceoverUrl,
         sharedAt: coachSessions.sharedAt,
         createdAt: coachSessions.createdAt,
         playerFirstName: users.firstName,
@@ -138,10 +147,17 @@ export function setupCoachingRoutes(app: Express) {
         playerUsername: users.username,
       }).from(coachSessions)
         .leftJoin(users, eq(coachSessions.playerId, users.id))
-        .where(eq(coachSessions.coachId, coach.id))
+        .where(condition)
         .orderBy(desc(coachSessions.createdAt));
 
-      res.json(rows);
+      // Resolve voiceover R2 keys
+      const resolved = await Promise.all(rows.map(async row =>
+        row.voiceoverUrl && isR2Key(row.voiceoverUrl)
+          ? { ...row, voiceoverUrl: await getVideoUrl(row.voiceoverUrl) }
+          : row
+      ));
+
+      res.json(resolved);
     } catch (err) { next(err); }
   });
 
