@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, useCallback } from "react";
+import { useRef, useState, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
 
 type Tool = "select" | "pen" | "line" | "circle" | "rect" | "text" | "angle" | "timer";
 type DrawAction = {
@@ -19,8 +19,12 @@ interface DrawingCanvasProps {
   onTimerClick?: () => void;
 }
 
-export default function DrawingCanvas({ tool, color, annotations, onAnnotationsChange, onTimerClick }: DrawingCanvasProps) {
+const DrawingCanvas = forwardRef<HTMLCanvasElement, DrawingCanvasProps>(function DrawingCanvas(
+  { tool, color, annotations, onAnnotationsChange, onTimerClick },
+  ref,
+) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  useImperativeHandle(ref, () => canvasRef.current!, []);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentAction, setCurrentAction] = useState<DrawAction | null>(null);
@@ -300,4 +304,7 @@ export default function DrawingCanvas({ tool, color, annotations, onAnnotationsC
   );
 }
 
+});
+
+export default DrawingCanvas;
 export type { Tool, DrawAction };

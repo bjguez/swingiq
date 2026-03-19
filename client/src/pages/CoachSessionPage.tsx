@@ -4,20 +4,35 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { VideoLibraryModal } from "@/components/VideoLibraryModal";
+import DrawingCanvas from "@/components/DrawingCanvas";
+import type { Tool, DrawAction } from "@/components/DrawingCanvas";
 import {
-  ArrowLeft, Send, Video, CheckCircle, Scissors, X,
-  Mic, Square, RotateCcw, Play, Loader2, Check,
+  ArrowLeft, Send, Video, CheckCircle, X,
+  Mic, Square, RotateCcw, Loader2, Check,
+  Pen, Minus, Circle, RectangleHorizontal, Triangle,
+  Undo2, Trash2, ChevronLeft, ChevronRight, Scissors,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import type { Video as VideoType } from "@shared/schema";
 
 type RecordingState = "idle" | "recording" | "preview" | "uploading" | "done";
 
+const COLORS = ["#ef4444", "#eab308", "#22c55e", "#ffffff"];
+const SPEEDS = [0.25, 0.5, 0.75, 1];
+
 function formatTime(secs: number) {
   const m = Math.floor(secs / 60).toString().padStart(2, "0");
   const s = (secs % 60).toString().padStart(2, "0");
   return `${m}:${s}`;
 }
+
+const TOOLS: { id: Tool; icon: React.ReactNode; label: string }[] = [
+  { id: "pen", icon: <Pen size={14} />, label: "Draw" },
+  { id: "line", icon: <Minus size={14} />, label: "Line" },
+  { id: "angle", icon: <Triangle size={14} />, label: "Angle" },
+  { id: "circle", icon: <Circle size={14} />, label: "Circle" },
+  { id: "rect", icon: <RectangleHorizontal size={14} />, label: "Rect" },
+];
 
 export default function CoachSessionPage() {
   const [, navigate] = useLocation();
@@ -26,7 +41,7 @@ export default function CoachSessionPage() {
   const playerId = params.get("playerId") ?? "";
   const initialVideoId = params.get("videoId") ?? "";
 
-  // Session state
+  // Session
   const [notes, setNotes] = useState("");
   const [playerVideoId, setPlayerVideoId] = useState<string>(initialVideoId);
   const [proVideoId, setProVideoId] = useState<string>("");
@@ -38,15 +53,25 @@ export default function CoachSessionPage() {
   const [highlightEnd, setHighlightEnd] = useState(5);
   const [videoDuration, setVideoDuration] = useState(5);
 
-  // Recording state
+  // Analysis tools
+  const [activeTool, setActiveTool] = useState<Tool>("pen");
+  const [activeColor, setActiveColor] = useState(COLORS[0]);
+  const [leftAnnotations, setLeftAnnotations] = useState<DrawAction[]>([]);
+  const [rightAnnotations, setRightAnnotations] = useState<DrawAction[]>([]);
+  const [activePanel, setActivePanel] = useState<"left" | "right">("left");
+  const [speed, setSpeed] = useState(1);
+
+  // Recording
   const [recordingState, setRecordingState] = useState<RecordingState>("idle");
   const [recordingTime, setRecordingTime] = useState(0);
   const [previewUrl, setPreviewUrl] = useState("");
-  const [voiceoverKey, setVoiceoverKey] = useState(""); // R2 key stored on session
+  const [voiceoverKey, setVoiceoverKey] = useState("");
   const [recordingError, setRecordingError] = useState("");
 
   const playerVideoRef = useRef<HTMLVideoElement>(null);
   const proVideoRef = useRef<HTMLVideoElement>(null);
+  const leftAnnotationRef = useRef<HTMLCanvasElement>(null);
+  const rightAnnotationRef = useRef<HTMLCanvasElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -70,7 +95,30 @@ export default function CoachSessionPage() {
     }
   }, [initialVideoId, playerVideos]);
 
-  // Canvas draw loop — composites both video frames side by side
+  // Sync playback speed
+  useEffect(() => {
+    if (playerVideoRef.current) playerVideoRef.current.playbackRate = speed;
+    if (proVideoRef.current) proVideoRef.current.playbackRate = speed;
+  }, [speed]);
+
+  const stepFrame = (dir: 1 | -1) => {
+    const vid = activePanel === "left" ? playerVideoRef.current : proVideoRef.current;
+    if (!vid) return;
+    vid.pause();
+    vid.currentTime = Math.max(0, Math.min(vid.duration || 0, vid.currentTime + dir / 30));
+  };
+
+  const undoAnnotation = () => {
+    if (activePanel === "left") setLeftAnnotations(a => a.slice(0, -1));
+    else setRightAnnotations(a => a.slice(0, -1));
+  };
+
+  const clearAnnotations = () => {
+    if (activePanel === "left") setLeftAnnotations([]);
+    else setRightAnnotations([]);
+  };
+
+  // Canvas draw loop — composites videos + annotation layers
   const startDrawLoop = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -100,7 +148,15 @@ export default function CoachSessionPage() {
       if (playerVid && hasProVideo) {
         // Side by side
         ctx.drawImage(playerVid, 0, headerH, W / 2 - 1, videoH);
+        // Composite left annotations
+        if (leftAnnotationRef.current) {
+          ctx.drawImage(leftAnnotationRef.current, 0, headerH, W / 2 - 1, videoH);
+        }
         ctx.drawImage(proVid, W / 2 + 1, headerH, W / 2 - 1, videoH);
+        // Composite right annotations
+        if (rightAnnotationRef.current) {
+          ctx.drawImage(rightAnnotationRef.current, W / 2 + 1, headerH, W / 2 - 1, videoH);
+        }
         // Divider
         ctx.fillStyle = "#333";
         ctx.fillRect(W / 2 - 1, headerH, 2, videoH);
@@ -113,21 +169,15 @@ export default function CoachSessionPage() {
         ctx.fillText("Player Swing", 8, headerH + 15);
         ctx.fillText("Pro Comparison", W / 2 + 9, headerH + 15);
       } else if (playerVid && playerVideoSrc) {
-        // Full width player swing
         ctx.drawImage(playerVid, 0, headerH, W, videoH);
+        if (leftAnnotationRef.current) {
+          ctx.drawImage(leftAnnotationRef.current, 0, headerH, W, videoH);
+        }
         ctx.fillStyle = "rgba(0,0,0,0.65)";
         ctx.fillRect(0, headerH, 140, 22);
         ctx.fillStyle = "#fff";
         ctx.font = "12px Arial, sans-serif";
         ctx.fillText("Player Swing", 8, headerH + 15);
-      } else {
-        ctx.fillStyle = "#333";
-        ctx.fillRect(0, headerH, W, videoH);
-        ctx.fillStyle = "#666";
-        ctx.font = "16px Arial, sans-serif";
-        ctx.textAlign = "center";
-        ctx.fillText("No video selected", W / 2, H / 2);
-        ctx.textAlign = "left";
       }
 
       // Footer
@@ -139,7 +189,6 @@ export default function CoachSessionPage() {
 
       rafRef.current = requestAnimationFrame(draw);
     }
-
     draw();
   }, [playerVideoSrc, proVideoSrc]);
 
@@ -154,7 +203,7 @@ export default function CoachSessionPage() {
     try {
       micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
     } catch {
-      setRecordingError("Microphone access is required to record. Please allow microphone access and try again.");
+      setRecordingError("Microphone access is required. Please allow microphone access and try again.");
       return;
     }
 
@@ -162,28 +211,19 @@ export default function CoachSessionPage() {
     startDrawLoop();
 
     const canvasStream = canvas.captureStream(30);
-    const audioTrack = micStream.getAudioTracks()[0];
-    canvasStream.addTrack(audioTrack);
+    canvasStream.addTrack(micStream.getAudioTracks()[0]);
 
     const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")
       ? "video/webm;codecs=vp9,opus"
       : "video/webm";
 
-    const recorder = new MediaRecorder(canvasStream, {
-      mimeType,
-      videoBitsPerSecond: 2_000_000,
-    });
-
-    recorder.ondataavailable = e => {
-      if (e.data.size > 0) chunksRef.current.push(e.data);
-    };
-
+    const recorder = new MediaRecorder(canvasStream, { mimeType, videoBitsPerSecond: 2_000_000 });
+    recorder.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data); };
     recorder.onstop = () => {
       stopDrawLoop();
       micStream.getTracks().forEach(t => t.stop());
       const blob = new Blob(chunksRef.current, { type: "video/webm" });
-      const url = URL.createObjectURL(blob);
-      setPreviewUrl(url);
+      setPreviewUrl(URL.createObjectURL(blob));
       setRecordingState("preview");
     };
 
@@ -209,10 +249,8 @@ export default function CoachSessionPage() {
   async function uploadRecording() {
     const blob = new Blob(chunksRef.current, { type: "video/webm" });
     setRecordingState("uploading");
-
     const form = new FormData();
     form.append("file", blob, "coaching-session.webm");
-
     try {
       const res = await fetch("/api/coaching/recordings/upload", { method: "POST", body: form });
       if (!res.ok) {
@@ -249,17 +287,6 @@ export default function CoachSessionPage() {
     onSuccess: () => setShared(true),
   });
 
-  const previewHighlight = () => {
-    const vid = playerVideoRef.current;
-    if (!vid) return;
-    vid.currentTime = highlightStart;
-    vid.play();
-    const stop = () => {
-      if (vid.currentTime >= highlightEnd) { vid.pause(); vid.removeEventListener("timeupdate", stop); }
-    };
-    vid.addEventListener("timeupdate", stop);
-  };
-
   if (shared) {
     return (
       <Layout>
@@ -272,6 +299,7 @@ export default function CoachSessionPage() {
             <Button onClick={() => {
               setShared(false); setNotes(""); setVoiceoverKey("");
               setRecordingState("idle"); setShowHighlight(false);
+              setLeftAnnotations([]); setRightAnnotations([]);
             }}>Share Another</Button>
           </div>
         </div>
@@ -279,12 +307,14 @@ export default function CoachSessionPage() {
     );
   }
 
+  const isRecordingActive = recordingState === "recording";
+
   return (
     <Layout>
-      {/* Hidden canvas for recording — 1280×720 */}
+      {/* Hidden recording canvas */}
       <canvas ref={canvasRef} width={1280} height={720} className="hidden" />
 
-      <div className="max-w-5xl mx-auto w-full py-8 space-y-6">
+      <div className="max-w-6xl mx-auto w-full py-6 space-y-5">
         {/* Header */}
         <div className="flex items-center gap-3">
           <button onClick={() => navigate("/coach")} className="text-muted-foreground hover:text-foreground transition-colors">
@@ -293,56 +323,218 @@ export default function CoachSessionPage() {
           <h1 className="font-display text-2xl uppercase tracking-wider">New Coaching Session</h1>
         </div>
 
-        {/* Video pickers */}
-        <div className="grid md:grid-cols-2 gap-4">
-          {/* Player swing */}
+        {/* ── Video picker (no player video selected yet) ── */}
+        {!playerVideoSrc && (
           <div className="space-y-2">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Player's Swing</p>
-            {playerVideoSrc ? (
-              <div className="space-y-2">
-                <div className="relative aspect-video rounded-lg overflow-hidden bg-black border border-border">
-                  <video
-                    ref={playerVideoRef}
-                    src={playerVideoSrc}
-                    controls
-                    crossOrigin="anonymous"
-                    className="w-full h-full object-contain"
-                    onLoadedMetadata={e => {
-                      const dur = (e.target as HTMLVideoElement).duration;
-                      setVideoDuration(dur);
-                      setHighlightEnd(dur);
-                    }}
-                  />
-                  {recordingState === "idle" && (
-                    <button
-                      onClick={() => { setPlayerVideoSrc(""); setPlayerVideoId(""); setShowHighlight(false); }}
-                      className="absolute top-2 right-2 bg-black/60 text-white rounded-full p-1 hover:bg-black/80"
-                    ><X size={14} /></button>
-                  )}
-                  {recordingState === "recording" && (
-                    <div className="absolute top-2 left-2 flex items-center gap-1.5 bg-red-600 text-white text-xs font-bold px-2 py-1 rounded">
-                      <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                      REC {formatTime(recordingTime)}
-                    </div>
-                  )}
-                </div>
-
-                {/* Highlight moment (only when not recording) */}
-                {recordingState === "idle" && !showHighlight && (
-                  <button
-                    onClick={() => setShowHighlight(true)}
-                    className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Select Player's Swing</p>
+            {playerVideos.length > 0 ? (
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-56 overflow-y-auto">
+                {playerVideos.map(v => (
+                  <button key={v.id}
+                    onClick={() => { setPlayerVideoId(v.id); setPlayerVideoSrc(v.sourceUrl ?? ""); }}
+                    className="relative aspect-video rounded-md overflow-hidden border border-border hover:border-primary/50 transition-colors bg-secondary"
                   >
-                    <Scissors size={13} /> Mark a specific moment
+                    {v.thumbnailUrl
+                      ? <img src={v.thumbnailUrl} alt={v.title} className="w-full h-full object-cover" />
+                      : <Video size={16} className="absolute inset-0 m-auto text-muted-foreground opacity-40" />
+                    }
+                    <div className="absolute inset-x-0 bottom-0 bg-black/60 p-0.5">
+                      <p className="text-white text-[10px] truncate">{v.title}</p>
+                    </div>
                   </button>
+                ))}
+              </div>
+            ) : (
+              <div className="aspect-video max-w-sm rounded-lg border border-dashed border-border flex items-center justify-center text-muted-foreground">
+                <p className="text-sm">Player has no swings uploaded yet</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Analysis UI (player video selected) ── */}
+        {playerVideoSrc && (
+          <div className="space-y-3">
+            {/* Toolbar */}
+            <div className="flex items-center gap-2 flex-wrap rounded-lg border border-border bg-card px-3 py-2">
+              {/* Drawing tools */}
+              <div className="flex items-center gap-1">
+                {TOOLS.map(t => (
+                  <button
+                    key={t.id}
+                    onClick={() => setActiveTool(t.id)}
+                    title={t.label}
+                    className={`p-1.5 rounded transition-colors ${activeTool === t.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-secondary"}`}
+                  >
+                    {t.icon}
+                  </button>
+                ))}
+              </div>
+
+              <div className="w-px h-5 bg-border" />
+
+              {/* Colors */}
+              <div className="flex items-center gap-1">
+                {COLORS.map(c => (
+                  <button
+                    key={c}
+                    onClick={() => setActiveColor(c)}
+                    className={`w-4 h-4 rounded-full border-2 transition-transform ${activeColor === c ? "border-white scale-125" : "border-transparent"}`}
+                    style={{ background: c }}
+                  />
+                ))}
+              </div>
+
+              <div className="w-px h-5 bg-border" />
+
+              {/* Undo / Clear */}
+              <button onClick={undoAnnotation} title="Undo" className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">
+                <Undo2 size={14} />
+              </button>
+              <button onClick={clearAnnotations} title="Clear all" className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">
+                <Trash2 size={14} />
+              </button>
+
+              <div className="w-px h-5 bg-border" />
+
+              {/* Speed */}
+              <div className="flex items-center gap-1">
+                {SPEEDS.map(s => (
+                  <button
+                    key={s}
+                    onClick={() => setSpeed(s)}
+                    className={`text-[11px] font-semibold px-1.5 py-0.5 rounded transition-colors ${speed === s ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-secondary"}`}
+                  >
+                    {s}x
+                  </button>
+                ))}
+              </div>
+
+              <div className="w-px h-5 bg-border" />
+
+              {/* Frame step */}
+              <button onClick={() => stepFrame(-1)} title="Previous frame" className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">
+                <ChevronLeft size={14} />
+              </button>
+              <button onClick={() => stepFrame(1)} title="Next frame" className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">
+                <ChevronRight size={14} />
+              </button>
+
+              <div className="w-px h-5 bg-border" />
+
+              {/* Active panel selector */}
+              <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                <span>Active:</span>
+                {(["left", "right"] as const).map(p => (
+                  <button
+                    key={p}
+                    onClick={() => setActivePanel(p)}
+                    className={`px-2 py-0.5 rounded font-semibold transition-colors ${activePanel === p ? "bg-primary text-primary-foreground" : "hover:bg-secondary"}`}
+                  >
+                    {p === "left" ? "Player" : "Pro"}
+                  </button>
+                ))}
+              </div>
+
+              {/* Change player video */}
+              <button
+                onClick={() => { setPlayerVideoSrc(""); setPlayerVideoId(""); setLeftAnnotations([]); }}
+                className="ml-auto text-[11px] text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+              >
+                <X size={12} /> Change video
+              </button>
+            </div>
+
+            {/* Video panels */}
+            <div className="grid md:grid-cols-2 gap-4">
+              {/* Player swing */}
+              <div
+                onClick={() => setActivePanel("left")}
+                className={`relative aspect-video rounded-lg overflow-hidden bg-black border-2 transition-colors cursor-pointer ${activePanel === "left" ? "border-primary" : "border-border"}`}
+              >
+                <video
+                  ref={playerVideoRef}
+                  src={playerVideoSrc}
+                  controls
+                  crossOrigin="anonymous"
+                  className="w-full h-full object-contain"
+                  onLoadedMetadata={e => {
+                    const dur = (e.target as HTMLVideoElement).duration;
+                    setVideoDuration(dur);
+                    setHighlightEnd(dur);
+                  }}
+                />
+                <DrawingCanvas
+                  ref={leftAnnotationRef}
+                  tool={activePanel === "left" ? activeTool : "select"}
+                  color={activeColor}
+                  annotations={leftAnnotations}
+                  onAnnotationsChange={setLeftAnnotations}
+                />
+                <div className="absolute top-2 left-2 text-[10px] font-bold text-white/60 bg-black/40 px-1.5 py-0.5 rounded pointer-events-none">Player</div>
+                {isRecordingActive && (
+                  <div className="absolute top-2 right-2 flex items-center gap-1 bg-red-600 text-white text-xs font-bold px-2 py-1 rounded pointer-events-none">
+                    <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" /> REC {formatTime(recordingTime)}
+                  </div>
                 )}
-                {recordingState === "idle" && showHighlight && (
+              </div>
+
+              {/* Pro video */}
+              <div
+                onClick={() => proVideoSrc && setActivePanel("right")}
+                className={`relative aspect-video rounded-lg overflow-hidden bg-black border-2 transition-colors ${proVideoSrc ? (activePanel === "right" ? "border-primary cursor-pointer" : "border-border cursor-pointer") : "border-dashed border-border"}`}
+              >
+                {proVideoSrc ? (
+                  <>
+                    <video
+                      ref={proVideoRef}
+                      src={proVideoSrc}
+                      controls
+                      crossOrigin="anonymous"
+                      className="w-full h-full object-contain"
+                    />
+                    <DrawingCanvas
+                      ref={rightAnnotationRef}
+                      tool={activePanel === "right" ? activeTool : "select"}
+                      color={activeColor}
+                      annotations={rightAnnotations}
+                      onAnnotationsChange={setRightAnnotations}
+                    />
+                    <div className="absolute top-2 left-2 text-[10px] font-bold text-white/60 bg-black/40 px-1.5 py-0.5 rounded pointer-events-none">Pro</div>
+                    {!isRecordingActive && (
+                      <button
+                        onClick={e => { e.stopPropagation(); setProVideoSrc(""); setProVideoId(""); setRightAnnotations([]); }}
+                        className="absolute top-2 right-2 bg-black/60 text-white rounded-full p-1 hover:bg-black/80"
+                      ><X size={14} /></button>
+                    )}
+                  </>
+                ) : (
+                  <VideoLibraryModal
+                    mode="pro"
+                    trigger={
+                      <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
+                        <Video size={28} className="opacity-40" />
+                        <p className="text-sm">Add pro comparison</p>
+                      </div>
+                    }
+                    onVideoSelected={(src, _label, id) => { setProVideoSrc(src); if (id) setProVideoId(id); }}
+                  />
+                )}
+              </div>
+            </div>
+
+            {/* Highlight moment */}
+            {!isRecordingActive && (
+              <div>
+                {!showHighlight ? (
+                  <button onClick={() => setShowHighlight(true)} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                    <Scissors size={13} /> Mark a specific moment for the player
+                  </button>
+                ) : (
                   <div className="rounded-lg border border-border bg-secondary/40 p-3 space-y-3">
                     <div className="flex items-center justify-between">
                       <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Highlight Moment</p>
-                      <button onClick={() => setShowHighlight(false)} className="text-muted-foreground hover:text-foreground">
-                        <X size={13} />
-                      </button>
+                      <button onClick={() => setShowHighlight(false)} className="text-muted-foreground hover:text-foreground"><X size={13} /></button>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
@@ -362,153 +554,84 @@ export default function CoachSessionPage() {
                         />
                       </div>
                     </div>
-                    <Button size="sm" variant="outline" onClick={previewHighlight} className="w-full text-xs">Preview Highlight</Button>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {playerVideos.length > 0 ? (
-                  <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto">
-                    {playerVideos.map(v => (
-                      <button key={v.id}
-                        onClick={() => { setPlayerVideoId(v.id); setPlayerVideoSrc(v.sourceUrl ?? ""); }}
-                        className="relative aspect-video rounded-md overflow-hidden border border-border hover:border-primary/50 transition-colors bg-secondary"
-                      >
-                        {v.thumbnailUrl
-                          ? <img src={v.thumbnailUrl} alt={v.title} className="w-full h-full object-cover" />
-                          : <Video size={16} className="absolute inset-0 m-auto text-muted-foreground opacity-40" />
-                        }
-                        <div className="absolute inset-x-0 bottom-0 bg-black/60 p-0.5">
-                          <p className="text-white text-[10px] truncate">{v.title}</p>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="aspect-video rounded-lg border border-dashed border-border flex items-center justify-center text-muted-foreground">
-                    <p className="text-sm">Player has no swings uploaded yet</p>
                   </div>
                 )}
               </div>
             )}
           </div>
+        )}
 
-          {/* Pro video */}
+        {/* ── Voiceover recording ── */}
+        {playerVideoSrc && (
           <div className="space-y-2">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Pro Comparison (optional)</p>
-            {proVideoSrc ? (
-              <div className="relative aspect-video rounded-lg overflow-hidden bg-black border border-border">
-                <video
-                  ref={proVideoRef}
-                  src={proVideoSrc}
-                  controls
-                  crossOrigin="anonymous"
-                  className="w-full h-full object-contain"
-                />
-                {recordingState === "idle" && (
-                  <button
-                    onClick={() => { setProVideoSrc(""); setProVideoId(""); }}
-                    className="absolute top-2 right-2 bg-black/60 text-white rounded-full p-1 hover:bg-black/80"
-                  ><X size={14} /></button>
-                )}
-              </div>
-            ) : (
-              <VideoLibraryModal
-                mode="pro"
-                trigger={
-                  <div className="aspect-video rounded-lg border border-dashed border-border flex flex-col items-center justify-center gap-2 text-muted-foreground cursor-pointer hover:border-primary/40 hover:text-foreground transition-colors">
-                    <Video size={28} className="opacity-40" />
-                    <p className="text-sm">Choose a pro video</p>
-                  </div>
-                }
-                onVideoSelected={(src, _label, id) => { setProVideoSrc(src); if (id) setProVideoId(id); }}
-              />
-            )}
-          </div>
-        </div>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Voiceover Recording</p>
 
-        {/* ── Voiceover Recording ── */}
-        <div className="space-y-2">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Voiceover Recording</p>
-
-          {recordingState === "idle" && !voiceoverKey && (
-            <div className="rounded-lg border border-dashed border-border p-6 flex flex-col items-center gap-3 text-center">
-              <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center">
-                <Mic size={22} className="text-muted-foreground" />
-              </div>
-              <div>
-                <p className="font-medium text-sm">Record a coaching video</p>
-                <p className="text-xs text-muted-foreground mt-0.5 max-w-xs">
-                  Your screen will be captured as you talk through the swing. Scrub both videos freely while recording.
-                </p>
-              </div>
-              <Button onClick={startRecording} disabled={!playerVideoSrc} size="sm">
-                <Mic size={14} className="mr-2" /> Start Recording
-              </Button>
-              {!playerVideoSrc && (
-                <p className="text-xs text-muted-foreground">Select a player swing above first</p>
-              )}
-            </div>
-          )}
-
-          {recordingState === "recording" && (
-            <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
+            {recordingState === "idle" && !voiceoverKey && (
+              <div className="rounded-lg border border-dashed border-border p-5 flex items-center justify-between gap-4">
                 <div>
-                  <p className="font-semibold text-sm">Recording in progress</p>
-                  <p className="text-xs text-muted-foreground">
-                    {formatTime(recordingTime)} · Scrub and play the videos above while you talk
+                  <p className="font-medium text-sm">Record your coaching analysis</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Draw on the videos above while you talk. Only the video + annotations will be captured — not the rest of the page.
                   </p>
                 </div>
-              </div>
-              <Button variant="destructive" size="sm" onClick={stopRecording}>
-                <Square size={12} className="mr-2 fill-current" /> Stop
-              </Button>
-            </div>
-          )}
-
-          {recordingState === "preview" && (
-            <div className="space-y-3">
-              <video src={previewUrl} controls className="w-full aspect-video rounded-lg bg-black border border-border object-contain" />
-              {recordingError && <p className="text-xs text-destructive">{recordingError}</p>}
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={discardRecording}>
-                  <RotateCcw size={13} className="mr-2" /> Re-record
-                </Button>
-                <Button size="sm" onClick={uploadRecording} className="flex-1">
-                  <Play size={13} className="mr-2" /> Use This Recording
+                <Button onClick={startRecording} size="sm" className="shrink-0">
+                  <Mic size={14} className="mr-2" /> Start Recording
                 </Button>
               </div>
-            </div>
-          )}
+            )}
 
-          {recordingState === "uploading" && (
-            <div className="rounded-lg border border-border p-4 flex items-center gap-3">
-              <Loader2 size={18} className="animate-spin text-primary shrink-0" />
-              <div>
-                <p className="font-medium text-sm">Uploading recording…</p>
-                <p className="text-xs text-muted-foreground">This may take a moment depending on the length.</p>
+            {recordingState === "recording" && (
+              <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
+                  <div>
+                    <p className="font-semibold text-sm">Recording — {formatTime(recordingTime)}</p>
+                    <p className="text-xs text-muted-foreground">Draw on the videos, scrub, and talk. Hit Stop when done.</p>
+                  </div>
+                </div>
+                <Button variant="destructive" size="sm" onClick={stopRecording}>
+                  <Square size={12} className="mr-2 fill-current" /> Stop
+                </Button>
               </div>
-            </div>
-          )}
+            )}
 
-          {recordingState === "done" && (
-            <div className="rounded-lg border border-green-500/30 bg-green-500/5 p-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Check size={18} className="text-green-500 shrink-0" />
-                <div>
-                  <p className="font-medium text-sm">Recording ready</p>
-                  <p className="text-xs text-muted-foreground">Saved · {formatTime(recordingTime)} coaching video</p>
+            {recordingState === "preview" && (
+              <div className="space-y-3">
+                <video src={previewUrl} controls className="w-full aspect-video rounded-lg bg-black border border-border object-contain" />
+                {recordingError && <p className="text-xs text-destructive">{recordingError}</p>}
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={discardRecording}>
+                    <RotateCcw size={13} className="mr-2" /> Re-record
+                  </Button>
+                  <Button size="sm" onClick={uploadRecording} className="flex-1">
+                    Use This Recording
+                  </Button>
                 </div>
               </div>
-              <Button variant="outline" size="sm" onClick={() => { setVoiceoverKey(""); setRecordingTime(0); setRecordingState("idle"); }}>
-                <RotateCcw size={13} className="mr-2" /> Re-record
-              </Button>
-            </div>
-          )}
-        </div>
+            )}
+
+            {recordingState === "uploading" && (
+              <div className="rounded-lg border border-border p-4 flex items-center gap-3">
+                <Loader2 size={18} className="animate-spin text-primary shrink-0" />
+                <p className="text-sm font-medium">Uploading recording…</p>
+              </div>
+            )}
+
+            {recordingState === "done" && (
+              <div className="rounded-lg border border-green-500/30 bg-green-500/5 p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Check size={18} className="text-green-500 shrink-0" />
+                  <div>
+                    <p className="font-medium text-sm">Recording ready — {formatTime(recordingTime)}</p>
+                  </div>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => { setVoiceoverKey(""); setRecordingTime(0); setRecordingState("idle"); }}>
+                  <RotateCcw size={13} className="mr-2" /> Re-record
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Notes */}
         <div className="space-y-2">
