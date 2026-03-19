@@ -22,6 +22,7 @@ type CoachSessionRow = {
   proVideoId: string | null;
   highlightStart: number | null;
   highlightEnd: number | null;
+  voiceoverUrl: string | null;
   coachFirstName: string | null;
   coachLastName: string | null;
   coachUsername: string;
@@ -309,7 +310,14 @@ export default function Development() {
                 </button>
                 {isSelected && (
                   <div className="px-4 pb-4 space-y-4 border-t border-border pt-4">
-                    {/* Videos */}
+                    {/* Coach recording video — shown first and full-width */}
+                    {session.voiceoverUrl && (
+                      <div className="space-y-1">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Coach Recording</p>
+                        <video src={session.voiceoverUrl} controls className="w-full aspect-video rounded-lg bg-black border border-border object-contain" />
+                      </div>
+                    )}
+                    {/* Reference videos */}
                     {(session.playerVideoId || session.proVideoId) && (
                       <div className="grid grid-cols-2 gap-3">
                         {session.playerVideoId && (

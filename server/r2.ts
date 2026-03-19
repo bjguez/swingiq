@@ -23,10 +23,11 @@ export function r2Configured(): boolean {
 export async function uploadToR2(
   buffer: Buffer,
   originalName: string,
-  contentType: string
+  contentType: string,
+  prefix = "videos"
 ): Promise<string> {
-  const ext = path.extname(originalName).toLowerCase();
-  const key = `videos/${randomUUID()}${ext}`;
+  const ext = path.extname(originalName).toLowerCase() || ".bin";
+  const key = `${prefix}/${randomUUID()}${ext}`;
   await r2.send(new PutObjectCommand({
     Bucket: bucket,
     Key: key,
@@ -55,7 +56,7 @@ export async function deleteFromR2(key: string): Promise<void> {
 
 /** Returns true if a sourceUrl value is an R2 key (not a legacy /uploads/ path) */
 export function isR2Key(sourceUrl: string): boolean {
-  return sourceUrl.startsWith("videos/");
+  return sourceUrl.startsWith("videos/") || sourceUrl.startsWith("recordings/");
 }
 
 /** Configures CORS on the R2 bucket to allow browser video/canvas access from any origin */

@@ -993,5 +993,25 @@ export async function registerRoutes(
   setupCoachRoutes(app);
   setupCoachingRoutes(app);
 
+  // ── Coach recording upload ─────────────────────────────────────────────────
+  // Accept webm blobs from the canvas recorder, store in R2 under recordings/
+  const recordingUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 500 * 1024 * 1024 },
+  });
+  app.post("/api/coaching/recordings/upload", recordingUpload.single("file"), async (req, res, next) => {
+    try {
+      const user = req.user as any;
+      if (!user) return res.status(401).json({ message: "Not authenticated" });
+      if (user.accountType !== "coach") return res.status(403).json({ message: "Coach account required" });
+      if (!req.file) return res.status(400).json({ message: "No file provided" });
+      if (!r2Configured()) return res.status(503).json({ message: "Storage not configured" });
+
+      const key = await uploadToR2(req.file.buffer, "recording.webm", "video/webm", "recordings");
+      const url = await getVideoUrl(key);
+      res.json({ key, url });
+    } catch (err) { next(err); }
+  });
+
   return httpServer;
 }

@@ -4,6 +4,7 @@ import { coachSessions, notifications, messages, coachPlayers, videos, users } f
 import { eq, and, desc, or } from "drizzle-orm";
 import { User } from "../shared/schema";
 import { Resend } from "resend";
+import { getVideoUrl, isR2Key } from "./r2";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 const FROM = "Swing Studio <noreply@swingstudio.ai>";
@@ -53,7 +54,7 @@ export function setupCoachingRoutes(app: Express) {
       if (!coach) return res.status(401).json({ message: "Not authenticated" });
       if (coach.accountType !== "coach") return res.status(403).json({ message: "Coach account required" });
 
-      const { playerId, playerVideoId, proVideoId, notes, highlightStart, highlightEnd } = req.body;
+      const { playerId, playerVideoId, proVideoId, notes, highlightStart, highlightEnd, voiceoverUrl } = req.body;
       if (!playerId) return res.status(400).json({ message: "playerId is required" });
 
       // Verify relationship
@@ -74,6 +75,7 @@ export function setupCoachingRoutes(app: Express) {
         playerVideoId: playerVideoId || null,
         proVideoId: proVideoId || null,
         notes: notes || null,
+        voiceoverUrl: voiceoverUrl || null,
         highlightStart: highlightStart ?? null,
         highlightEnd: highlightEnd ?? null,
         sharedAt: new Date(),
@@ -149,6 +151,9 @@ export function setupCoachingRoutes(app: Express) {
         createdAt: coachSessions.createdAt,
         playerVideoId: coachSessions.playerVideoId,
         proVideoId: coachSessions.proVideoId,
+        highlightStart: coachSessions.highlightStart,
+        highlightEnd: coachSessions.highlightEnd,
+        voiceoverUrl: coachSessions.voiceoverUrl,
         coachFirstName: users.firstName,
         coachLastName: users.lastName,
         coachUsername: users.username,
@@ -158,7 +163,15 @@ export function setupCoachingRoutes(app: Express) {
         .where(eq(coachSessions.playerId, player.id))
         .orderBy(desc(coachSessions.sharedAt));
 
-      res.json(rows);
+      // Resolve R2 keys to public URLs
+      const resolved = await Promise.all(rows.map(async row => {
+        if (row.voiceoverUrl && isR2Key(row.voiceoverUrl)) {
+          return { ...row, voiceoverUrl: await getVideoUrl(row.voiceoverUrl) };
+        }
+        return row;
+      }));
+
+      res.json(resolved);
     } catch (err) { next(err); }
   });
 
