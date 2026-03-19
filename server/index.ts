@@ -223,6 +223,9 @@ app.use((req, res, next) => {
     )
   `);
 
+  // Video visibility flags
+  await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS show_in_library BOOLEAN NOT NULL DEFAULT true`);
+  await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS show_in_development BOOLEAN NOT NULL DEFAULT true`);
   // team_name column on coach_players
   await pool.query(`ALTER TABLE coach_players ADD COLUMN IF NOT EXISTS team_name TEXT`);
   // coach_teams table

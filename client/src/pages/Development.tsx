@@ -70,8 +70,8 @@ export default function Development() {
   });
 
   const { data: allVideos = [], isLoading: videosLoading } = useQuery({
-    queryKey: ["/api/videos"],
-    queryFn: () => fetchVideos(),
+    queryKey: ["/api/videos", "development"],
+    queryFn: () => fetchVideos(undefined, "development"),
     enabled: isProOrAdmin,
   });
 

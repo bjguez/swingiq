@@ -90,6 +90,9 @@ export const videos = pgTable("videos", {
   // Swing Notes
   notes: text("notes"),
   tags: text("tags").array(),
+  // Visibility
+  showInLibrary: boolean("show_in_library").default(true),
+  showInDevelopment: boolean("show_in_development").default(true),
 });
 
 export const drills = pgTable("drills", {

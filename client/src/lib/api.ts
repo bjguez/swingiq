@@ -30,8 +30,12 @@ export async function fetchPlayer(id: string): Promise<MlbPlayer> {
   return res.json();
 }
 
-export async function fetchVideos(category?: string): Promise<Video[]> {
-  const url = category ? `/api/videos?category=${encodeURIComponent(category)}` : "/api/videos";
+export async function fetchVideos(category?: string, context?: string): Promise<Video[]> {
+  const params = new URLSearchParams();
+  if (category) params.set("category", category);
+  if (context) params.set("context", context);
+  const query = params.toString();
+  const url = query ? `/api/videos?${query}` : "/api/videos";
   const res = await fetch(url);
   if (!res.ok) throw new Error("Failed to fetch videos");
   return res.json();

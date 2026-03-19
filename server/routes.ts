@@ -645,20 +645,24 @@ export async function registerRoutes(
 
   app.get("/api/videos", async (req, res) => {
     try {
-      const { category, playerId } = req.query;
+      const { category, playerId, context } = req.query;
       const userId = (req.user as any)?.id ?? null;
+      const isAdmin = (req.user as any)?.isAdmin ?? false;
 
       let vids;
       if (category) {
-        // Category filter: pro videos only (used by Library/Development)
         vids = (await storage.getVideosByCategory(category as string)).filter(v => v.isProVideo);
       } else if (playerId) {
         vids = await storage.getVideosByPlayer(playerId as string);
       } else {
-        // Default: all pro videos + this user's own uploads
         const proVideos = await storage.getProVideos();
         const userVideos = userId ? await storage.getVideosByUser(userId) : [];
-        vids = [...proVideos, ...userVideos];
+        // Apply visibility filtering for non-admin requests
+        const filteredPro = isAdmin ? proVideos : proVideos.filter(v => {
+          if (context === "development") return v.showInDevelopment !== false;
+          return v.showInLibrary !== false;
+        });
+        vids = [...filteredPro, ...userVideos];
       }
       res.json(await resolveVideoUrls(vids));
     } catch (err) {

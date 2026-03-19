@@ -264,6 +264,8 @@ export default function Admin() {
       sourceUrl: editData.sourceUrl ?? null,
       season: editData.season ?? null,
       isProVideo: editData.isProVideo ?? false,
+      showInLibrary: editData.showInLibrary ?? true,
+      showInDevelopment: editData.showInDevelopment ?? true,
     };
     updateMutation.mutate({ id: editingId, data: payload as Partial<Video> });
   };
@@ -403,11 +405,12 @@ export default function Admin() {
           {/* Videos Table */}
           <div className="border border-border rounded-xl overflow-hidden">
             <div className="bg-secondary/50 p-3 text-xs font-semibold text-muted-foreground grid grid-cols-12 gap-2 uppercase tracking-wider items-center">
-              <div className="col-span-4">Title</div>
-              <div className="col-span-3">Player</div>
+              <div className="col-span-3">Title</div>
+              <div className="col-span-2">Player</div>
               <div className="col-span-1">Category</div>
               <div className="col-span-1">Duration</div>
               <div className="col-span-1">File</div>
+              <div className="col-span-2 text-center">Visibility</div>
               <div className="col-span-2 text-right">Actions</div>
             </div>
 
@@ -449,6 +452,7 @@ export default function Admin() {
                           deleteMutation.mutate(video.id);
                         }
                       }}
+                      onToggle={(field, val) => updateMutation.mutate({ id: video.id, data: { [field]: val } as Partial<Video> })}
                       deleting={deleteMutation.isPending}
                     />
                   )
@@ -899,10 +903,33 @@ function FilterPill({ label, active, onClick, count }: { label: string; active: 
 
 // ── Video components ──────────────────────────────────────────────────────────
 
-function VideoRow({ video, onEdit, onTrim, onDelete, deleting }: { video: Video; onEdit: () => void; onTrim: () => void; onDelete: () => void; deleting: boolean }) {
+function VisibilityToggle({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      title={`${active ? "Hide from" : "Show in"} ${label}`}
+      className={`text-[10px] font-bold px-1.5 py-0.5 rounded border transition-colors ${
+        active
+          ? "bg-green-500/15 text-green-400 border-green-500/30 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/20"
+          : "bg-secondary text-muted-foreground/50 border-border hover:bg-green-500/10 hover:text-green-400 hover:border-green-500/20"
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
+function VideoRow({ video, onEdit, onTrim, onDelete, onToggle, deleting }: {
+  video: Video;
+  onEdit: () => void;
+  onTrim: () => void;
+  onDelete: () => void;
+  onToggle: (field: "showInLibrary" | "showInDevelopment", val: boolean) => void;
+  deleting: boolean;
+}) {
   return (
     <div className="p-3 grid grid-cols-12 gap-2 items-center hover:bg-secondary/20 transition-colors text-sm" data-testid={`admin-row-${video.id}`}>
-      <div className="col-span-4 font-medium flex items-center gap-2 min-w-0">
+      <div className="col-span-3 font-medium flex items-center gap-2 min-w-0">
         <div className="w-8 h-8 rounded bg-secondary flex items-center justify-center shrink-0">
           {video.sourceUrl ? (
             <PlayCircle className="w-4 h-4 text-primary" />
@@ -912,7 +939,7 @@ function VideoRow({ video, onEdit, onTrim, onDelete, deleting }: { video: Video;
         </div>
         <span className="truncate">{video.title}</span>
       </div>
-      <div className="col-span-3 text-muted-foreground truncate">{video.playerName || "—"}</div>
+      <div className="col-span-2 text-muted-foreground truncate">{video.playerName || "—"}</div>
       <div className="col-span-1">
         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-primary/10 text-primary">{video.category}</span>
       </div>
@@ -923,6 +950,18 @@ function VideoRow({ video, onEdit, onTrim, onDelete, deleting }: { video: Video;
         ) : (
           <AlertCircle className="w-4 h-4 text-yellow-500/50" />
         )}
+      </div>
+      <div className="col-span-2 flex justify-center gap-1">
+        <VisibilityToggle
+          label="Library"
+          active={video.showInLibrary !== false}
+          onClick={() => onToggle("showInLibrary", !(video.showInLibrary !== false))}
+        />
+        <VisibilityToggle
+          label="Dev"
+          active={video.showInDevelopment !== false}
+          onClick={() => onToggle("showInDevelopment", !(video.showInDevelopment !== false))}
+        />
       </div>
       <div className="col-span-2 flex justify-end gap-1">
         <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" onClick={onEdit} data-testid={`button-edit-${video.id}`}>
