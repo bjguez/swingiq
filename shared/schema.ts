@@ -11,6 +11,8 @@ export const users = pgTable("users", {
   email: text("email").unique(),
   emailVerified: boolean("email_verified").default(false).notNull(),
   // Profile
+  firstName: text("first_name"),
+  lastName: text("last_name"),
   age: integer("age"),
   city: text("city"),
   state: text("state"),

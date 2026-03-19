@@ -17,7 +17,7 @@ const PLAYER_SKILL_OPTIONS = [
   { value: "pro", label: "Pro / Semi-Pro" },
 ] as const;
 const COACHING_LEVELS = [
-  { value: "youth", label: "Youth / Little League" },
+  { value: "little_league", label: "Little League" },
   { value: "select", label: "Select / Travel" },
   { value: "high_school", label: "High School" },
   { value: "college", label: "College" },
@@ -39,6 +39,8 @@ export default function OnboardingPage() {
   const [step, setStep] = useState<Step>("account_type");
 
   const [playerForm, setPlayerForm] = useState({
+    firstName: "",
+    lastName: "",
     bats: "",
     throws: "",
     skillLevel: "",
@@ -48,6 +50,8 @@ export default function OnboardingPage() {
   });
 
   const [coachForm, setCoachForm] = useState({
+    firstName: "",
+    lastName: "",
     organization: "",
     coachingLevel: "",
     city: "",
@@ -57,6 +61,8 @@ export default function OnboardingPage() {
   async function handlePlayerSubmit(e: React.FormEvent) {
     e.preventDefault();
     const payload: Record<string, any> = { accountType: "player" };
+    if (playerForm.firstName) payload.firstName = playerForm.firstName;
+    if (playerForm.lastName) payload.lastName = playerForm.lastName;
     if (playerForm.bats) payload.bats = playerForm.bats;
     if (playerForm.throws) payload.throws = playerForm.throws;
     if (playerForm.skillLevel) payload.skillLevel = playerForm.skillLevel;
@@ -70,6 +76,8 @@ export default function OnboardingPage() {
   async function handleCoachSubmit(e: React.FormEvent) {
     e.preventDefault();
     const payload: Record<string, any> = { accountType: "coach" };
+    if (coachForm.firstName) payload.firstName = coachForm.firstName;
+    if (coachForm.lastName) payload.lastName = coachForm.lastName;
     if (coachForm.organization) payload.organization = coachForm.organization;
     if (coachForm.coachingLevel) payload.coachingLevel = coachForm.coachingLevel;
     if (coachForm.city) payload.city = coachForm.city;
@@ -120,9 +128,6 @@ export default function OnboardingPage() {
                   <div className="text-sm text-muted-foreground">Analyze and share sessions with your players</div>
                 </div>
               </button>
-              <Button variant="ghost" className="w-full" onClick={() => navigate("/")}>
-                Skip for now
-              </Button>
             </CardContent>
           </Card>
         )}
@@ -136,6 +141,28 @@ export default function OnboardingPage() {
             </CardHeader>
             <CardContent>
               <form onSubmit={handlePlayerSubmit} className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label htmlFor="player-first">First Name</Label>
+                    <Input
+                      id="player-first"
+                      placeholder="First"
+                      value={playerForm.firstName}
+                      onChange={(e) => setPlayerForm(f => ({ ...f, firstName: e.target.value }))}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="player-last">Last Name</Label>
+                    <Input
+                      id="player-last"
+                      placeholder="Last"
+                      value={playerForm.lastName}
+                      onChange={(e) => setPlayerForm(f => ({ ...f, lastName: e.target.value }))}
+                      required
+                    />
+                  </div>
+                </div>
                 <div className="space-y-1">
                   <Label>Bats</Label>
                   <div className="flex gap-2">
@@ -232,7 +259,6 @@ export default function OnboardingPage() {
                   <Button type="submit" className="flex-1" disabled={isUpdatingProfile}>
                     {isUpdatingProfile ? "Saving..." : "Save & Continue"}
                   </Button>
-                  <Button type="button" variant="ghost" onClick={() => navigate("/")}>Skip</Button>
                 </div>
               </form>
             </CardContent>
@@ -248,6 +274,28 @@ export default function OnboardingPage() {
             </CardHeader>
             <CardContent>
               <form onSubmit={handleCoachSubmit} className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label htmlFor="coach-first">First Name</Label>
+                    <Input
+                      id="coach-first"
+                      placeholder="First"
+                      value={coachForm.firstName}
+                      onChange={(e) => setCoachForm(f => ({ ...f, firstName: e.target.value }))}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="coach-last">Last Name</Label>
+                    <Input
+                      id="coach-last"
+                      placeholder="Last"
+                      value={coachForm.lastName}
+                      onChange={(e) => setCoachForm(f => ({ ...f, lastName: e.target.value }))}
+                      required
+                    />
+                  </div>
+                </div>
                 <div className="space-y-1">
                   <Label htmlFor="coach-org">Organization / Team Name</Label>
                   <Input
@@ -303,7 +351,6 @@ export default function OnboardingPage() {
                   <Button type="submit" className="flex-1" disabled={isUpdatingProfile}>
                     {isUpdatingProfile ? "Saving..." : "Save & Continue"}
                   </Button>
-                  <Button type="button" variant="ghost" onClick={() => navigate("/")}>Skip</Button>
                 </div>
               </form>
             </CardContent>

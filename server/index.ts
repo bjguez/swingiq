@@ -144,6 +144,9 @@ app.use((req, res, next) => {
   await pool.query(`
     ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_status TEXT
   `);
+  // Name fields
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS first_name TEXT`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_name TEXT`);
   // Account type and coach fields
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS account_type TEXT NOT NULL DEFAULT 'player'`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS organization TEXT`);

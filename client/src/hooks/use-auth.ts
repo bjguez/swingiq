@@ -14,6 +14,8 @@ export type AuthUser = {
   throws?: string | null;
   heightInches?: number | null;
   weightLbs?: number | null;
+  firstName?: string | null;
+  lastName?: string | null;
   profileComplete?: boolean;
   subscriptionTier?: string;
   accountType?: "player" | "coach";

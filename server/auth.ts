@@ -58,6 +58,8 @@ function serializeUser(user: User) {
     throws: user.throws,
     heightInches: user.heightInches,
     weightLbs: user.weightLbs,
+    firstName: user.firstName,
+    lastName: user.lastName,
     profileComplete: user.profileComplete,
     subscriptionTier: user.subscriptionTier ?? "free",
     accountType: user.accountType ?? "player",
@@ -291,8 +293,10 @@ export function setupAuth(app: Express) {
   app.put("/api/auth/profile", async (req, res, next) => {
     if (!req.user) return res.status(401).json({ message: "Not authenticated" });
     try {
-      const { age, city, state, skillLevel, bats, throws: throwHand, heightInches, weightLbs, accountType, organization, coachingLevel } = req.body;
+      const { firstName, lastName, age, city, state, skillLevel, bats, throws: throwHand, heightInches, weightLbs, accountType, organization, coachingLevel } = req.body;
       const updated = await storage.updateUser((req.user as User).id, {
+        ...(firstName !== undefined && { firstName: firstName || null }),
+        ...(lastName !== undefined && { lastName: lastName || null }),
         age: age ? Number(age) : null,
         city: city || null,
         state: state || null,
