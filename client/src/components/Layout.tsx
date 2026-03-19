@@ -41,14 +41,21 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/notifications"] }),
   });
 
-  const navLinks = [
+  const isCoach = user?.accountType === "coach";
+  const isPaid = user && ["player", "pro", "coach"].includes(user.subscriptionTier ?? "");
+  const isAdmin = user?.isAdmin;
+
+  const navLinks = isCoach ? [
+    { href: "/", icon: <Video className="w-4 h-4 mr-2" />, label: "Analysis" },
+    { href: "/library", icon: <Library className="w-4 h-4 mr-2" />, label: "Pro Library" },
+    { href: "/coach", icon: <Users className="w-4 h-4 mr-2" />, label: "My Players" },
+  ] : [
     { href: "/", icon: <Video className="w-4 h-4 mr-2" />, label: "Analysis" },
     { href: "/library", icon: <Library className="w-4 h-4 mr-2" />, label: "Pro Library" },
     { href: "/my-swings", icon: <Film className="w-4 h-4 mr-2" />, label: "My Swings" },
-    { href: "/biometrics", icon: <Dna className="w-4 h-4 mr-2" />, label: "Biometrics", badge: <Lock className="w-3 h-3 ml-1.5 text-yellow-500" /> },
-    { href: "/development", icon: <BarChart2 className="w-4 h-4 mr-2" />, label: "Development", badge: <Lock className="w-3 h-3 ml-1.5 text-yellow-500" /> },
-    ...(user?.accountType === "coach" ? [{ href: "/coach", icon: <Users className="w-4 h-4 mr-2" />, label: "My Players" }] : []),
-    { href: "/pricing", icon: <Tag className="w-4 h-4 mr-2" />, label: "Pricing" },
+    { href: "/biometrics", icon: <Dna className="w-4 h-4 mr-2" />, label: "Biometrics", badge: (!isPaid && !isAdmin) ? <Lock className="w-3 h-3 ml-1.5 text-yellow-500" /> : undefined },
+    { href: "/development", icon: <BarChart2 className="w-4 h-4 mr-2" />, label: "Development", badge: (!isPaid && !isAdmin) ? <Lock className="w-3 h-3 ml-1.5 text-yellow-500" /> : undefined },
+    ...(!isPaid && !isAdmin ? [{ href: "/pricing", icon: <Tag className="w-4 h-4 mr-2" />, label: "Pricing" }] : []),
   ];
 
   const footerLinks = [
@@ -99,15 +106,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="flex items-center gap-3">
-            <VideoLibraryModal
-              mode="user"
-              trigger={
-                <Button size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold hidden sm:flex">
-                  <Upload className="w-4 h-4 mr-2" />
-                  Upload Swing
-                </Button>
-              }
-            />
+            {!isCoach && (
+              <VideoLibraryModal
+                mode="user"
+                trigger={
+                  <Button size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold hidden sm:flex">
+                    <Upload className="w-4 h-4 mr-2" />
+                    Upload Swing
+                  </Button>
+                }
+              />
+            )}
             <Popover open={notifOpen} onOpenChange={(o) => { setNotifOpen(o); if (o && unreadCount > 0) readAllMutation.mutate(); }}>
               <PopoverTrigger asChild>
                 <Button variant="ghost" size="icon" className="text-muted-foreground relative">
@@ -177,17 +186,19 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 </Button>
               </Link>
             ))}
-            <div className="pt-2 border-t border-border mt-1 w-full">
-              <VideoLibraryModal
-                mode="user"
-                trigger={
-                  <Button size="sm" className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-bold">
-                    <Upload className="w-4 h-4 mr-2" />
-                    Upload Swing
-                  </Button>
-                }
-              />
-            </div>
+            {!isCoach && (
+              <div className="pt-2 border-t border-border mt-1 w-full">
+                <VideoLibraryModal
+                  mode="user"
+                  trigger={
+                    <Button size="sm" className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-bold">
+                      <Upload className="w-4 h-4 mr-2" />
+                      Upload Swing
+                    </Button>
+                  }
+                />
+              </div>
+            )}
           </nav>
         )}
 

@@ -174,10 +174,14 @@ app.use((req, res, next) => {
       pro_video_id VARCHAR REFERENCES videos(id) ON DELETE SET NULL,
       notes TEXT,
       voiceover_url TEXT,
+      highlight_start REAL,
+      highlight_end REAL,
       shared_at TIMESTAMP,
       created_at TIMESTAMP DEFAULT NOW()
     )
   `);
+  await pool.query(`ALTER TABLE coach_sessions ADD COLUMN IF NOT EXISTS highlight_start REAL`);
+  await pool.query(`ALTER TABLE coach_sessions ADD COLUMN IF NOT EXISTS highlight_end REAL`);
   // Notifications
   await pool.query(`
     CREATE TABLE IF NOT EXISTS notifications (

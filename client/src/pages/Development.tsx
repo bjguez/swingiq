@@ -20,6 +20,8 @@ type CoachSessionRow = {
   sharedAt: string;
   playerVideoId: string | null;
   proVideoId: string | null;
+  highlightStart: number | null;
+  highlightEnd: number | null;
   coachFirstName: string | null;
   coachLastName: string | null;
   coachUsername: string;
@@ -313,7 +315,7 @@ export default function Development() {
                         {session.playerVideoId && (
                           <div className="space-y-1">
                             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Your Swing</p>
-                            <PlayerVideo videoId={session.playerVideoId} />
+                            <PlayerVideo videoId={session.playerVideoId} highlightStart={session.highlightStart} highlightEnd={session.highlightEnd} />
                           </div>
                         )}
                         {session.proVideoId && (
@@ -393,11 +395,19 @@ export default function Development() {
   );
 }
 
-function PlayerVideo({ videoId }: { videoId: string }) {
+function PlayerVideo({ videoId, highlightStart, highlightEnd }: { videoId: string; highlightStart?: number | null; highlightEnd?: number | null }) {
   const { data: allVideos = [] } = useQuery({ queryKey: ["/api/videos"], queryFn: () => fetchVideos() });
   const video = (allVideos as VideoType[]).find(v => v.id === videoId);
   if (!video?.sourceUrl) return <div className="aspect-video bg-secondary rounded-lg flex items-center justify-center"><Video size={20} className="text-muted-foreground opacity-30" /></div>;
-  return <video src={video.sourceUrl} controls className="w-full aspect-video rounded-lg bg-black object-contain" />;
+  const src = highlightStart != null ? `${video.sourceUrl}#t=${highlightStart},${highlightEnd ?? ""}` : video.sourceUrl;
+  return (
+    <div className="space-y-1">
+      <video src={src} controls className="w-full aspect-video rounded-lg bg-black object-contain" />
+      {highlightStart != null && (
+        <p className="text-[10px] text-primary font-semibold">⚑ Coach highlighted {highlightStart.toFixed(1)}s – {(highlightEnd ?? 0).toFixed(1)}s</p>
+      )}
+    </div>
+  );
 }
 
 function PhaseCard({ title, active, onClick }: { title: string; active: boolean; onClick: () => void }) {

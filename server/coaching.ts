@@ -53,7 +53,7 @@ export function setupCoachingRoutes(app: Express) {
       if (!coach) return res.status(401).json({ message: "Not authenticated" });
       if (coach.accountType !== "coach") return res.status(403).json({ message: "Coach account required" });
 
-      const { playerId, playerVideoId, proVideoId, notes } = req.body;
+      const { playerId, playerVideoId, proVideoId, notes, highlightStart, highlightEnd } = req.body;
       if (!playerId) return res.status(400).json({ message: "playerId is required" });
 
       // Verify relationship
@@ -74,6 +74,8 @@ export function setupCoachingRoutes(app: Express) {
         playerVideoId: playerVideoId || null,
         proVideoId: proVideoId || null,
         notes: notes || null,
+        highlightStart: highlightStart ?? null,
+        highlightEnd: highlightEnd ?? null,
         sharedAt: new Date(),
       }).returning();
 

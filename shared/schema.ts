@@ -131,7 +131,9 @@ export const coachSessions = pgTable("coach_sessions", {
   playerVideoId: varchar("player_video_id").references(() => videos.id, { onDelete: "set null" }),
   proVideoId: varchar("pro_video_id").references(() => videos.id, { onDelete: "set null" }),
   notes: text("notes"),
-  voiceoverUrl: text("voiceover_url"), // R2 key for future audio
+  voiceoverUrl: text("voiceover_url"), // R2/blob key for coach audio
+  highlightStart: real("highlight_start"), // optional moment marker (seconds)
+  highlightEnd: real("highlight_end"),
   sharedAt: timestamp("shared_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
