@@ -6,7 +6,7 @@ import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { UserPlus, Trash2, Clock, CheckCircle, Mail, ChevronRight, Video, ArrowLeft, MessageSquare, FileVideo, Mic } from "lucide-react";
+import { UserPlus, Trash2, Clock, CheckCircle, Mail, ChevronRight, Video, ArrowLeft, MessageSquare, FileVideo, Mic, Users, Pencil, Check } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import type { Video as VideoType } from "@shared/schema";
 
@@ -28,6 +28,7 @@ type PlayerRow = {
   id: string;
   status: "pending" | "active";
   inviteEmail: string;
+  teamName: string | null;
   createdAt: string;
   playerId: string | null;
   firstName: string | null;
@@ -47,8 +48,11 @@ export default function CoachDashboard() {
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
   const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteTeam, setInviteTeam] = useState("");
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteSuccess, setInviteSuccess] = useState(false);
+  const [editingTeam, setEditingTeam] = useState<string | null>(null); // relationship id being edited
+  const [teamDraft, setTeamDraft] = useState("");
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerRow | null>(null);
   const [playerTab, setPlayerTab] = useState<"swings" | "sessions">("swings");
 
@@ -78,16 +82,27 @@ export default function CoachDashboard() {
   });
 
   const inviteMutation = useMutation({
-    mutationFn: async (email: string) => {
-      const res = await apiRequest("POST", "/api/coach/invite", { email });
+    mutationFn: async ({ email, teamName }: { email: string; teamName?: string }) => {
+      const res = await apiRequest("POST", "/api/coach/invite", { email, teamName: teamName || null });
       if (!res.ok) { const d = await res.json(); throw new Error(d.message); }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/coach/players"] });
-      setInviteEmail(""); setInviteSuccess(true);
+      setInviteEmail(""); setInviteTeam(""); setInviteSuccess(true);
       setTimeout(() => setInviteSuccess(false), 3000);
     },
     onError: (err: Error) => setInviteError(err.message),
+  });
+
+  const updateTeamMutation = useMutation({
+    mutationFn: async ({ id, teamName }: { id: string; teamName: string }) => {
+      const res = await apiRequest("PATCH", `/api/coach/players/${id}`, { teamName: teamName.trim() || null });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.message); }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/coach/players"] });
+      setEditingTeam(null);
+    },
   });
 
   const removeMutation = useMutation({
@@ -262,12 +277,16 @@ export default function CoachDashboard() {
             <CardDescription>Enter their email. They'll get an invitation to connect with you.</CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={(e) => { e.preventDefault(); setInviteError(null); if (inviteEmail) inviteMutation.mutate(inviteEmail); }} className="flex gap-2">
-              <Input type="email" placeholder="player@example.com" value={inviteEmail}
-                onChange={(e) => { setInviteEmail(e.target.value); setInviteError(null); }} className="flex-1" required />
-              <Button type="submit" disabled={inviteMutation.isPending}>
-                {inviteMutation.isPending ? "Sending..." : "Send Invite"}
-              </Button>
+            <form onSubmit={(e) => { e.preventDefault(); setInviteError(null); if (inviteEmail) inviteMutation.mutate({ email: inviteEmail, teamName: inviteTeam }); }} className="space-y-2">
+              <div className="flex gap-2">
+                <Input type="email" placeholder="player@example.com" value={inviteEmail}
+                  onChange={(e) => { setInviteEmail(e.target.value); setInviteError(null); }} className="flex-1" required />
+                <Button type="submit" disabled={inviteMutation.isPending}>
+                  {inviteMutation.isPending ? "Sending..." : "Send Invite"}
+                </Button>
+              </div>
+              <Input placeholder="Team name (optional, e.g. Varsity, JV)" value={inviteTeam}
+                onChange={(e) => setInviteTeam(e.target.value)} />
             </form>
             {inviteError && <p className="text-sm text-destructive mt-2">{inviteError}</p>}
             {inviteSuccess && <p className="text-sm text-green-500 mt-2">Invitation sent!</p>}
@@ -282,47 +301,110 @@ export default function CoachDashboard() {
             <p className="font-semibold">No players yet</p>
             <p className="text-sm mt-1">Send an invite above to get started.</p>
           </div>
-        ) : (
-          <div className="space-y-2">
-            {players.map((p) => {
-              const name = [p.firstName, p.lastName].filter(Boolean).join(" ") || null;
-              const displayEmail = p.email || p.inviteEmail;
-              return (
-                <div key={p.id} className="flex items-center justify-between p-4 rounded-lg border border-border bg-card">
-                  <button
-                    className="flex items-center gap-3 flex-1 text-left hover:opacity-80 transition-opacity"
-                    onClick={() => p.status === "active" ? setSelectedPlayer(p) : undefined}
-                    disabled={p.status !== "active"}
-                  >
-                    <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm shrink-0">
-                      {name ? name[0].toUpperCase() : <Mail size={14} />}
-                    </div>
-                    <div>
-                      <p className="font-semibold text-sm">{name || displayEmail}</p>
-                      {name && <p className="text-xs text-muted-foreground">{displayEmail}</p>}
-                      <div className="mt-0.5">{statusBadge(p.status)}</div>
-                    </div>
-                  </button>
-                  <div className="flex items-center gap-2">
-                    {p.status === "active" && (
-                      <ChevronRight size={16} className="text-muted-foreground" />
+        ) : (() => {
+          // Group players by team name; null team = "Unassigned"
+          const grouped = players.reduce<Record<string, PlayerRow[]>>((acc, p) => {
+            const key = p.teamName?.trim() || "__none__";
+            (acc[key] ??= []).push(p);
+            return acc;
+          }, {});
+          // Sort: named teams first (alphabetical), unassigned last
+          const teamKeys = Object.keys(grouped).sort((a, b) => {
+            if (a === "__none__") return 1;
+            if (b === "__none__") return -1;
+            return a.localeCompare(b);
+          });
+
+          return (
+            <div className="space-y-6">
+              {teamKeys.map(teamKey => (
+                <div key={teamKey}>
+                  {/* Team header */}
+                  <div className="flex items-center gap-2 mb-2">
+                    {editingTeam === teamKey ? (
+                      <form
+                        className="flex items-center gap-2"
+                        onSubmit={e => {
+                          e.preventDefault();
+                          // Update all players in this team
+                          grouped[teamKey].forEach(p => updateTeamMutation.mutate({ id: p.id, teamName: teamDraft }));
+                        }}
+                      >
+                        <Input
+                          autoFocus
+                          value={teamDraft}
+                          onChange={e => setTeamDraft(e.target.value)}
+                          placeholder="Team name"
+                          className="h-7 text-sm w-40"
+                        />
+                        <button type="submit" className="text-primary hover:text-primary/80 transition-colors" title="Save">
+                          <Check size={14} />
+                        </button>
+                        <button type="button" onClick={() => setEditingTeam(null)} className="text-muted-foreground hover:text-foreground transition-colors text-xs">Cancel</button>
+                      </form>
+                    ) : (
+                      <>
+                        <Users size={13} className="text-muted-foreground shrink-0" />
+                        <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                          {teamKey === "__none__" ? "Unassigned" : teamKey}
+                        </span>
+                        <span className="text-xs text-muted-foreground/60">· {grouped[teamKey].length}</span>
+                        <button
+                          onClick={() => { setEditingTeam(teamKey); setTeamDraft(teamKey === "__none__" ? "" : teamKey); }}
+                          className="text-muted-foreground/40 hover:text-muted-foreground transition-colors ml-1"
+                          title="Rename team"
+                        >
+                          <Pencil size={11} />
+                        </button>
+                      </>
                     )}
-                    {p.status === "pending" && (
-                      <button onClick={() => resendMutation.mutate(p.id)} disabled={resendMutation.isPending}
-                        className="text-xs text-muted-foreground hover:text-primary transition-colors">
-                        {resendSuccess === p.id ? "Sent!" : "Resend"}
-                      </button>
-                    )}
-                    <button onClick={() => removeMutation.mutate(p.id)} disabled={removeMutation.isPending}
-                      className="text-muted-foreground hover:text-destructive transition-colors p-1" title="Remove player">
-                      <Trash2 size={15} />
-                    </button>
+                  </div>
+
+                  {/* Players in team */}
+                  <div className="space-y-2 pl-0">
+                    {grouped[teamKey].map((p) => {
+                      const name = [p.firstName, p.lastName].filter(Boolean).join(" ") || null;
+                      const displayEmail = p.email || p.inviteEmail;
+                      return (
+                        <div key={p.id} className="flex items-center justify-between p-4 rounded-lg border border-border bg-card">
+                          <button
+                            className="flex items-center gap-3 flex-1 text-left hover:opacity-80 transition-opacity"
+                            onClick={() => p.status === "active" ? setSelectedPlayer(p) : undefined}
+                            disabled={p.status !== "active"}
+                          >
+                            <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm shrink-0">
+                              {name ? name[0].toUpperCase() : <Mail size={14} />}
+                            </div>
+                            <div>
+                              <p className="font-semibold text-sm">{name || displayEmail}</p>
+                              {name && <p className="text-xs text-muted-foreground">{displayEmail}</p>}
+                              <div className="mt-0.5">{statusBadge(p.status)}</div>
+                            </div>
+                          </button>
+                          <div className="flex items-center gap-2">
+                            {p.status === "active" && (
+                              <ChevronRight size={16} className="text-muted-foreground" />
+                            )}
+                            {p.status === "pending" && (
+                              <button onClick={() => resendMutation.mutate(p.id)} disabled={resendMutation.isPending}
+                                className="text-xs text-muted-foreground hover:text-primary transition-colors">
+                                {resendSuccess === p.id ? "Sent!" : "Resend"}
+                              </button>
+                            )}
+                            <button onClick={() => removeMutation.mutate(p.id)} disabled={removeMutation.isPending}
+                              className="text-muted-foreground hover:text-destructive transition-colors p-1" title="Remove player">
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        )}
+              ))}
+            </div>
+          );
+        })()}
       </div>
     </Layout>
   );

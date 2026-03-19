@@ -110,6 +110,7 @@ export const coachPlayers = pgTable("coach_players", {
   status: text("status").default("pending").notNull(), // "pending" | "active" | "declined"
   inviteEmail: text("invite_email"), // email used to send invite
   inviteToken: text("invite_token").unique(), // token for accept link
+  teamName: text("team_name"), // optional team grouping
   createdAt: timestamp("created_at").defaultNow(),
 });
 

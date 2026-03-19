@@ -14,7 +14,7 @@ export function setupCoachRoutes(app: Express) {
       if (!coach) return res.status(401).json({ message: "Not authenticated" });
       if (coach.accountType !== "coach") return res.status(403).json({ message: "Coach account required" });
 
-      const { email } = req.body;
+      const { email, teamName } = req.body;
       if (!email) return res.status(400).json({ message: "Email is required" });
       if (email.toLowerCase() === coach.email?.toLowerCase())
         return res.status(400).json({ message: "You cannot invite yourself" });
@@ -39,6 +39,7 @@ export function setupCoachRoutes(app: Express) {
         status: "pending",
         inviteEmail: email.toLowerCase(),
         inviteToken: token,
+        teamName: teamName?.trim() || null,
       });
 
       await sendCoachInviteEmail(email, coachName, token, !!player);
@@ -96,6 +97,7 @@ export function setupCoachRoutes(app: Express) {
           id: coachPlayers.id,
           status: coachPlayers.status,
           inviteEmail: coachPlayers.inviteEmail,
+          teamName: coachPlayers.teamName,
           createdAt: coachPlayers.createdAt,
           playerId: users.id,
           firstName: users.firstName,
@@ -161,6 +163,22 @@ export function setupCoachRoutes(app: Express) {
 
       await sendCoachInviteEmail(email, coachName, token, !!player);
       res.json({ message: "Invitation resent" });
+    } catch (err) { next(err); }
+  });
+
+  // PATCH /api/coach/players/:id — update team name
+  app.patch("/api/coach/players/:id", async (req, res, next) => {
+    try {
+      const coach = req.user as User | undefined;
+      if (!coach) return res.status(401).json({ message: "Not authenticated" });
+
+      const { teamName } = req.body;
+      await db
+        .update(coachPlayers)
+        .set({ teamName: teamName?.trim() || null })
+        .where(and(eq(coachPlayers.id, req.params.id), eq(coachPlayers.coachId, coach.id)));
+
+      res.json({ message: "Updated" });
     } catch (err) { next(err); }
   });
 
