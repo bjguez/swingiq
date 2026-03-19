@@ -20,7 +20,7 @@ type Notification = {
   createdAt: string;
 };
 
-export default function Layout({ children }: { children: React.ReactNode }) {
+export default function Layout({ children, showScoreTicker = false }: { children: React.ReactNode; showScoreTicker?: boolean }) {
   const [location] = useLocation();
   const { user } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -202,7 +202,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </nav>
         )}
 
-        <ScoreTicker />
+        {showScoreTicker && <ScoreTicker />}
       </header>
 
       {/* Main Content */}

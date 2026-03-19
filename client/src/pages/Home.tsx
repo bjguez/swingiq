@@ -60,7 +60,7 @@ export default function Home() {
   const finalRightLabel = proVideo?.playerName ?? externalProVideo?.label ?? undefined;
 
   return (
-    <Layout>
+    <Layout showScoreTicker>
       {/* Header Section */}
       <div className="flex flex-col gap-1">
         <div className="flex items-center gap-2">
