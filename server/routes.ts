@@ -9,6 +9,7 @@ import express from "express";
 import { execFile } from "child_process";
 import { uploadToR2, getVideoUrl, deleteFromR2, isR2Key, r2Configured, checkR2Exists } from "./r2";
 import { createCheckoutSession, createPortalSession, handleWebhook, PRICES } from "./stripe";
+import { setupCoachRoutes } from "./coach";
 
 const uploadDir = path.resolve("uploads");
 if (!fs.existsSync(uploadDir)) {
@@ -987,6 +988,8 @@ export async function registerRoutes(
       res.status(500).json({ message: err.message });
     }
   });
+
+  setupCoachRoutes(app);
 
   return httpServer;
 }

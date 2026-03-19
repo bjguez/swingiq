@@ -106,9 +106,10 @@ export const drills = pgTable("drills", {
 export const coachPlayers = pgTable("coach_players", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   coachId: varchar("coach_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  playerId: varchar("player_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  playerId: varchar("player_id").references(() => users.id, { onDelete: "cascade" }),
   status: text("status").default("pending").notNull(), // "pending" | "active" | "declined"
-  inviteEmail: text("invite_email"), // email used to send invite (player may not have account yet)
+  inviteEmail: text("invite_email"), // email used to send invite
+  inviteToken: text("invite_token").unique(), // token for accept link
   createdAt: timestamp("created_at").defaultNow(),
 });
 

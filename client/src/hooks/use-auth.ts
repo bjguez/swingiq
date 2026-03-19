@@ -59,6 +59,12 @@ export function useAuth() {
     onSuccess: (user) => {
       queryClient.setQueryData(["/api/auth/me"], user);
       queryClient.invalidateQueries({ queryKey: ["/api/videos"] });
+      // Auto-accept a pending coach invite if one was stored before login
+      const pendingInvite = sessionStorage.getItem("pendingInviteToken");
+      if (pendingInvite) {
+        fetch(`/api/coach/invite/accept?token=${encodeURIComponent(pendingInvite)}`).catch(() => {});
+        sessionStorage.removeItem("pendingInviteToken");
+      }
     },
   });
 

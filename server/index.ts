@@ -159,9 +159,11 @@ app.use((req, res, next) => {
       player_id VARCHAR REFERENCES users(id) ON DELETE CASCADE,
       status TEXT NOT NULL DEFAULT 'pending',
       invite_email TEXT,
+      invite_token TEXT UNIQUE,
       created_at TIMESTAMP DEFAULT NOW()
     )
   `);
+  await pool.query(`ALTER TABLE coach_players ADD COLUMN IF NOT EXISTS invite_token TEXT UNIQUE`);
   // Email verification columns and table
   await pool.query(`
     ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT UNIQUE
