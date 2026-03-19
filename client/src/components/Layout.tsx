@@ -65,7 +65,6 @@ export default function Layout({ children, showScoreTicker = false }: { children
       { href: "/my-swings", label: "My Swings" },
       { href: "/biometrics", label: "Biometrics" },
       { href: "/development", label: "Development" },
-      { href: "/pricing", label: "Pricing" },
     ]},
     { section: "Account", links: [
       { href: "/onboarding", label: "Edit Profile" },
@@ -73,6 +72,7 @@ export default function Layout({ children, showScoreTicker = false }: { children
     ]},
     { section: "Company", links: [
       { href: "https://swingstudio.ai", label: "About" },
+      { href: "/pricing", label: "Pricing" },
     ]},
   ];
 
