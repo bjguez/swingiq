@@ -103,6 +103,13 @@ export const drills = pgTable("drills", {
   thumbnailUrl: text("thumbnail_url"),
 });
 
+export const coachTeams = pgTable("coach_teams", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  coachId: varchar("coach_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const coachPlayers = pgTable("coach_players", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   coachId: varchar("coach_id").notNull().references(() => users.id, { onDelete: "cascade" }),
@@ -184,6 +191,7 @@ export type InsertDrill = z.infer<typeof insertDrillSchema>;
 export type Drill = typeof drills.$inferSelect;
 export type InsertSession = z.infer<typeof insertSessionSchema>;
 export type Session = typeof sessions.$inferSelect;
+export type CoachTeam = typeof coachTeams.$inferSelect;
 export type CoachPlayer = typeof coachPlayers.$inferSelect;
 export type CoachSession = typeof coachSessions.$inferSelect;
 export type Notification = typeof notifications.$inferSelect;

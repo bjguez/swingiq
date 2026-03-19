@@ -1,12 +1,81 @@
 import { Express } from "express";
 import { randomBytes } from "crypto";
 import { db } from "./db";
-import { coachPlayers, users } from "../shared/schema";
+import { coachPlayers, coachTeams, users } from "../shared/schema";
 import { eq, and, or } from "drizzle-orm";
 import { sendCoachInviteEmail } from "./email";
 import { User } from "../shared/schema";
 
 export function setupCoachRoutes(app: Express) {
+
+  // ── TEAMS ───────────────────────────────────────────────────────────────────
+
+  // GET /api/coach/teams — list coach's teams; auto-seeds org team on first call
+  app.get("/api/coach/teams", async (req, res, next) => {
+    try {
+      const coach = req.user as User | undefined;
+      if (!coach) return res.status(401).json({ message: "Not authenticated" });
+
+      let teams = await db.select().from(coachTeams).where(eq(coachTeams.coachId, coach.id));
+
+      // Auto-seed from organization on first call if empty
+      if (teams.length === 0 && coach.organization) {
+        const [created] = await db.insert(coachTeams)
+          .values({ coachId: coach.id, name: coach.organization })
+          .returning();
+        teams = [created];
+      }
+
+      res.json(teams);
+    } catch (err) { next(err); }
+  });
+
+  // POST /api/coach/teams — create a new team
+  app.post("/api/coach/teams", async (req, res, next) => {
+    try {
+      const coach = req.user as User | undefined;
+      if (!coach) return res.status(401).json({ message: "Not authenticated" });
+
+      const { name } = req.body;
+      if (!name?.trim()) return res.status(400).json({ message: "Team name is required" });
+
+      // Check for duplicate
+      const existing = await db.select().from(coachTeams)
+        .where(and(eq(coachTeams.coachId, coach.id), eq(coachTeams.name, name.trim())));
+      if (existing.length > 0) return res.status(400).json({ message: "Team already exists" });
+
+      const [team] = await db.insert(coachTeams)
+        .values({ coachId: coach.id, name: name.trim() })
+        .returning();
+
+      res.json(team);
+    } catch (err) { next(err); }
+  });
+
+  // DELETE /api/coach/teams/:id — delete a team (moves players to unassigned)
+  app.delete("/api/coach/teams/:id", async (req, res, next) => {
+    try {
+      const coach = req.user as User | undefined;
+      if (!coach) return res.status(401).json({ message: "Not authenticated" });
+
+      const [team] = await db.select().from(coachTeams)
+        .where(and(eq(coachTeams.id, req.params.id), eq(coachTeams.coachId, coach.id)));
+      if (!team) return res.status(404).json({ message: "Team not found" });
+
+      // Unassign players from this team
+      await db.update(coachPlayers)
+        .set({ teamName: null })
+        .where(and(eq(coachPlayers.coachId, coach.id), eq(coachPlayers.teamName, team.name)));
+
+      await db.delete(coachTeams)
+        .where(eq(coachTeams.id, req.params.id));
+
+      res.json({ message: "Team deleted" });
+    } catch (err) { next(err); }
+  });
+
+  // ── INVITES & PLAYERS ───────────────────────────────────────────────────────
+
   // POST /api/coach/invite — coach invites a player by email
   app.post("/api/coach/invite", async (req, res, next) => {
     try {
