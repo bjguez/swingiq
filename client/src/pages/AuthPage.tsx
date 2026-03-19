@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useLocation } from "wouter";
+import { useState, useEffect } from "react";
+import { useLocation, useSearch } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,14 @@ import { Video } from "lucide-react";
 
 export default function AuthPage() {
   const [, navigate] = useLocation();
+  const search = useSearch();
+
+  // Store pending invite token from URL so it survives login/registration
+  useEffect(() => {
+    const params = new URLSearchParams(search);
+    const invite = params.get("invite");
+    if (invite) sessionStorage.setItem("pendingInviteToken", invite);
+  }, []);
   const { login, register, isLoggingIn, isRegistering, loginError, registerError } = useAuth();
 
   const [loginForm, setLoginForm] = useState({ email: "", password: "" });

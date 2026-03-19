@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery } from "@tanstack/react-query";
 import { fetchVideos } from "@/lib/api";
-import { LogOut, User, CheckCircle2 } from "lucide-react";
+import { LogOut, User, CheckCircle2, GraduationCap } from "lucide-react";
 import type { Video } from "@shared/schema";
 import { AuthGateModal } from "@/components/AuthGateModal";
 
@@ -52,8 +52,13 @@ export function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) {
     enabled: open && !!user,
   });
 
+  const { data: coaches = [] } = useQuery<any[]>({
+    queryKey: ["/api/coach/coaches"],
+    enabled: open && !!user && user.accountType !== "coach",
+  });
+
   const userVideos = (allVideos as Video[]).filter(v => !v.isProVideo && v.sourceUrl);
-  const isPaid = user?.subscriptionTier === "paid";
+  const isPaid = user?.subscriptionTier === "player" || user?.subscriptionTier === "pro" || user?.subscriptionTier === "coach";
   const swingsUsed = userVideos.length;
 
   const handleEdit = () => {
@@ -228,6 +233,28 @@ export function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) {
                       <Button type="button" variant="ghost" onClick={() => setEditing(false)}>Cancel</Button>
                     </div>
                   </form>
+                )}
+                {/* My Coaches — player accounts only */}
+                {user.accountType !== "coach" && coaches.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">My Coaches</p>
+                    <div className="space-y-2">
+                      {coaches.map((c: any) => {
+                        const name = [c.firstName, c.lastName].filter(Boolean).join(" ") || c.email;
+                        return (
+                          <div key={c.id} className="flex items-center gap-3 p-2 rounded-lg bg-primary/5 border border-primary/10">
+                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                              <GraduationCap size={14} className="text-primary" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-semibold">{name}</p>
+                              {c.organization && <p className="text-xs text-muted-foreground">{c.organization}</p>}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 )}
               </div>
             )}

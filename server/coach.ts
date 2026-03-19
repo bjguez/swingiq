@@ -63,8 +63,12 @@ export function setupCoachRoutes(app: Express) {
 
       const player = req.user as User | undefined;
 
-      // Link to the logged-in player if not already linked
-      const playerId = invite.playerId ?? player?.id;
+      // Link to the logged-in player if not already linked, or match by email
+      let playerId = invite.playerId ?? player?.id;
+      if (!playerId && invite.inviteEmail) {
+        const [matchedUser] = await db.select().from(users).where(eq(users.email, invite.inviteEmail));
+        playerId = matchedUser?.id ?? null;
+      }
       if (!playerId) return res.status(401).json({ message: "Please sign in to accept this invitation" });
 
       await db

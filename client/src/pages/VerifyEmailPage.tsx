@@ -26,6 +26,12 @@ export default function VerifyEmailPage() {
         // Update auth cache so the app recognises the user as logged in
         queryClient.setQueryData(["/api/auth/me"], data.user);
         sessionStorage.removeItem("pendingVerificationEmail");
+        // Auto-accept a pending coach invite if one was stored before registration
+        const pendingInvite = sessionStorage.getItem("pendingInviteToken");
+        if (pendingInvite) {
+          fetch(`/api/coach/invite/accept?token=${encodeURIComponent(pendingInvite)}`).catch(() => {});
+          sessionStorage.removeItem("pendingInviteToken");
+        }
         setState("success");
       })
       .catch((err) => {
