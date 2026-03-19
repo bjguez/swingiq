@@ -16,6 +16,9 @@ export type AuthUser = {
   weightLbs?: number | null;
   profileComplete?: boolean;
   subscriptionTier?: string;
+  accountType?: "player" | "coach";
+  organization?: string | null;
+  coachingLevel?: string | null;
 };
 
 async function fetchCurrentUser(): Promise<AuthUser | null> {

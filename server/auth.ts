@@ -60,6 +60,9 @@ function serializeUser(user: User) {
     weightLbs: user.weightLbs,
     profileComplete: user.profileComplete,
     subscriptionTier: user.subscriptionTier ?? "free",
+    accountType: user.accountType ?? "player",
+    organization: user.organization,
+    coachingLevel: user.coachingLevel,
   };
 }
 
@@ -288,7 +291,7 @@ export function setupAuth(app: Express) {
   app.put("/api/auth/profile", async (req, res, next) => {
     if (!req.user) return res.status(401).json({ message: "Not authenticated" });
     try {
-      const { age, city, state, skillLevel, bats, throws: throwHand, heightInches, weightLbs } = req.body;
+      const { age, city, state, skillLevel, bats, throws: throwHand, heightInches, weightLbs, accountType, organization, coachingLevel } = req.body;
       const updated = await storage.updateUser((req.user as User).id, {
         age: age ? Number(age) : null,
         city: city || null,
@@ -298,6 +301,9 @@ export function setupAuth(app: Express) {
         throws: throwHand || null,
         heightInches: heightInches ? Number(heightInches) : null,
         weightLbs: weightLbs ? Number(weightLbs) : null,
+        ...(accountType && { accountType }),
+        ...(organization !== undefined && { organization: organization || null }),
+        ...(coachingLevel !== undefined && { coachingLevel: coachingLevel || null }),
         profileComplete: true,
       });
       if (!updated) return res.status(404).json({ message: "User not found" });

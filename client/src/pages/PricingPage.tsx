@@ -68,6 +68,25 @@ const TIERS = [
     cta: "Start Pro",
     highlight: false,
   },
+  {
+    key: "coach",
+    name: "Coach",
+    monthlyPrice: 59,
+    annualPrice: 590,
+    description: "Full Pro access + manage and develop your players",
+    priceKey: { monthly: "coach_monthly", annual: "coach_annual" },
+    features: [
+      "Everything in Pro",
+      "Manage multiple player accounts",
+      "Create and share analysis sessions",
+      "Audio voiceover commentary",
+      "In-app + email notifications to players",
+      "Player progress tracking",
+    ],
+    limitations: [],
+    cta: "Start Coaching",
+    highlight: false,
+  },
 ];
 
 export default function PricingPage() {
@@ -152,7 +171,7 @@ export default function PricingPage() {
         </div>
 
         {/* Tier cards */}
-        <div className="grid md:grid-cols-3 gap-6">
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
           {TIERS.map((tier) => {
             const price = interval === "monthly" ? tier.monthlyPrice : tier.annualPrice;
             const isCurrentTier = user?.subscriptionTier === tier.key ||

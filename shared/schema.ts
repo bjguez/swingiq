@@ -20,7 +20,12 @@ export const users = pgTable("users", {
   heightInches: integer("height_inches"),
   weightLbs: integer("weight_lbs"),
   profileComplete: boolean("profile_complete").default(false).notNull(),
-  // Subscription — tiers: "free" | "player" | "pro"
+  // Account type — "player" | "coach"
+  accountType: text("account_type").default("player").notNull(),
+  // Coach-specific profile fields
+  organization: text("organization"),
+  coachingLevel: text("coaching_level"), // "youth" | "high_school" | "college" | "pro"
+  // Subscription — tiers: "free" | "player" | "pro" | "coach"
   subscriptionTier: text("subscription_tier").default("free").notNull(),
   stripeCustomerId: text("stripe_customer_id"),
   stripeSubscriptionId: text("stripe_subscription_id"),
@@ -96,6 +101,15 @@ export const drills = pgTable("drills", {
   thumbnailUrl: text("thumbnail_url"),
 });
 
+export const coachPlayers = pgTable("coach_players", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  coachId: varchar("coach_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  playerId: varchar("player_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  status: text("status").default("pending").notNull(), // "pending" | "active" | "declined"
+  inviteEmail: text("invite_email"), // email used to send invite (player may not have account yet)
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const sessions = pgTable("sessions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").references(() => users.id),
@@ -129,3 +143,4 @@ export type InsertDrill = z.infer<typeof insertDrillSchema>;
 export type Drill = typeof drills.$inferSelect;
 export type InsertSession = z.infer<typeof insertSessionSchema>;
 export type Session = typeof sessions.$inferSelect;
+export type CoachPlayer = typeof coachPlayers.$inferSelect;

@@ -4,7 +4,7 @@ import { users } from "../shared/schema";
 import { eq } from "drizzle-orm";
 
 export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
-  apiVersion: "2025-02-24.acacia",
+  apiVersion: "2026-02-25.clover",
 });
 
 const APP_URL = process.env.APP_URL || "https://swingstudio.ai";
@@ -15,12 +15,15 @@ export const PRICES = {
   player_annual: process.env.STRIPE_PLAYER_ANNUAL_PRICE_ID || "",
   pro_monthly: process.env.STRIPE_PRO_MONTHLY_PRICE_ID || "",
   pro_annual: process.env.STRIPE_PRO_ANNUAL_PRICE_ID || "",
+  coach_monthly: process.env.STRIPE_COACH_MONTHLY_PRICE_ID || "",
+  coach_annual: process.env.STRIPE_COACH_ANNUAL_PRICE_ID || "",
 };
 
 // Maps Stripe price ID → subscription tier
-function tierForPrice(priceId: string): "player" | "pro" {
+function tierForPrice(priceId: string): "player" | "pro" | "coach" {
   if (priceId === PRICES.player_monthly || priceId === PRICES.player_annual) return "player";
   if (priceId === PRICES.pro_monthly || priceId === PRICES.pro_annual) return "pro";
+  if (priceId === PRICES.coach_monthly || priceId === PRICES.coach_annual) return "coach";
   return "player";
 }
 

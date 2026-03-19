@@ -144,6 +144,21 @@ app.use((req, res, next) => {
   await pool.query(`
     ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_status TEXT
   `);
+  // Account type and coach fields
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS account_type TEXT NOT NULL DEFAULT 'player'`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS organization TEXT`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS coaching_level TEXT`);
+  // Coach-player relationships
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS coach_players (
+      id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+      coach_id VARCHAR NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      player_id VARCHAR REFERENCES users(id) ON DELETE CASCADE,
+      status TEXT NOT NULL DEFAULT 'pending',
+      invite_email TEXT,
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
   // Email verification columns and table
   await pool.query(`
     ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT UNIQUE
