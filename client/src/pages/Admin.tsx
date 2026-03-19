@@ -60,6 +60,7 @@ export default function Admin() {
   const [activeTab, setActiveTab] = useState<"videos" | "users" | "players" | "health">("videos");
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [playingVideo, setPlayingVideo] = useState<{ title: string; url: string } | null>(null);
+  const [tierDraft, setTierDraft] = useState<Record<string, string>>({});
 
   // Video state
   const [filterCategory, setFilterCategory] = useState("All");
@@ -167,6 +168,25 @@ export default function Admin() {
     },
     onError: () => {
       toast({ title: "Failed to delete video", variant: "destructive" });
+    },
+  });
+
+  const setTierMutation = useMutation({
+    mutationFn: async ({ userId, tier }: { userId: string; tier: string }) => {
+      const res = await fetch("/api/admin/set-tier", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, tier }),
+      });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.message); }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast({ title: `${data.username} set to ${data.subscriptionTier}` });
+    },
+    onError: (err: Error) => {
+      toast({ title: err.message || "Failed to set tier", variant: "destructive" });
     },
   });
 
@@ -510,6 +530,27 @@ export default function Admin() {
                   </div>
                   {expandedUserId === u.id && (
                     <div key={`${u.id}-detail`} className="bg-secondary/20 border-t border-border/50 px-4 py-4 space-y-4">
+                      {/* Set Tier */}
+                      <div className="flex items-center gap-3 p-3 rounded-lg border border-border bg-secondary/40">
+                        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider shrink-0">Set Tier</span>
+                        <select
+                          value={tierDraft[u.id] ?? u.subscriptionTier ?? "free"}
+                          onChange={e => setTierDraft(d => ({ ...d, [u.id]: e.target.value }))}
+                          className="text-sm bg-background border border-input rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-ring"
+                        >
+                          {["free", "rookie", "player", "pro", "coach"].map(t => (
+                            <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>
+                          ))}
+                        </select>
+                        <Button
+                          size="sm"
+                          onClick={() => setTierMutation.mutate({ userId: u.id, tier: tierDraft[u.id] ?? u.subscriptionTier ?? "free" })}
+                          disabled={setTierMutation.isPending}
+                          className="h-7 px-3 text-xs"
+                        >
+                          {setTierMutation.isPending ? "Saving…" : "Apply"}
+                        </Button>
+                      </div>
                       {/* Full profile fields */}
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
                         {[
