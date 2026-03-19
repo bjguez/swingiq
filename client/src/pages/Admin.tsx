@@ -344,14 +344,27 @@ export default function Admin() {
               <StatCard label="User Uploads" value={uploadCount} />
               <StatCard label="With Files" value={withFileCount} />
             </div>
-            <Button
-              onClick={() => setShowAddVideoForm(!showAddVideoForm)}
-              className="bg-primary text-primary-foreground hover:bg-primary/90 shrink-0"
-              data-testid="button-add-video"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Add New Video
-            </Button>
+            <div className="flex gap-2 shrink-0">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  if (!confirm("Reset ALL videos to visible in Library and Development?")) return;
+                  await fetch("/api/admin/reset-visibility", { method: "POST" });
+                  queryClient.invalidateQueries({ queryKey: ["/api/videos"] });
+                }}
+              >
+                Reset All Visible
+              </Button>
+              <Button
+                onClick={() => setShowAddVideoForm(!showAddVideoForm)}
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
+                data-testid="button-add-video"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Add New Video
+              </Button>
+            </div>
           </div>
 
           {showAddVideoForm && (

@@ -300,6 +300,15 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/admin/reset-visibility", async (req, res) => {
+    const adminUsername = process.env.ADMIN_USERNAME;
+    if (!req.user || (req.user as any).username !== adminUsername) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    await db.update(videos).set({ showInLibrary: true, showInDevelopment: true });
+    res.json({ message: "All videos reset to visible" });
+  });
+
   app.post("/api/admin/set-tier", async (req, res) => {
     const adminUsername = process.env.ADMIN_USERNAME;
     if (!req.user || (req.user as any).username !== adminUsername) {
