@@ -48,7 +48,7 @@ export default function CoachDashboard() {
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
   const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteTeam, setInviteTeam] = useState("");
+  const [inviteTeam, setInviteTeam] = useState(() => (user as any)?.organization || "");
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteSuccess, setInviteSuccess] = useState(false);
   const [editingTeam, setEditingTeam] = useState<string | null>(null); // relationship id being edited
@@ -88,7 +88,7 @@ export default function CoachDashboard() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/coach/players"] });
-      setInviteEmail(""); setInviteTeam(""); setInviteSuccess(true);
+      setInviteEmail(""); setInviteSuccess(true);
       setTimeout(() => setInviteSuccess(false), 3000);
     },
     onError: (err: Error) => setInviteError(err.message),
@@ -277,17 +277,38 @@ export default function CoachDashboard() {
             <CardDescription>Enter their email. They'll get an invitation to connect with you.</CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={(e) => { e.preventDefault(); setInviteError(null); if (inviteEmail) inviteMutation.mutate({ email: inviteEmail, teamName: inviteTeam }); }} className="space-y-2">
-              <div className="flex gap-2">
-                <Input type="email" placeholder="player@example.com" value={inviteEmail}
-                  onChange={(e) => { setInviteEmail(e.target.value); setInviteError(null); }} className="flex-1" required />
-                <Button type="submit" disabled={inviteMutation.isPending}>
-                  {inviteMutation.isPending ? "Sending..." : "Send Invite"}
-                </Button>
-              </div>
-              <Input placeholder="Team name (optional, e.g. Varsity, JV)" value={inviteTeam}
-                onChange={(e) => setInviteTeam(e.target.value)} />
-            </form>
+            {(() => {
+              const orgName = (user as any)?.organization as string | undefined;
+              const existingTeams = Array.from(new Set(
+                players.map(p => p.teamName).filter(Boolean) as string[]
+              )).sort();
+              const suggestions = Array.from(new Set([
+                ...(orgName ? [orgName] : []),
+                ...existingTeams,
+              ]));
+              return (
+                <form onSubmit={(e) => { e.preventDefault(); setInviteError(null); if (inviteEmail) inviteMutation.mutate({ email: inviteEmail, teamName: inviteTeam }); }} className="space-y-2">
+                  <div className="flex gap-2">
+                    <Input type="email" placeholder="player@example.com" value={inviteEmail}
+                      onChange={(e) => { setInviteEmail(e.target.value); setInviteError(null); }} className="flex-1" required />
+                    <Button type="submit" disabled={inviteMutation.isPending}>
+                      {inviteMutation.isPending ? "Sending..." : "Send Invite"}
+                    </Button>
+                  </div>
+                  <div>
+                    <Input
+                      list="team-suggestions"
+                      placeholder="Team (e.g. Varsity, JV) — type to add new"
+                      value={inviteTeam}
+                      onChange={(e) => setInviteTeam(e.target.value)}
+                    />
+                    <datalist id="team-suggestions">
+                      {suggestions.map(t => <option key={t} value={t} />)}
+                    </datalist>
+                  </div>
+                </form>
+              );
+            })()}
             {inviteError && <p className="text-sm text-destructive mt-2">{inviteError}</p>}
             {inviteSuccess && <p className="text-sm text-green-500 mt-2">Invitation sent!</p>}
           </CardContent>

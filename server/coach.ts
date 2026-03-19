@@ -92,22 +92,42 @@ export function setupCoachRoutes(app: Express) {
       const coach = req.user as User | undefined;
       if (!coach) return res.status(401).json({ message: "Not authenticated" });
 
-      const rows = await db
-        .select({
-          id: coachPlayers.id,
-          status: coachPlayers.status,
-          inviteEmail: coachPlayers.inviteEmail,
-          teamName: coachPlayers.teamName,
-          createdAt: coachPlayers.createdAt,
-          playerId: users.id,
-          firstName: users.firstName,
-          lastName: users.lastName,
-          email: users.email,
-          skillLevel: users.skillLevel,
-        })
-        .from(coachPlayers)
-        .leftJoin(users, eq(coachPlayers.playerId, users.id))
-        .where(eq(coachPlayers.coachId, coach.id));
+      let rows: any[];
+      try {
+        rows = await db
+          .select({
+            id: coachPlayers.id,
+            status: coachPlayers.status,
+            inviteEmail: coachPlayers.inviteEmail,
+            teamName: coachPlayers.teamName,
+            createdAt: coachPlayers.createdAt,
+            playerId: users.id,
+            firstName: users.firstName,
+            lastName: users.lastName,
+            email: users.email,
+            skillLevel: users.skillLevel,
+          })
+          .from(coachPlayers)
+          .leftJoin(users, eq(coachPlayers.playerId, users.id))
+          .where(eq(coachPlayers.coachId, coach.id));
+      } catch {
+        // teamName column may not exist yet (migration pending) — fall back without it
+        rows = await db
+          .select({
+            id: coachPlayers.id,
+            status: coachPlayers.status,
+            inviteEmail: coachPlayers.inviteEmail,
+            createdAt: coachPlayers.createdAt,
+            playerId: users.id,
+            firstName: users.firstName,
+            lastName: users.lastName,
+            email: users.email,
+            skillLevel: users.skillLevel,
+          })
+          .from(coachPlayers)
+          .leftJoin(users, eq(coachPlayers.playerId, users.id))
+          .where(eq(coachPlayers.coachId, coach.id));
+      }
 
       res.json(rows);
     } catch (err) { next(err); }
