@@ -2,7 +2,8 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import {
   Play, Pause, SkipBack, SkipForward,
   MousePointer2, PenTool, Circle, Square, Type,
-  Undo, Trash2, Link2, Upload, Maximize, Minimize, Timer, PersonStanding, RotateCw
+  Undo, Trash2, Link2, Upload, Maximize, Minimize, Timer, PersonStanding, RotateCw,
+  FlipHorizontal2, ZoomIn, ZoomOut
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -41,6 +42,16 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel, ex
   const [rightLabel, setRightLabel] = useState("Pro Swing");
   const [leftRotation, setLeftRotation] = useState<0 | 90 | 180 | 270>(0);
   const [rightRotation, setRightRotation] = useState<0 | 90 | 180 | 270>(0);
+  const [leftFlipH, setLeftFlipH] = useState(false);
+  const [rightFlipH, setRightFlipH] = useState(false);
+  const [leftZoom, setLeftZoom] = useState(1);
+  const [rightZoom, setRightZoom] = useState(1);
+  const [leftPanX, setLeftPanX] = useState(0);
+  const [leftPanY, setLeftPanY] = useState(0);
+  const [rightPanX, setRightPanX] = useState(0);
+  const [rightPanY, setRightPanY] = useState(0);
+  const leftPanRef = useRef({ dragging: false, startX: 0, startY: 0, basePanX: 0, basePanY: 0 });
+  const rightPanRef = useRef({ dragging: false, startX: 0, startY: 0, basePanX: 0, basePanY: 0 });
   const [playbackRate, setPlaybackRate] = useState(1);
 
   const applyRate = useCallback((rate: number) => {
@@ -367,6 +378,20 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel, ex
             'border border-border'
           }`}
           onClick={() => { setActivePanel("left"); setSynced(false); if (isFullscreen) showControls(); }}
+          onPointerDown={(e) => {
+            if (activeTool === "select" && leftZoom > 1) {
+              leftPanRef.current = { dragging: true, startX: e.clientX, startY: e.clientY, basePanX: leftPanX, basePanY: leftPanY };
+              (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+            }
+          }}
+          onPointerMove={(e) => {
+            const p = leftPanRef.current;
+            if (p.dragging) {
+              setLeftPanX(p.basePanX + (e.clientX - p.startX));
+              setLeftPanY(p.basePanY + (e.clientY - p.startY));
+            }
+          }}
+          onPointerUp={() => { leftPanRef.current.dragging = false; }}
         >
           <div className="absolute top-0 left-0 right-0 p-3 bg-gradient-to-b from-black/80 to-transparent z-30 flex justify-between items-start pointer-events-none">
             <div>
@@ -374,11 +399,20 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel, ex
               <div className="text-white/70 text-xs">{leftVideoSrc ? "Uploaded" : "No video"}</div>
             </div>
             <div className="flex items-center gap-2 pointer-events-auto">
-              {leftVideoSrc && (
+              {leftVideoSrc && (<>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-white/70 hover:text-white bg-black/20 hover:bg-black/40" title="Flip horizontal" onClick={() => setLeftFlipH(f => !f)}>
+                  <FlipHorizontal2 className="w-4 h-4" />
+                </Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-white/70 hover:text-white bg-black/20 hover:bg-black/40" title="Zoom out" onClick={() => { setLeftZoom(z => { const nz = Math.max(1, +(z - 0.5).toFixed(1)); if (nz === 1) { setLeftPanX(0); setLeftPanY(0); } return nz; }); }}>
+                  <ZoomOut className="w-4 h-4" />
+                </Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-white/70 hover:text-white bg-black/20 hover:bg-black/40" title="Zoom in" onClick={() => setLeftZoom(z => +(z + 0.5).toFixed(1))}>
+                  <ZoomIn className="w-4 h-4" />
+                </Button>
                 <Button variant="ghost" size="icon" className="h-8 w-8 text-white/70 hover:text-white bg-black/20 hover:bg-black/40" title="Rotate video" onClick={() => setLeftRotation((r: 0 | 90 | 180 | 270) => ((r + 90) % 360) as 0 | 90 | 180 | 270)}>
                   <RotateCw className="w-4 h-4" />
                 </Button>
-              )}
+              </>)}
               <VideoLibraryModal
                 mode="user"
                 onVideoSelected={handleLeftUpload}
@@ -398,6 +432,10 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel, ex
             onTimeUpdate={handleLeftTimeUpdate}
             onLoadedMetadata={(d) => setLeftDuration(d)}
             rotation={leftRotation}
+            flipH={leftFlipH}
+            zoom={leftZoom}
+            panX={leftPanX}
+            panY={leftPanY}
             className="w-full h-full object-contain"
             placeholder={
               <VideoLibraryModal
@@ -465,6 +503,20 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel, ex
             'border border-border'
           }`}
           onClick={() => { setActivePanel("right"); setSynced(false); if (isFullscreen) showControls(); }}
+          onPointerDown={(e) => {
+            if (activeTool === "select" && rightZoom > 1) {
+              rightPanRef.current = { dragging: true, startX: e.clientX, startY: e.clientY, basePanX: rightPanX, basePanY: rightPanY };
+              (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+            }
+          }}
+          onPointerMove={(e) => {
+            const p = rightPanRef.current;
+            if (p.dragging) {
+              setRightPanX(p.basePanX + (e.clientX - p.startX));
+              setRightPanY(p.basePanY + (e.clientY - p.startY));
+            }
+          }}
+          onPointerUp={() => { rightPanRef.current.dragging = false; }}
         >
           <div className="absolute top-0 left-0 right-0 p-3 bg-gradient-to-b from-black/80 to-transparent z-30 flex justify-between items-start pointer-events-none">
             <div>
@@ -472,11 +524,20 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel, ex
               <div className="text-white/70 text-xs">{rightVideoSrc ? "Loaded" : "No video"}</div>
             </div>
             <div className="flex items-center gap-2 pointer-events-auto">
-              {rightVideoSrc && (
+              {rightVideoSrc && (<>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-white/70 hover:text-white bg-black/20 hover:bg-black/40" title="Flip horizontal" onClick={() => setRightFlipH(f => !f)}>
+                  <FlipHorizontal2 className="w-4 h-4" />
+                </Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-white/70 hover:text-white bg-black/20 hover:bg-black/40" title="Zoom out" onClick={() => { setRightZoom(z => { const nz = Math.max(1, +(z - 0.5).toFixed(1)); if (nz === 1) { setRightPanX(0); setRightPanY(0); } return nz; }); }}>
+                  <ZoomOut className="w-4 h-4" />
+                </Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-white/70 hover:text-white bg-black/20 hover:bg-black/40" title="Zoom in" onClick={() => setRightZoom(z => +(z + 0.5).toFixed(1))}>
+                  <ZoomIn className="w-4 h-4" />
+                </Button>
                 <Button variant="ghost" size="icon" className="h-8 w-8 text-white/70 hover:text-white bg-black/20 hover:bg-black/40" title="Rotate video" onClick={() => setRightRotation((r: 0 | 90 | 180 | 270) => ((r + 90) % 360) as 0 | 90 | 180 | 270)}>
                   <RotateCw className="w-4 h-4" />
                 </Button>
-              )}
+              </>)}
               <VideoLibraryModal
                 mode="pro"
                 onVideoSelected={handleRightUpload}
@@ -495,6 +556,10 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel, ex
             onTimeUpdate={handleRightTimeUpdate}
             onLoadedMetadata={(d) => setRightDuration(d)}
             rotation={rightRotation}
+            flipH={rightFlipH}
+            zoom={rightZoom}
+            panX={rightPanX}
+            panY={rightPanY}
             className="w-full h-full object-contain"
             placeholder={
               <VideoLibraryModal

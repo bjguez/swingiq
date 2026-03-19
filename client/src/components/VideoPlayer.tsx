@@ -19,10 +19,14 @@ interface VideoPlayerProps {
   className?: string;
   placeholder?: React.ReactNode;
   rotation?: 0 | 90 | 180 | 270;
+  flipH?: boolean;
+  zoom?: number;
+  panX?: number;
+  panY?: number;
 }
 
 const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
-  ({ src, onTimeUpdate, onLoadedMetadata, className, placeholder, rotation = 0 }, ref) => {
+  ({ src, onTimeUpdate, onLoadedMetadata, className, placeholder, rotation = 0, flipH = false, zoom = 1, panX = 0, panY = 0 }, ref) => {
     const videoRef = useRef<HTMLVideoElement>(null);
     const [loadError, setLoadError] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
@@ -83,10 +87,15 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
       );
     }
 
-    const rotationStyle: React.CSSProperties = rotation !== 0 ? {
-      transform: `rotate(${rotation}deg)`,
+    const parts: string[] = [];
+    if (rotation !== 0) parts.push(`rotate(${rotation}deg)`);
+    if (flipH) parts.push("scaleX(-1)");
+    if (zoom !== 1) parts.push(`scale(${zoom})`);
+    if (panX !== 0 || panY !== 0) parts.push(`translate(${panX}px, ${panY}px)`);
+    const videoStyle: React.CSSProperties = {
+      ...(parts.length ? { transform: parts.join(" ") } : {}),
       ...(rotation === 90 || rotation === 270 ? { width: "100%", height: "100%", maxWidth: "unset" } : {}),
-    } : {};
+    };
 
     const handleFirstFrame = () => {
       if (videoRef.current && !firstFrameSeekDone.current) {
@@ -106,7 +115,7 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
           ref={videoRef}
           src={src}
           className="w-full h-full object-contain"
-          style={rotationStyle}
+          style={videoStyle}
           playsInline
           muted
           preload="metadata"

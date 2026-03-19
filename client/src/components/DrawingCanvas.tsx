@@ -302,8 +302,6 @@ const DrawingCanvas = forwardRef<HTMLCanvasElement, DrawingCanvasProps>(function
       />
     </div>
   );
-}
-
 });
 
 export default DrawingCanvas;

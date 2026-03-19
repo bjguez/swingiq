@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useSearch, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import Layout from "@/components/Layout";
@@ -11,6 +11,7 @@ import {
   Mic, Square, RotateCcw, Loader2, Check,
   Pen, Minus, Circle, RectangleHorizontal, Triangle,
   Undo2, Trash2, ChevronLeft, ChevronRight, Scissors,
+  FlipHorizontal2, ZoomIn, ZoomOut,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import type { Video as VideoType } from "@shared/schema";
@@ -61,6 +62,18 @@ export default function CoachSessionPage() {
   const [activePanel, setActivePanel] = useState<"left" | "right">("left");
   const [speed, setSpeed] = useState(1);
 
+  // Flip / Zoom / Pan
+  const [leftFlipH, setLeftFlipH] = useState(false);
+  const [rightFlipH, setRightFlipH] = useState(false);
+  const [leftZoom, setLeftZoom] = useState(1);
+  const [rightZoom, setRightZoom] = useState(1);
+  const [leftPanX, setLeftPanX] = useState(0);
+  const [leftPanY, setLeftPanY] = useState(0);
+  const [rightPanX, setRightPanX] = useState(0);
+  const [rightPanY, setRightPanY] = useState(0);
+  const leftPanRef = useRef({ dragging: false, startX: 0, startY: 0, basePanX: 0, basePanY: 0 });
+  const rightPanRef = useRef({ dragging: false, startX: 0, startY: 0, basePanX: 0, basePanY: 0 });
+
   // Recording
   const [recordingState, setRecordingState] = useState<RecordingState>("idle");
   const [recordingTime, setRecordingTime] = useState(0);
@@ -76,7 +89,7 @@ export default function CoachSessionPage() {
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const rafRef = useRef<number>(0);
-  const timerRef = useRef<ReturnType<typeof setInterval>>();
+  const timerRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
 
   // Load player videos
   const { data: playerVideos = [] } = useQuery<VideoType[]>({
@@ -127,6 +140,31 @@ export default function CoachSessionPage() {
     const headerH = 50, footerH = 30;
     const videoH = H - headerH - footerH;
 
+    function drawVid(vid: HTMLVideoElement, dx: number, dy: number, dw: number, dh: number, flipH: boolean, zoom: number, panX: number, panY: number) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(dx, dy, dw, dh);
+      ctx.clip();
+      if (flipH) {
+        ctx.translate(dx + dw, dy);
+        ctx.scale(-1, 1);
+      } else {
+        ctx.translate(dx, dy);
+      }
+      if (zoom !== 1 || panX !== 0 || panY !== 0) {
+        const sw = (vid.videoWidth || dw) / zoom;
+        const sh = (vid.videoHeight || dh) / zoom;
+        const pxSrc = panX * ((vid.videoWidth || dw) / dw) / zoom;
+        const pySrc = panY * ((vid.videoHeight || dh) / dh) / zoom;
+        const sx = Math.max(0, ((vid.videoWidth || dw) - sw) / 2 - pxSrc);
+        const sy = Math.max(0, ((vid.videoHeight || dh) - sh) / 2 - pySrc);
+        ctx.drawImage(vid, sx, sy, sw, sh, 0, 0, dw, dh);
+      } else {
+        ctx.drawImage(vid, 0, 0, dw, dh);
+      }
+      ctx.restore();
+    }
+
     function draw() {
       ctx.fillStyle = "#0d0d0d";
       ctx.fillRect(0, 0, W, H);
@@ -147,13 +185,11 @@ export default function CoachSessionPage() {
 
       if (playerVid && hasProVideo) {
         // Side by side
-        ctx.drawImage(playerVid, 0, headerH, W / 2 - 1, videoH);
-        // Composite left annotations
+        drawVid(playerVid, 0, headerH, W / 2 - 1, videoH, leftFlipH, leftZoom, leftPanX, leftPanY);
         if (leftAnnotationRef.current) {
           ctx.drawImage(leftAnnotationRef.current, 0, headerH, W / 2 - 1, videoH);
         }
-        ctx.drawImage(proVid, W / 2 + 1, headerH, W / 2 - 1, videoH);
-        // Composite right annotations
+        drawVid(proVid, W / 2 + 1, headerH, W / 2 - 1, videoH, rightFlipH, rightZoom, rightPanX, rightPanY);
         if (rightAnnotationRef.current) {
           ctx.drawImage(rightAnnotationRef.current, W / 2 + 1, headerH, W / 2 - 1, videoH);
         }
@@ -169,7 +205,7 @@ export default function CoachSessionPage() {
         ctx.fillText("Player Swing", 8, headerH + 15);
         ctx.fillText("Pro Comparison", W / 2 + 9, headerH + 15);
       } else if (playerVid && playerVideoSrc) {
-        ctx.drawImage(playerVid, 0, headerH, W, videoH);
+        drawVid(playerVid, 0, headerH, W, videoH, leftFlipH, leftZoom, leftPanX, leftPanY);
         if (leftAnnotationRef.current) {
           ctx.drawImage(leftAnnotationRef.current, 0, headerH, W, videoH);
         }
@@ -190,7 +226,7 @@ export default function CoachSessionPage() {
       rafRef.current = requestAnimationFrame(draw);
     }
     draw();
-  }, [playerVideoSrc, proVideoSrc]);
+  }, [playerVideoSrc, proVideoSrc, leftFlipH, leftZoom, leftPanX, leftPanY, rightFlipH, rightZoom, rightPanX, rightPanY]);
 
   const stopDrawLoop = () => cancelAnimationFrame(rafRef.current);
 
@@ -308,6 +344,12 @@ export default function CoachSessionPage() {
   }
 
   const isRecordingActive = recordingState === "recording";
+
+  const videoTransform = (flipH: boolean, zoom: number, panX: number, panY: number): React.CSSProperties => {
+    const parts: string[] = [`scale(${zoom})`, `translate(${panX / zoom}px, ${panY / zoom}px)`];
+    if (flipH) parts.push("scaleX(-1)");
+    return { transform: parts.join(" "), transformOrigin: "center" };
+  };
 
   return (
     <Layout>
@@ -451,6 +493,21 @@ export default function CoachSessionPage() {
               <div
                 onClick={() => setActivePanel("left")}
                 className={`relative aspect-video rounded-lg overflow-hidden bg-black border-2 transition-colors cursor-pointer ${activePanel === "left" ? "border-primary" : "border-border"}`}
+                onPointerDown={(e) => {
+                  if (activeTool === "pen" || activeTool === "line" || activeTool === "angle" || activeTool === "circle" || activeTool === "rect") return;
+                  if (leftZoom > 1) {
+                    leftPanRef.current = { dragging: true, startX: e.clientX, startY: e.clientY, basePanX: leftPanX, basePanY: leftPanY };
+                    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+                  }
+                }}
+                onPointerMove={(e) => {
+                  const p = leftPanRef.current;
+                  if (p.dragging) {
+                    setLeftPanX(p.basePanX + (e.clientX - p.startX));
+                    setLeftPanY(p.basePanY + (e.clientY - p.startY));
+                  }
+                }}
+                onPointerUp={() => { leftPanRef.current.dragging = false; }}
               >
                 <video
                   ref={playerVideoRef}
@@ -458,6 +515,7 @@ export default function CoachSessionPage() {
                   controls
                   crossOrigin="anonymous"
                   className="w-full h-full object-contain"
+                  style={videoTransform(leftFlipH, leftZoom, leftPanX, leftPanY)}
                   onLoadedMetadata={e => {
                     const dur = (e.target as HTMLVideoElement).duration;
                     setVideoDuration(dur);
@@ -472,8 +530,19 @@ export default function CoachSessionPage() {
                   onAnnotationsChange={setLeftAnnotations}
                 />
                 <div className="absolute top-2 left-2 text-[10px] font-bold text-white/60 bg-black/40 px-1.5 py-0.5 rounded pointer-events-none">Player</div>
+                <div className="absolute top-2 right-2 flex items-center gap-1 pointer-events-auto z-30">
+                  <button onClick={e => { e.stopPropagation(); setLeftFlipH(f => !f); }} title="Flip horizontal" className="bg-black/50 hover:bg-black/70 text-white/70 hover:text-white rounded p-1 transition-colors">
+                    <FlipHorizontal2 size={13} />
+                  </button>
+                  <button onClick={e => { e.stopPropagation(); setLeftZoom(z => { const nz = Math.max(1, +(z - 0.5).toFixed(1)); if (nz === 1) { setLeftPanX(0); setLeftPanY(0); } return nz; }); }} title="Zoom out" className="bg-black/50 hover:bg-black/70 text-white/70 hover:text-white rounded p-1 transition-colors">
+                    <ZoomOut size={13} />
+                  </button>
+                  <button onClick={e => { e.stopPropagation(); setLeftZoom(z => +(z + 0.5).toFixed(1)); }} title="Zoom in" className="bg-black/50 hover:bg-black/70 text-white/70 hover:text-white rounded p-1 transition-colors">
+                    <ZoomIn size={13} />
+                  </button>
+                </div>
                 {isRecordingActive && (
-                  <div className="absolute top-2 right-2 flex items-center gap-1 bg-red-600 text-white text-xs font-bold px-2 py-1 rounded pointer-events-none">
+                  <div className="absolute bottom-2 right-2 flex items-center gap-1 bg-red-600 text-white text-xs font-bold px-2 py-1 rounded pointer-events-none">
                     <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" /> REC {formatTime(recordingTime)}
                   </div>
                 )}
@@ -483,6 +552,22 @@ export default function CoachSessionPage() {
               <div
                 onClick={() => proVideoSrc && setActivePanel("right")}
                 className={`relative aspect-video rounded-lg overflow-hidden bg-black border-2 transition-colors ${proVideoSrc ? (activePanel === "right" ? "border-primary cursor-pointer" : "border-border cursor-pointer") : "border-dashed border-border"}`}
+                onPointerDown={(e) => {
+                  if (!proVideoSrc) return;
+                  if (activeTool === "pen" || activeTool === "line" || activeTool === "angle" || activeTool === "circle" || activeTool === "rect") return;
+                  if (rightZoom > 1) {
+                    rightPanRef.current = { dragging: true, startX: e.clientX, startY: e.clientY, basePanX: rightPanX, basePanY: rightPanY };
+                    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+                  }
+                }}
+                onPointerMove={(e) => {
+                  const p = rightPanRef.current;
+                  if (p.dragging) {
+                    setRightPanX(p.basePanX + (e.clientX - p.startX));
+                    setRightPanY(p.basePanY + (e.clientY - p.startY));
+                  }
+                }}
+                onPointerUp={() => { rightPanRef.current.dragging = false; }}
               >
                 {proVideoSrc ? (
                   <>
@@ -492,6 +577,7 @@ export default function CoachSessionPage() {
                       controls
                       crossOrigin="anonymous"
                       className="w-full h-full object-contain"
+                      style={videoTransform(rightFlipH, rightZoom, rightPanX, rightPanY)}
                     />
                     <DrawingCanvas
                       ref={rightAnnotationRef}
@@ -501,12 +587,23 @@ export default function CoachSessionPage() {
                       onAnnotationsChange={setRightAnnotations}
                     />
                     <div className="absolute top-2 left-2 text-[10px] font-bold text-white/60 bg-black/40 px-1.5 py-0.5 rounded pointer-events-none">Pro</div>
-                    {!isRecordingActive && (
-                      <button
-                        onClick={e => { e.stopPropagation(); setProVideoSrc(""); setProVideoId(""); setRightAnnotations([]); }}
-                        className="absolute top-2 right-2 bg-black/60 text-white rounded-full p-1 hover:bg-black/80"
-                      ><X size={14} /></button>
-                    )}
+                    <div className="absolute top-2 right-2 flex items-center gap-1 pointer-events-auto z-30">
+                      <button onClick={e => { e.stopPropagation(); setRightFlipH(f => !f); }} title="Flip horizontal" className="bg-black/50 hover:bg-black/70 text-white/70 hover:text-white rounded p-1 transition-colors">
+                        <FlipHorizontal2 size={13} />
+                      </button>
+                      <button onClick={e => { e.stopPropagation(); setRightZoom(z => { const nz = Math.max(1, +(z - 0.5).toFixed(1)); if (nz === 1) { setRightPanX(0); setRightPanY(0); } return nz; }); }} title="Zoom out" className="bg-black/50 hover:bg-black/70 text-white/70 hover:text-white rounded p-1 transition-colors">
+                        <ZoomOut size={13} />
+                      </button>
+                      <button onClick={e => { e.stopPropagation(); setRightZoom(z => +(z + 0.5).toFixed(1)); }} title="Zoom in" className="bg-black/50 hover:bg-black/70 text-white/70 hover:text-white rounded p-1 transition-colors">
+                        <ZoomIn size={13} />
+                      </button>
+                      {!isRecordingActive && (
+                        <button
+                          onClick={e => { e.stopPropagation(); setProVideoSrc(""); setProVideoId(""); setRightAnnotations([]); }}
+                          className="bg-black/60 text-white rounded-full p-1 hover:bg-black/80"
+                        ><X size={13} /></button>
+                      )}
+                    </div>
                   </>
                 ) : (
                   <VideoLibraryModal
