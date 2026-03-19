@@ -123,6 +123,41 @@ export const sessions = pgTable("sessions", {
   notes: text("notes"),
 });
 
+// Coach sessions shared with players
+export const coachSessions = pgTable("coach_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  coachId: varchar("coach_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  playerId: varchar("player_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  playerVideoId: varchar("player_video_id").references(() => videos.id, { onDelete: "set null" }),
+  proVideoId: varchar("pro_video_id").references(() => videos.id, { onDelete: "set null" }),
+  notes: text("notes"),
+  voiceoverUrl: text("voiceover_url"), // R2 key for future audio
+  sharedAt: timestamp("shared_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// In-app notifications
+export const notifications = pgTable("notifications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  type: text("type").notNull(), // "coach_session" | "coach_invite" | "message"
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  read: boolean("read").default(false).notNull(),
+  metadata: jsonb("metadata"), // e.g. { sessionId, coachId }
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Coach-player messages
+export const messages = pgTable("messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  coachPlayerId: varchar("coach_player_id").notNull().references(() => coachPlayers.id, { onDelete: "cascade" }),
+  senderId: varchar("sender_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  content: text("content").notNull(),
+  read: boolean("read").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,
@@ -147,3 +182,6 @@ export type Drill = typeof drills.$inferSelect;
 export type InsertSession = z.infer<typeof insertSessionSchema>;
 export type Session = typeof sessions.$inferSelect;
 export type CoachPlayer = typeof coachPlayers.$inferSelect;
+export type CoachSession = typeof coachSessions.$inferSelect;
+export type Notification = typeof notifications.$inferSelect;
+export type Message = typeof messages.$inferSelect;

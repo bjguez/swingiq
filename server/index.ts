@@ -164,6 +164,44 @@ app.use((req, res, next) => {
     )
   `);
   await pool.query(`ALTER TABLE coach_players ADD COLUMN IF NOT EXISTS invite_token TEXT UNIQUE`);
+  // Coach sessions
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS coach_sessions (
+      id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+      coach_id VARCHAR NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      player_id VARCHAR NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      player_video_id VARCHAR REFERENCES videos(id) ON DELETE SET NULL,
+      pro_video_id VARCHAR REFERENCES videos(id) ON DELETE SET NULL,
+      notes TEXT,
+      voiceover_url TEXT,
+      shared_at TIMESTAMP,
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
+  // Notifications
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS notifications (
+      id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id VARCHAR NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      type TEXT NOT NULL,
+      title TEXT NOT NULL,
+      message TEXT NOT NULL,
+      read BOOLEAN NOT NULL DEFAULT false,
+      metadata JSONB,
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
+  // Messages
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS messages (
+      id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+      coach_player_id VARCHAR NOT NULL REFERENCES coach_players(id) ON DELETE CASCADE,
+      sender_id VARCHAR NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      content TEXT NOT NULL,
+      read BOOLEAN NOT NULL DEFAULT false,
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
   // Email verification columns and table
   await pool.query(`
     ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT UNIQUE

@@ -10,6 +10,7 @@ import { execFile } from "child_process";
 import { uploadToR2, getVideoUrl, deleteFromR2, isR2Key, r2Configured, checkR2Exists } from "./r2";
 import { createCheckoutSession, createPortalSession, handleWebhook, PRICES } from "./stripe";
 import { setupCoachRoutes } from "./coach";
+import { setupCoachingRoutes } from "./coaching";
 
 const uploadDir = path.resolve("uploads");
 if (!fs.existsSync(uploadDir)) {
@@ -990,6 +991,7 @@ export async function registerRoutes(
   });
 
   setupCoachRoutes(app);
+  setupCoachingRoutes(app);
 
   return httpServer;
 }

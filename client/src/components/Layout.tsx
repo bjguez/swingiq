@@ -7,12 +7,39 @@ import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { ProfileSheet } from "@/components/ProfileSheet";
 import ScoreTicker from "@/components/ScoreTicker";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+
+type Notification = {
+  id: string;
+  type: string;
+  title: string;
+  message: string;
+  read: boolean;
+  createdAt: string;
+};
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { user } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const queryClient = useQueryClient();
+
+  const { data: notifs = [] } = useQuery<Notification[]>({
+    queryKey: ["/api/notifications"],
+    enabled: !!user,
+    refetchInterval: 30000,
+  });
+
+  const unreadCount = notifs.filter(n => !n.read).length;
+
+  const readAllMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/notifications/read-all", undefined),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/notifications"] }),
+  });
 
   const navLinks = [
     { href: "/", icon: <Video className="w-4 h-4 mr-2" />, label: "Analysis" },
@@ -81,9 +108,36 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 </Button>
               }
             />
-            <Button variant="ghost" size="icon" className="text-muted-foreground">
-              <Bell className="w-5 h-5" />
-            </Button>
+            <Popover open={notifOpen} onOpenChange={(o) => { setNotifOpen(o); if (o && unreadCount > 0) readAllMutation.mutate(); }}>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" size="icon" className="text-muted-foreground relative">
+                  <Bell className="w-5 h-5" />
+                  {unreadCount > 0 && (
+                    <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center leading-none">
+                      {unreadCount > 9 ? "9+" : unreadCount}
+                    </span>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-80 p-0 overflow-hidden">
+                <div className="px-4 py-3 border-b border-border">
+                  <p className="font-semibold text-sm">Notifications</p>
+                </div>
+                <div className="max-h-80 overflow-y-auto">
+                  {notifs.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-8">No notifications yet.</p>
+                  ) : (
+                    notifs.map(n => (
+                      <div key={n.id} className={`px-4 py-3 border-b border-border last:border-0 ${!n.read ? "bg-primary/5" : ""}`}>
+                        <p className="text-sm font-semibold">{n.title}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{n.message}</p>
+                        <p className="text-[10px] text-muted-foreground/60 mt-1">{new Date(n.createdAt).toLocaleDateString()}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
             <Button
               variant="ghost"
               size="icon"
