@@ -93,6 +93,8 @@ export function useAuth() {
       throws?: string;
       heightInches?: number;
       weightLbs?: number;
+      organization?: string;
+      coachingLevel?: string;
     }) => {
       const res = await fetch("/api/auth/profile", {
         method: "PUT",

@@ -17,6 +17,14 @@ const SKILL_LEVELS = [
   { value: "pro", label: "Pro / Semi-Pro" },
 ];
 
+const COACHING_LEVELS = [
+  { value: "little_league", label: "Little League" },
+  { value: "select", label: "Select" },
+  { value: "high_school", label: "High School" },
+  { value: "college", label: "College" },
+  { value: "pro", label: "Pro" },
+];
+
 const US_STATES = [
   "AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA",
   "HI","ID","IL","IN","IA","KS","KY","LA","ME","MD",
@@ -37,6 +45,7 @@ export function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) {
   const [authGateOpen, setAuthGateOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [saved, setSaved] = useState(false);
+  const isCoach = user?.accountType === "coach";
   const [form, setForm] = useState({
     age: user?.age ? String(user.age) : "",
     city: user?.city ?? "",
@@ -44,6 +53,8 @@ export function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) {
     skillLevel: user?.skillLevel ?? "",
     bats: user?.bats ?? "",
     throws: user?.throws ?? "",
+    organization: (user as any)?.organization ?? "",
+    coachingLevel: (user as any)?.coachingLevel ?? "",
   });
 
   const { data: allVideos = [] } = useQuery({
@@ -69,6 +80,8 @@ export function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) {
       skillLevel: user?.skillLevel ?? "",
       bats: user?.bats ?? "",
       throws: user?.throws ?? "",
+      organization: (user as any)?.organization ?? "",
+      coachingLevel: (user as any)?.coachingLevel ?? "",
     });
     setEditing(true);
     setSaved(false);
@@ -83,6 +96,8 @@ export function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) {
       skillLevel: form.skillLevel || undefined,
       bats: form.bats || undefined,
       throws: form.throws || undefined,
+      organization: form.organization || undefined,
+      coachingLevel: form.coachingLevel || undefined,
     });
     setEditing(false);
     setSaved(true);
@@ -108,8 +123,8 @@ export function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) {
                 </SheetTitle>
                 <SheetDescription className="sr-only">Your profile and account settings</SheetDescription>
                 {user ? (
-                  <span className={`text-xs font-semibold px-2 py-0.5 rounded ${isPaid ? "bg-primary/20 text-primary" : "bg-secondary text-muted-foreground"}`}>
-                    {isPaid ? "Pro" : "Free"}
+                  <span className={`text-xs font-semibold px-2 py-0.5 rounded ${isCoach ? "bg-blue-500/20 text-blue-400" : isPaid ? "bg-primary/20 text-primary" : "bg-secondary text-muted-foreground"}`}>
+                    {isCoach ? "Coach" : isPaid ? "Pro" : "Free"}
                   </span>
                 ) : (
                   <p className="text-xs text-muted-foreground">Not signed in</p>
@@ -128,8 +143,8 @@ export function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) {
               </div>
             ) : (
               <div className="p-6 flex flex-col gap-6">
-                {/* Usage */}
-                {!isPaid && (
+                {/* Player: Swings Used */}
+                {!isCoach && !isPaid && (
                   <div>
                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Swings Used</p>
                     <div className="flex items-center gap-3">
@@ -155,7 +170,16 @@ export function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) {
                       <button onClick={handleEdit} className="cursor-pointer text-xs text-primary hover:underline">Edit</button>
                     </div>
                     <dl className="space-y-2 text-sm">
-                      {[
+                      {isCoach ? [
+                        { label: "Organization", value: (user as any).organization },
+                        { label: "Coaching Level", value: COACHING_LEVELS.find(s => s.value === (user as any).coachingLevel)?.label },
+                        { label: "Location", value: [user.city, user.state].filter(Boolean).join(", ") || null },
+                      ].map(({ label, value }) => value ? (
+                        <div key={label} className="flex justify-between">
+                          <dt className="text-muted-foreground">{label}</dt>
+                          <dd className="font-medium">{value}</dd>
+                        </div>
+                      ) : null) : [
                         { label: "Skill Level", value: SKILL_LEVELS.find(s => s.value === user.skillLevel)?.label },
                         { label: "Bats", value: user.bats },
                         { label: "Throws", value: user.throws },
@@ -174,7 +198,48 @@ export function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) {
                       </p>
                     )}
                   </div>
+                ) : isCoach ? (
+                  /* Coach edit form */
+                  <form onSubmit={handleSave} className="space-y-4">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Edit Profile</p>
+
+                    <Input placeholder="Organization / Team Name"
+                      value={form.organization} onChange={e => setForm(f => ({ ...f, organization: e.target.value }))} />
+
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-2">Coaching Level</p>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {COACHING_LEVELS.map(s => (
+                          <button key={s.value} type="button"
+                            onClick={() => setForm(f => ({ ...f, coachingLevel: s.value }))}
+                            className={`cursor-pointer py-2 px-3 rounded-md text-xs font-semibold border transition-colors text-left ${form.coachingLevel === s.value ? "bg-primary/10 border-primary/50 text-primary" : "border-border text-muted-foreground hover:text-foreground"}`}
+                          >{s.label}</button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input placeholder="City"
+                        value={form.city} onChange={e => setForm(f => ({ ...f, city: e.target.value }))} />
+                      <select
+                        value={form.state}
+                        onChange={e => setForm(f => ({ ...f, state: e.target.value }))}
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 text-foreground"
+                      >
+                        <option value="">State</option>
+                        {US_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <Button type="submit" className="flex-1" disabled={isUpdatingProfile}>
+                        {isUpdatingProfile ? "Saving..." : "Save"}
+                      </Button>
+                      <Button type="button" variant="ghost" onClick={() => setEditing(false)}>Cancel</Button>
+                    </div>
+                  </form>
                 ) : (
+                  /* Player edit form */
                   <form onSubmit={handleSave} className="space-y-4">
                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Edit Profile</p>
 
@@ -234,8 +299,9 @@ export function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) {
                     </div>
                   </form>
                 )}
+
                 {/* My Coaches — player accounts only */}
-                {user.accountType !== "coach" && coaches.length > 0 && (
+                {!isCoach && coaches.length > 0 && (
                   <div>
                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">My Coaches</p>
                     <div className="space-y-2">

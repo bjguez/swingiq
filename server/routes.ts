@@ -670,7 +670,8 @@ export async function registerRoutes(
         // Apply visibility filtering for non-admin requests
         const filteredPro = isAdmin ? proVideos : proVideos.filter(v => {
           if (context === "development") return v.showInDevelopment !== false;
-          return v.showInLibrary !== false;
+          if (context === "coaching") return v.showInLibrary !== false || v.showInDevelopment !== false;
+          return v.showInLibrary !== false; // default: library context
         });
         vids = [...filteredPro, ...userVideos];
       }

@@ -84,7 +84,7 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected }: Vi
   const draggingRef = useRef<"start" | "end" | "middle" | null>(null);
   const dragAnchorRef = useRef<{ x: number; start: number; end: number } | null>(null);
 
-  const { data: allVideos = [] } = useQuery({ queryKey: ["/api/videos"], queryFn: () => fetchVideos(), enabled: mode === "pro" || !!user });
+  const { data: allVideos = [] } = useQuery({ queryKey: ["/api/videos", mode === "pro" ? "coaching" : undefined], queryFn: () => mode === "pro" ? fetchVideos(undefined, "coaching") : fetchVideos(), enabled: mode === "pro" || !!user });
   const { data: players = [] } = useQuery({ queryKey: ["/api/players"], queryFn: fetchPlayers });
 
   const userVideos = (allVideos as Video[]).filter(v => !v.isProVideo && v.sourceUrl);
