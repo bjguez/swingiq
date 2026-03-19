@@ -43,7 +43,14 @@ export function setupCoachingRoutes(app: Express) {
         .where(and(eq(videos.userId, req.params.playerId), eq(videos.isProVideo, false)))
         .orderBy(desc(videos.createdAt));
 
-      res.json(playerVideos);
+      // Resolve R2 keys to playable URLs
+      const resolved = await Promise.all(playerVideos.map(async v => ({
+        ...v,
+        sourceUrl: v.sourceUrl && isR2Key(v.sourceUrl) ? await getVideoUrl(v.sourceUrl) : v.sourceUrl,
+        thumbnailUrl: v.thumbnailUrl && isR2Key(v.thumbnailUrl) ? await getVideoUrl(v.thumbnailUrl) : v.thumbnailUrl,
+      })));
+
+      res.json(resolved);
     } catch (err) { next(err); }
   });
 
