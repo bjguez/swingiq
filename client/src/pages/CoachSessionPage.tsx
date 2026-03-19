@@ -517,7 +517,7 @@ export default function CoachSessionPage() {
                   onAnnotationsChange={setLeftAnnotations}
                 />
                 <div className="absolute top-2 left-2 text-[10px] font-bold text-white/60 bg-black/40 px-1.5 py-0.5 rounded pointer-events-none">Player</div>
-                <div className="absolute top-2 right-2 flex items-center gap-1 pointer-events-auto z-30">
+                <div className="absolute top-2 right-2 flex items-center gap-1 pointer-events-auto z-30" onPointerDown={e => e.stopPropagation()}>
                   <button onClick={e => { e.stopPropagation(); setLeftFlipH(f => !f); }} title="Flip horizontal" className="bg-black/50 hover:bg-black/70 text-white/70 hover:text-white rounded p-1 transition-colors">
                     <FlipHorizontal2 size={13} />
                   </button>
@@ -573,7 +573,7 @@ export default function CoachSessionPage() {
                       onAnnotationsChange={setRightAnnotations}
                     />
                     <div className="absolute top-2 left-2 text-[10px] font-bold text-white/60 bg-black/40 px-1.5 py-0.5 rounded pointer-events-none">Pro</div>
-                    <div className="absolute top-2 right-2 flex items-center gap-1 pointer-events-auto z-30">
+                    <div className="absolute top-2 right-2 flex items-center gap-1 pointer-events-auto z-30" onPointerDown={e => e.stopPropagation()}>
                       <button onClick={e => { e.stopPropagation(); setRightFlipH(f => !f); }} title="Flip horizontal" className="bg-black/50 hover:bg-black/70 text-white/70 hover:text-white rounded p-1 transition-colors">
                         <FlipHorizontal2 size={13} />
                       </button>

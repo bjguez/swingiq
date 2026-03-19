@@ -398,7 +398,7 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel, ex
               <div className="text-white font-bold font-display text-lg drop-shadow-md">{leftLabel}</div>
               <div className="text-white/70 text-xs">{leftVideoSrc ? "Uploaded" : "No video"}</div>
             </div>
-            <div className="flex items-center gap-2 pointer-events-auto">
+            <div className="flex items-center gap-2 pointer-events-auto" onPointerDown={e => e.stopPropagation()}>
               {leftVideoSrc && (<>
                 <Button variant="ghost" size="icon" className="h-8 w-8 text-white/70 hover:text-white bg-black/20 hover:bg-black/40" title="Flip horizontal" onClick={() => setLeftFlipH(f => !f)}>
                   <FlipHorizontal2 className="w-4 h-4" />
@@ -523,7 +523,7 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel, ex
               <div className="text-white font-bold font-display text-lg drop-shadow-md">{rightLabel}</div>
               <div className="text-white/70 text-xs">{rightVideoSrc ? "Loaded" : "No video"}</div>
             </div>
-            <div className="flex items-center gap-2 pointer-events-auto">
+            <div className="flex items-center gap-2 pointer-events-auto" onPointerDown={e => e.stopPropagation()}>
               {rightVideoSrc && (<>
                 <Button variant="ghost" size="icon" className="h-8 w-8 text-white/70 hover:text-white bg-black/20 hover:bg-black/40" title="Flip horizontal" onClick={() => setRightFlipH(f => !f)}>
                   <FlipHorizontal2 className="w-4 h-4" />
