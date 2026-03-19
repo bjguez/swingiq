@@ -74,6 +74,21 @@ export default function CoachDashboard() {
     },
   });
 
+  const [resendSuccess, setResendSuccess] = useState<string | null>(null);
+  const resendMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("POST", `/api/coach/invite/resend/${id}`, undefined);
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message);
+      }
+    },
+    onSuccess: (_data, id) => {
+      setResendSuccess(id);
+      setTimeout(() => setResendSuccess(null), 3000);
+    },
+  });
+
   function handleInvite(e: React.FormEvent) {
     e.preventDefault();
     setInviteError(null);
@@ -152,14 +167,26 @@ export default function CoachDashboard() {
                       <div className="mt-0.5">{statusBadge(p.status)}</div>
                     </div>
                   </div>
-                  <button
-                    onClick={() => removeMutation.mutate(p.id)}
-                    disabled={removeMutation.isPending}
-                    className="text-muted-foreground hover:text-destructive transition-colors p-1"
-                    title="Remove player"
-                  >
-                    <Trash2 size={15} />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {p.status === "pending" && (
+                      <button
+                        onClick={() => resendMutation.mutate(p.id)}
+                        disabled={resendMutation.isPending}
+                        className="text-xs text-muted-foreground hover:text-primary transition-colors"
+                        title="Resend invite"
+                      >
+                        {resendSuccess === p.id ? "Sent!" : "Resend"}
+                      </button>
+                    )}
+                    <button
+                      onClick={() => removeMutation.mutate(p.id)}
+                      disabled={removeMutation.isPending}
+                      className="text-muted-foreground hover:text-destructive transition-colors p-1"
+                      title="Remove player"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
                 </div>
               );
             })}

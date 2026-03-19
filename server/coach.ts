@@ -132,6 +132,34 @@ export function setupCoachRoutes(app: Express) {
     } catch (err) { next(err); }
   });
 
+  // POST /api/coach/invite/resend/:id — resend invite email for a pending relationship
+  app.post("/api/coach/invite/resend/:id", async (req, res, next) => {
+    try {
+      const coach = req.user as User | undefined;
+      if (!coach) return res.status(401).json({ message: "Not authenticated" });
+
+      const [invite] = await db
+        .select()
+        .from(coachPlayers)
+        .where(and(eq(coachPlayers.id, req.params.id), eq(coachPlayers.coachId, coach.id)));
+
+      if (!invite) return res.status(404).json({ message: "Invite not found" });
+      if (invite.status === "active") return res.status(400).json({ message: "Player is already connected" });
+
+      // Regenerate token
+      const { randomBytes } = await import("crypto");
+      const token = randomBytes(32).toString("hex");
+      await db.update(coachPlayers).set({ inviteToken: token }).where(eq(coachPlayers.id, invite.id));
+
+      const email = invite.inviteEmail!;
+      const [player] = await db.select().from(users).where(eq(users.email, email));
+      const coachName = [coach.firstName, coach.lastName].filter(Boolean).join(" ") || coach.username;
+
+      await sendCoachInviteEmail(email, coachName, token, !!player);
+      res.json({ message: "Invitation resent" });
+    } catch (err) { next(err); }
+  });
+
   // DELETE /api/coach/players/:id — coach removes a player relationship
   app.delete("/api/coach/players/:id", async (req, res, next) => {
     try {
