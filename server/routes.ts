@@ -300,6 +300,21 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/admin/set-tier", async (req, res) => {
+    const adminUsername = process.env.ADMIN_USERNAME;
+    if (!req.user || (req.user as any).username !== adminUsername) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    const { userId, tier } = req.body;
+    const validTiers = ["free", "rookie", "player", "pro", "coach"];
+    if (!userId || !validTiers.includes(tier)) {
+      return res.status(400).json({ message: `tier must be one of: ${validTiers.join(", ")}` });
+    }
+    const updated = await storage.updateUser(userId, { subscriptionTier: tier });
+    if (!updated) return res.status(404).json({ message: "User not found" });
+    res.json({ id: updated.id, username: updated.username, subscriptionTier: updated.subscriptionTier });
+  });
+
   app.get("/api/admin/r2-health", async (req, res) => {
     const adminUsername = process.env.ADMIN_USERNAME;
     if (!req.user || (req.user as any).username !== adminUsername) {
