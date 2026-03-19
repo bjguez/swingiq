@@ -647,7 +647,8 @@ export async function registerRoutes(
     try {
       const { category, playerId, context } = req.query;
       const userId = (req.user as any)?.id ?? null;
-      const isAdmin = (req.user as any)?.isAdmin ?? false;
+      const adminUsername = process.env.ADMIN_USERNAME;
+      const isAdmin = !!(adminUsername && (req.user as any)?.username === adminUsername);
 
       let vids;
       if (category) {
