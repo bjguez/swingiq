@@ -10,7 +10,7 @@ import type { Tool, DrawAction } from "@/components/DrawingCanvas";
 import {
   ArrowLeft, Send, Video, CheckCircle, X,
   Mic, Square as StopIcon, RotateCcw, Loader2, Check,
-  Circle, Undo, Trash2, Scissors,
+  Circle, Undo, Trash2, Scissors, RotateCw, Link2,
   FlipHorizontal2, ZoomIn, ZoomOut,
   MousePointer2, PenTool, Type, Timer,
   Play, Pause, SkipBack, SkipForward,
@@ -66,6 +66,13 @@ export default function CoachSessionPage() {
   const [activePanel, setActivePanel] = useState<"left" | "right">("left");
   const [speed, setSpeed] = useState(1);
 
+  // Rotation
+  const [leftRotation, setLeftRotation] = useState<0 | 90 | 180 | 270>(0);
+  const [rightRotation, setRightRotation] = useState<0 | 90 | 180 | 270>(0);
+
+  // Sync
+  const [synced, setSynced] = useState(false);
+
   // Flip / Zoom / Pan
   const [leftFlipH, setLeftFlipH] = useState(false);
   const [rightFlipH, setRightFlipH] = useState(false);
@@ -118,38 +125,43 @@ export default function CoachSessionPage() {
     if (proVideoRef.current) proVideoRef.current.playbackRate = speed;
   }, [speed]);
 
-  const togglePlay = () => {
-    const player = playerVideoRef.current;
-    const pro = proVideoRef.current;
+  const affectsLeft = synced || activePanel === "left";
+  const affectsRight = synced || activePanel === "right";
+
+  const togglePlay = useCallback(() => {
     if (isPlaying) {
-      player?.pause();
-      pro?.pause();
+      if (affectsLeft) playerVideoRef.current?.pause();
+      if (affectsRight && proVideoSrc) proVideoRef.current?.pause();
       setIsPlaying(false);
     } else {
-      player?.play();
-      pro?.play();
+      if (affectsLeft) playerVideoRef.current?.play();
+      if (affectsRight && proVideoSrc) proVideoRef.current?.play();
       setIsPlaying(true);
     }
-  };
+  }, [isPlaying, affectsLeft, affectsRight, proVideoSrc]);
 
-  const handleSeek = (values: number[]) => {
+  const handleSeek = useCallback((values: number[]) => {
     const pct = values[0];
     setProgress(values);
-    if (playerVideoRef.current && videoDuration > 0) {
+    if (affectsLeft && playerVideoRef.current && videoDuration > 0) {
       playerVideoRef.current.currentTime = (pct / 100) * videoDuration;
     }
-    if (proVideoRef.current && proVideoRef.current.duration > 0) {
+    if (affectsRight && proVideoRef.current && proVideoRef.current.duration > 0) {
       proVideoRef.current.currentTime = (pct / 100) * proVideoRef.current.duration;
     }
-  };
+  }, [affectsLeft, affectsRight, videoDuration]);
 
-  const stepFrame = (dir: 1 | -1) => {
-    const vid = activePanel === "left" ? playerVideoRef.current : proVideoRef.current;
-    if (!vid) return;
-    vid.pause();
+  const stepFrame = useCallback((dir: 1 | -1) => {
+    if (affectsLeft && playerVideoRef.current) {
+      playerVideoRef.current.pause();
+      playerVideoRef.current.currentTime = Math.max(0, Math.min(playerVideoRef.current.duration || 0, playerVideoRef.current.currentTime + dir / 30));
+    }
+    if (affectsRight && proVideoRef.current && proVideoSrc) {
+      proVideoRef.current.pause();
+      proVideoRef.current.currentTime = Math.max(0, Math.min(proVideoRef.current.duration || 0, proVideoRef.current.currentTime + dir / 30));
+    }
     setIsPlaying(false);
-    vid.currentTime = Math.max(0, Math.min(vid.duration || 0, vid.currentTime + dir / 30));
-  };
+  }, [affectsLeft, affectsRight, proVideoSrc]);
 
   const undoAnnotation = () => {
     if (activePanel === "left") setLeftAnnotations(a => a.slice(0, -1));
@@ -170,27 +182,26 @@ export default function CoachSessionPage() {
     const headerH = 50, footerH = 30;
     const videoH = H - headerH - footerH;
 
-    function drawVid(vid: HTMLVideoElement, dx: number, dy: number, dw: number, dh: number, flipH: boolean, zoom: number, panX: number, panY: number) {
+    function drawVid(vid: HTMLVideoElement, dx: number, dy: number, dw: number, dh: number, flipH: boolean, zoom: number, panX: number, panY: number, rotation: 0 | 90 | 180 | 270 = 0) {
       ctx.save();
       ctx.beginPath();
       ctx.rect(dx, dy, dw, dh);
       ctx.clip();
-      if (flipH) {
-        ctx.translate(dx + dw, dy);
-        ctx.scale(-1, 1);
-      } else {
-        ctx.translate(dx, dy);
-      }
+      ctx.translate(dx + dw / 2, dy + dh / 2);
+      if (rotation !== 0) ctx.rotate((rotation * Math.PI) / 180);
+      if (flipH) ctx.scale(-1, 1);
+      const drawW = rotation === 90 || rotation === 270 ? dh : dw;
+      const drawH = rotation === 90 || rotation === 270 ? dw : dh;
       if (zoom !== 1 || panX !== 0 || panY !== 0) {
-        const sw = (vid.videoWidth || dw) / zoom;
-        const sh = (vid.videoHeight || dh) / zoom;
-        const pxSrc = panX * ((vid.videoWidth || dw) / dw) / zoom;
-        const pySrc = panY * ((vid.videoHeight || dh) / dh) / zoom;
-        const sx = Math.max(0, ((vid.videoWidth || dw) - sw) / 2 - pxSrc);
-        const sy = Math.max(0, ((vid.videoHeight || dh) - sh) / 2 - pySrc);
-        ctx.drawImage(vid, sx, sy, sw, sh, 0, 0, dw, dh);
+        const sw = (vid.videoWidth || drawW) / zoom;
+        const sh = (vid.videoHeight || drawH) / zoom;
+        const pxSrc = panX * ((vid.videoWidth || drawW) / drawW) / zoom;
+        const pySrc = panY * ((vid.videoHeight || drawH) / drawH) / zoom;
+        const sx = Math.max(0, ((vid.videoWidth || drawW) - sw) / 2 - pxSrc);
+        const sy = Math.max(0, ((vid.videoHeight || drawH) - sh) / 2 - pySrc);
+        ctx.drawImage(vid, sx, sy, sw, sh, -drawW / 2, -drawH / 2, drawW, drawH);
       } else {
-        ctx.drawImage(vid, 0, 0, dw, dh);
+        ctx.drawImage(vid, -drawW / 2, -drawH / 2, drawW, drawH);
       }
       ctx.restore();
     }
@@ -215,11 +226,11 @@ export default function CoachSessionPage() {
 
       if (playerVid && hasProVideo) {
         // Side by side
-        drawVid(playerVid, 0, headerH, W / 2 - 1, videoH, leftFlipH, leftZoom, leftPanX, leftPanY);
+        drawVid(playerVid, 0, headerH, W / 2 - 1, videoH, leftFlipH, leftZoom, leftPanX, leftPanY, leftRotation);
         if (leftAnnotationRef.current) {
           ctx.drawImage(leftAnnotationRef.current, 0, headerH, W / 2 - 1, videoH);
         }
-        drawVid(proVid, W / 2 + 1, headerH, W / 2 - 1, videoH, rightFlipH, rightZoom, rightPanX, rightPanY);
+        drawVid(proVid, W / 2 + 1, headerH, W / 2 - 1, videoH, rightFlipH, rightZoom, rightPanX, rightPanY, rightRotation);
         if (rightAnnotationRef.current) {
           ctx.drawImage(rightAnnotationRef.current, W / 2 + 1, headerH, W / 2 - 1, videoH);
         }
@@ -235,7 +246,7 @@ export default function CoachSessionPage() {
         ctx.fillText("Player Swing", 8, headerH + 15);
         ctx.fillText("Pro Comparison", W / 2 + 9, headerH + 15);
       } else if (playerVid && playerVideoSrc) {
-        drawVid(playerVid, 0, headerH, W, videoH, leftFlipH, leftZoom, leftPanX, leftPanY);
+        drawVid(playerVid, 0, headerH, W, videoH, leftFlipH, leftZoom, leftPanX, leftPanY, leftRotation);
         if (leftAnnotationRef.current) {
           ctx.drawImage(leftAnnotationRef.current, 0, headerH, W, videoH);
         }
@@ -256,7 +267,7 @@ export default function CoachSessionPage() {
       rafRef.current = requestAnimationFrame(draw);
     }
     draw();
-  }, [playerVideoSrc, proVideoSrc, leftFlipH, leftZoom, leftPanX, leftPanY, rightFlipH, rightZoom, rightPanX, rightPanY]);
+  }, [playerVideoSrc, proVideoSrc, leftFlipH, leftZoom, leftPanX, leftPanY, leftRotation, rightFlipH, rightZoom, rightPanX, rightPanY, rightRotation]);
 
   const stopDrawLoop = () => cancelAnimationFrame(rafRef.current);
 
@@ -375,9 +386,12 @@ export default function CoachSessionPage() {
 
   const isRecordingActive = recordingState === "recording";
 
-  const videoTransform = (flipH: boolean, zoom: number, panX: number, panY: number): React.CSSProperties => {
-    const parts: string[] = [`scale(${zoom})`, `translate(${panX / zoom}px, ${panY / zoom}px)`];
+  const videoTransform = (flipH: boolean, zoom: number, panX: number, panY: number, rotation: 0 | 90 | 180 | 270 = 0): React.CSSProperties => {
+    const parts: string[] = [];
+    if (rotation !== 0) parts.push(`rotate(${rotation}deg)`);
     if (flipH) parts.push("scaleX(-1)");
+    parts.push(`scale(${zoom})`);
+    parts.push(`translate(${panX / zoom}px, ${panY / zoom}px)`);
     return { transform: parts.join(" "), transformOrigin: "center" };
   };
 
@@ -495,7 +509,7 @@ export default function CoachSessionPage() {
                   src={playerVideoSrc}
                   crossOrigin="anonymous"
                   className="w-full h-full object-contain"
-                  style={videoTransform(leftFlipH, leftZoom, leftPanX, leftPanY)}
+                  style={videoTransform(leftFlipH, leftZoom, leftPanX, leftPanY, leftRotation)}
                   onLoadedMetadata={e => {
                     const dur = (e.target as HTMLVideoElement).duration;
                     setVideoDuration(dur);
@@ -520,6 +534,9 @@ export default function CoachSessionPage() {
                 <div className="absolute top-2 right-2 flex items-center gap-1 pointer-events-auto z-30" onPointerDown={e => e.stopPropagation()}>
                   <button onClick={e => { e.stopPropagation(); setLeftFlipH(f => !f); }} title="Flip horizontal" className="bg-black/50 hover:bg-black/70 text-white/70 hover:text-white rounded p-1 transition-colors">
                     <FlipHorizontal2 size={13} />
+                  </button>
+                  <button onClick={e => { e.stopPropagation(); setLeftRotation(r => ((r + 90) % 360) as 0 | 90 | 180 | 270); }} title="Rotate" className="bg-black/50 hover:bg-black/70 text-white/70 hover:text-white rounded p-1 transition-colors">
+                    <RotateCw size={13} />
                   </button>
                   <button onClick={e => { e.stopPropagation(); setLeftZoom(z => { const nz = Math.max(1, +(z - 0.5).toFixed(1)); if (nz === 1) { setLeftPanX(0); setLeftPanY(0); } return nz; }); }} title="Zoom out" className="bg-black/50 hover:bg-black/70 text-white/70 hover:text-white rounded p-1 transition-colors">
                     <ZoomOut size={13} />
@@ -563,7 +580,16 @@ export default function CoachSessionPage() {
                       src={proVideoSrc}
                       crossOrigin="anonymous"
                       className="w-full h-full object-contain"
-                      style={videoTransform(rightFlipH, rightZoom, rightPanX, rightPanY)}
+                      style={videoTransform(rightFlipH, rightZoom, rightPanX, rightPanY, rightRotation)}
+                      onTimeUpdate={e => {
+                        if (activePanel === "right" && !synced) {
+                          const v = e.target as HTMLVideoElement;
+                          setCurrentTime(v.currentTime);
+                          if (v.duration > 0) setProgress([v.currentTime / v.duration * 100]);
+                        }
+                      }}
+                      onPlay={() => { if (affectsRight) setIsPlaying(true); }}
+                      onPause={() => { if (affectsRight) setIsPlaying(false); }}
                     />
                     <DrawingCanvas
                       ref={rightAnnotationRef}
@@ -576,6 +602,9 @@ export default function CoachSessionPage() {
                     <div className="absolute top-2 right-2 flex items-center gap-1 pointer-events-auto z-30" onPointerDown={e => e.stopPropagation()}>
                       <button onClick={e => { e.stopPropagation(); setRightFlipH(f => !f); }} title="Flip horizontal" className="bg-black/50 hover:bg-black/70 text-white/70 hover:text-white rounded p-1 transition-colors">
                         <FlipHorizontal2 size={13} />
+                      </button>
+                      <button onClick={e => { e.stopPropagation(); setRightRotation(r => ((r + 90) % 360) as 0 | 90 | 180 | 270); }} title="Rotate" className="bg-black/50 hover:bg-black/70 text-white/70 hover:text-white rounded p-1 transition-colors">
+                        <RotateCw size={13} />
                       </button>
                       <button onClick={e => { e.stopPropagation(); setRightZoom(z => { const nz = Math.max(1, +(z - 0.5).toFixed(1)); if (nz === 1) { setRightPanX(0); setRightPanY(0); } return nz; }); }} title="Zoom out" className="bg-black/50 hover:bg-black/70 text-white/70 hover:text-white rounded p-1 transition-colors">
                         <ZoomOut size={13} />
@@ -618,6 +647,15 @@ export default function CoachSessionPage() {
               </div>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className={`h-10 w-10 shrink-0 ${synced ? "bg-primary/20 text-primary border-primary/50" : "text-muted-foreground"}`}
+                    onClick={() => setSynced(s => !s)}
+                    title={synced ? "Videos synced — click to unsync" : "Videos unsynced — click to sync"}
+                  >
+                    <Link2 className="w-5 h-5" />
+                  </Button>
                   <Button variant="ghost" size="icon" className="h-10 w-10 text-muted-foreground hover:text-foreground" onClick={() => stepFrame(-1)} title="Previous frame">
                     <SkipBack className="w-5 h-5" />
                   </Button>
@@ -633,25 +671,27 @@ export default function CoachSessionPage() {
                     {SPEEDS.map(s => (
                       <button
                         key={s}
-                        onClick={() => setSpeed(s)}
+                        onClick={() => { setSpeed(s); if (playerVideoRef.current) playerVideoRef.current.playbackRate = s; if (proVideoRef.current) proVideoRef.current.playbackRate = s; }}
                         className={`px-1.5 py-0.5 rounded text-xs font-mono font-semibold transition-colors ${speed === s ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-secondary"}`}
                       >
                         {s}x
                       </button>
                     ))}
                   </div>
-                  <div className="flex items-center gap-0.5 bg-secondary/50 border border-border rounded-md p-1 text-xs font-semibold text-muted-foreground">
-                    <span className="px-1">Active:</span>
-                    {(["left", "right"] as const).map(p => (
-                      <button
-                        key={p}
-                        onClick={() => setActivePanel(p)}
-                        className={`px-2 py-0.5 rounded transition-colors ${activePanel === p ? "bg-primary text-primary-foreground" : "hover:bg-secondary"}`}
-                      >
-                        {p === "left" ? "Player" : "Pro"}
-                      </button>
-                    ))}
-                  </div>
+                  {!synced && (
+                    <div className="flex items-center gap-0.5 bg-secondary/50 border border-border rounded-md p-1 text-xs font-semibold text-muted-foreground">
+                      <span className="px-1">Active:</span>
+                      {(["left", "right"] as const).map(p => (
+                        <button
+                          key={p}
+                          onClick={() => setActivePanel(p)}
+                          className={`px-2 py-0.5 rounded transition-colors ${activePanel === p ? "bg-primary text-primary-foreground" : "hover:bg-secondary"}`}
+                        >
+                          {p === "left" ? "Player" : "Pro"}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
