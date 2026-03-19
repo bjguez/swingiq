@@ -11,17 +11,17 @@ const BATS_OPTIONS = ["R", "L", "S"] as const;
 const THROWS_OPTIONS = ["R", "L"] as const;
 const PLAYER_SKILL_OPTIONS = [
   { value: "little_league", label: "Little League" },
-  { value: "select", label: "Select / Travel" },
+  { value: "select", label: "Select" },
   { value: "high_school", label: "High School" },
   { value: "college", label: "College" },
-  { value: "pro", label: "Pro / Semi-Pro" },
+  { value: "pro", label: "Pro" },
 ] as const;
 const COACHING_LEVELS = [
   { value: "little_league", label: "Little League" },
-  { value: "select", label: "Select / Travel" },
+  { value: "select", label: "Select" },
   { value: "high_school", label: "High School" },
   { value: "college", label: "College" },
-  { value: "pro", label: "Pro / Semi-Pro" },
+  { value: "pro", label: "Pro" },
 ] as const;
 const US_STATES = [
   "AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA",
