@@ -3,22 +3,29 @@ import { useSearch, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
 import { VideoLibraryModal } from "@/components/VideoLibraryModal";
 import DrawingCanvas from "@/components/DrawingCanvas";
 import type { Tool, DrawAction } from "@/components/DrawingCanvas";
 import {
   ArrowLeft, Send, Video, CheckCircle, X,
-  Mic, Square, RotateCcw, Loader2, Check,
-  Pen, Minus, Circle, RectangleHorizontal, Triangle,
-  Undo2, Trash2, ChevronLeft, ChevronRight, Scissors,
+  Mic, Square as StopIcon, RotateCcw, Loader2, Check,
+  Circle, Undo, Trash2, Scissors,
   FlipHorizontal2, ZoomIn, ZoomOut,
+  MousePointer2, PenTool, Type, Timer,
+  Play, Pause, SkipBack, SkipForward,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import type { Video as VideoType } from "@shared/schema";
 
 type RecordingState = "idle" | "recording" | "preview" | "uploading" | "done";
 
-const COLORS = ["#ef4444", "#eab308", "#22c55e", "#ffffff"];
+const COLORS = [
+  { value: "#ef4444", label: "Red" },
+  { value: "#eab308", label: "Yellow" },
+  { value: "#22c55e", label: "Green" },
+  { value: "#ffffff", label: "White" },
+];
 const SPEEDS = [0.25, 0.5, 0.75, 1];
 
 function formatTime(secs: number) {
@@ -26,14 +33,6 @@ function formatTime(secs: number) {
   const s = (secs % 60).toString().padStart(2, "0");
   return `${m}:${s}`;
 }
-
-const TOOLS: { id: Tool; icon: React.ReactNode; label: string }[] = [
-  { id: "pen", icon: <Pen size={14} />, label: "Draw" },
-  { id: "line", icon: <Minus size={14} />, label: "Line" },
-  { id: "angle", icon: <Triangle size={14} />, label: "Angle" },
-  { id: "circle", icon: <Circle size={14} />, label: "Circle" },
-  { id: "rect", icon: <RectangleHorizontal size={14} />, label: "Rect" },
-];
 
 export default function CoachSessionPage() {
   const [, navigate] = useLocation();
@@ -54,9 +53,14 @@ export default function CoachSessionPage() {
   const [highlightEnd, setHighlightEnd] = useState(5);
   const [videoDuration, setVideoDuration] = useState(5);
 
+  // Playback
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [progress, setProgress] = useState([0]);
+  const [currentTime, setCurrentTime] = useState(0);
+
   // Analysis tools
-  const [activeTool, setActiveTool] = useState<Tool>("pen");
-  const [activeColor, setActiveColor] = useState(COLORS[0]);
+  const [activeTool, setActiveTool] = useState<Tool>("select");
+  const [activeColor, setActiveColor] = useState(COLORS[0].value);
   const [leftAnnotations, setLeftAnnotations] = useState<DrawAction[]>([]);
   const [rightAnnotations, setRightAnnotations] = useState<DrawAction[]>([]);
   const [activePanel, setActivePanel] = useState<"left" | "right">("left");
@@ -114,10 +118,36 @@ export default function CoachSessionPage() {
     if (proVideoRef.current) proVideoRef.current.playbackRate = speed;
   }, [speed]);
 
+  const togglePlay = () => {
+    const player = playerVideoRef.current;
+    const pro = proVideoRef.current;
+    if (isPlaying) {
+      player?.pause();
+      pro?.pause();
+      setIsPlaying(false);
+    } else {
+      player?.play();
+      pro?.play();
+      setIsPlaying(true);
+    }
+  };
+
+  const handleSeek = (values: number[]) => {
+    const pct = values[0];
+    setProgress(values);
+    if (playerVideoRef.current && videoDuration > 0) {
+      playerVideoRef.current.currentTime = (pct / 100) * videoDuration;
+    }
+    if (proVideoRef.current && proVideoRef.current.duration > 0) {
+      proVideoRef.current.currentTime = (pct / 100) * proVideoRef.current.duration;
+    }
+  };
+
   const stepFrame = (dir: 1 | -1) => {
     const vid = activePanel === "left" ? playerVideoRef.current : proVideoRef.current;
     if (!vid) return;
     vid.pause();
+    setIsPlaying(false);
     vid.currentTime = Math.max(0, Math.min(vid.duration || 0, vid.currentTime + dir / 30));
   };
 
@@ -397,94 +427,45 @@ export default function CoachSessionPage() {
         {/* ── Analysis UI (player video selected) ── */}
         {playerVideoSrc && (
           <div className="space-y-3">
-            {/* Toolbar */}
-            <div className="flex items-center gap-2 flex-wrap rounded-lg border border-border bg-card px-3 py-2">
-              {/* Drawing tools */}
-              <div className="flex items-center gap-1">
-                {TOOLS.map(t => (
-                  <button
-                    key={t.id}
-                    onClick={() => setActiveTool(t.id)}
-                    title={t.label}
-                    className={`p-1.5 rounded transition-colors ${activeTool === t.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-secondary"}`}
-                  >
-                    {t.icon}
-                  </button>
-                ))}
+            {/* Drawing Toolbar */}
+            <div className="flex items-center justify-center gap-2 py-2 px-3 overflow-x-auto border border-border rounded-lg bg-secondary/20">
+              <ToolBtn icon={<MousePointer2 className="w-4 h-4" />} active={activeTool === "select"} tooltip="Select" onClick={() => setActiveTool("select")} />
+              <ToolBtn icon={<PenTool className="w-4 h-4" />} active={activeTool === "pen"} tooltip="Freehand" onClick={() => setActiveTool("pen")} />
+              <ToolBtn icon={<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="12" y1="4" x2="12" y2="20" /></svg>} active={activeTool === "line"} tooltip="Straight Line" onClick={() => setActiveTool("line")} />
+              <ToolBtn icon={<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="21" x2="21" y2="21" /><line x1="3" y1="21" x2="16" y2="4" /><path d="M10 21 A7 7 0 0 1 8.2 15.5" fill="none" /></svg>} active={activeTool === "angle"} tooltip="Measure Angle" onClick={() => setActiveTool("angle")} />
+              <ToolBtn icon={<Circle className="w-4 h-4" />} active={activeTool === "circle"} tooltip="Circle" onClick={() => setActiveTool("circle")} />
+              <ToolBtn icon={<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="1" /></svg>} active={activeTool === "rect"} tooltip="Rectangle" onClick={() => setActiveTool("rect")} />
+              <ToolBtn icon={<Type className="w-4 h-4" />} active={activeTool === "text"} tooltip="Text Notes" onClick={() => setActiveTool("text")} />
+
+              <div className="w-px h-6 bg-border mx-1 shrink-0" />
+
+              <ToolBtn icon={<Timer className="w-4 h-4" />} active={activeTool === "timer"} tooltip="Frame Timer" onClick={() => setActiveTool("timer")} />
+
+              <div className="w-px h-6 bg-border mx-1 shrink-0" />
+
+              {COLORS.map(c => (
+                <div
+                  key={c.value}
+                  onClick={() => setActiveColor(c.value)}
+                  className={`w-6 h-6 rounded-full border-2 cursor-pointer hover:scale-110 transition-transform shrink-0 ${activeColor === c.value ? "border-white scale-110" : "border-background"}`}
+                  style={{ backgroundColor: c.value }}
+                  title={c.label}
+                />
+              ))}
+
+              <div className="w-px h-6 bg-border mx-1 shrink-0" />
+
+              <ToolBtn icon={<Undo className="w-4 h-4" />} tooltip="Undo" onClick={undoAnnotation} />
+              <ToolBtn icon={<Trash2 className="w-4 h-4" />} tooltip="Clear All" onClick={clearAnnotations} />
+
+              <div className="ml-auto shrink-0">
+                <button
+                  onClick={() => { setPlayerVideoSrc(""); setPlayerVideoId(""); setLeftAnnotations([]); }}
+                  className="text-[11px] text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+                >
+                  <X size={12} /> Change video
+                </button>
               </div>
-
-              <div className="w-px h-5 bg-border" />
-
-              {/* Colors */}
-              <div className="flex items-center gap-1">
-                {COLORS.map(c => (
-                  <button
-                    key={c}
-                    onClick={() => setActiveColor(c)}
-                    className={`w-4 h-4 rounded-full border-2 transition-transform ${activeColor === c ? "border-white scale-125" : "border-transparent"}`}
-                    style={{ background: c }}
-                  />
-                ))}
-              </div>
-
-              <div className="w-px h-5 bg-border" />
-
-              {/* Undo / Clear */}
-              <button onClick={undoAnnotation} title="Undo" className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">
-                <Undo2 size={14} />
-              </button>
-              <button onClick={clearAnnotations} title="Clear all" className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">
-                <Trash2 size={14} />
-              </button>
-
-              <div className="w-px h-5 bg-border" />
-
-              {/* Speed */}
-              <div className="flex items-center gap-1">
-                {SPEEDS.map(s => (
-                  <button
-                    key={s}
-                    onClick={() => setSpeed(s)}
-                    className={`text-[11px] font-semibold px-1.5 py-0.5 rounded transition-colors ${speed === s ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-secondary"}`}
-                  >
-                    {s}x
-                  </button>
-                ))}
-              </div>
-
-              <div className="w-px h-5 bg-border" />
-
-              {/* Frame step */}
-              <button onClick={() => stepFrame(-1)} title="Previous frame" className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">
-                <ChevronLeft size={14} />
-              </button>
-              <button onClick={() => stepFrame(1)} title="Next frame" className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">
-                <ChevronRight size={14} />
-              </button>
-
-              <div className="w-px h-5 bg-border" />
-
-              {/* Active panel selector */}
-              <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                <span>Active:</span>
-                {(["left", "right"] as const).map(p => (
-                  <button
-                    key={p}
-                    onClick={() => setActivePanel(p)}
-                    className={`px-2 py-0.5 rounded font-semibold transition-colors ${activePanel === p ? "bg-primary text-primary-foreground" : "hover:bg-secondary"}`}
-                  >
-                    {p === "left" ? "Player" : "Pro"}
-                  </button>
-                ))}
-              </div>
-
-              {/* Change player video */}
-              <button
-                onClick={() => { setPlayerVideoSrc(""); setPlayerVideoId(""); setLeftAnnotations([]); }}
-                className="ml-auto text-[11px] text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
-              >
-                <X size={12} /> Change video
-              </button>
             </div>
 
             {/* Video panels */}
@@ -512,7 +493,6 @@ export default function CoachSessionPage() {
                 <video
                   ref={playerVideoRef}
                   src={playerVideoSrc}
-                  controls
                   crossOrigin="anonymous"
                   className="w-full h-full object-contain"
                   style={videoTransform(leftFlipH, leftZoom, leftPanX, leftPanY)}
@@ -521,6 +501,13 @@ export default function CoachSessionPage() {
                     setVideoDuration(dur);
                     setHighlightEnd(dur);
                   }}
+                  onTimeUpdate={e => {
+                    const v = e.target as HTMLVideoElement;
+                    setCurrentTime(v.currentTime);
+                    if (v.duration > 0) setProgress([v.currentTime / v.duration * 100]);
+                  }}
+                  onPlay={() => setIsPlaying(true)}
+                  onPause={() => setIsPlaying(false)}
                 />
                 <DrawingCanvas
                   ref={leftAnnotationRef}
@@ -574,7 +561,6 @@ export default function CoachSessionPage() {
                     <video
                       ref={proVideoRef}
                       src={proVideoSrc}
-                      controls
                       crossOrigin="anonymous"
                       className="w-full h-full object-contain"
                       style={videoTransform(rightFlipH, rightZoom, rightPanX, rightPanY)}
@@ -617,6 +603,56 @@ export default function CoachSessionPage() {
                     onVideoSelected={(src, _label, id) => { setProVideoSrc(src); if (id) setProVideoId(id); }}
                   />
                 )}
+              </div>
+            </div>
+
+            {/* Playback Controls */}
+            <div className="border border-border rounded-lg bg-secondary/30 p-4 flex flex-col gap-3">
+              <div className="flex items-center gap-4">
+                <div className="flex-1 h-8 flex items-center">
+                  <Slider value={progress} onValueChange={handleSeek} max={100} step={0.1} className="w-full" />
+                </div>
+                <div className="text-sm font-mono text-muted-foreground w-10 text-right shrink-0">
+                  {Math.floor(currentTime)}s
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Button variant="ghost" size="icon" className="h-10 w-10 text-muted-foreground hover:text-foreground" onClick={() => stepFrame(-1)} title="Previous frame">
+                    <SkipBack className="w-5 h-5" />
+                  </Button>
+                  <Button size="icon" className="h-12 w-12 rounded-full bg-primary text-primary-foreground hover:bg-primary/90" onClick={togglePlay}>
+                    {isPlaying ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6 ml-0.5" />}
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-10 w-10 text-muted-foreground hover:text-foreground" onClick={() => stepFrame(1)} title="Next frame">
+                    <SkipForward className="w-5 h-5" />
+                  </Button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-0.5 bg-secondary/50 border border-border rounded-md p-1">
+                    {SPEEDS.map(s => (
+                      <button
+                        key={s}
+                        onClick={() => setSpeed(s)}
+                        className={`px-1.5 py-0.5 rounded text-xs font-mono font-semibold transition-colors ${speed === s ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-secondary"}`}
+                      >
+                        {s}x
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-0.5 bg-secondary/50 border border-border rounded-md p-1 text-xs font-semibold text-muted-foreground">
+                    <span className="px-1">Active:</span>
+                    {(["left", "right"] as const).map(p => (
+                      <button
+                        key={p}
+                        onClick={() => setActivePanel(p)}
+                        className={`px-2 py-0.5 rounded transition-colors ${activePanel === p ? "bg-primary text-primary-foreground" : "hover:bg-secondary"}`}
+                      >
+                        {p === "left" ? "Player" : "Pro"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -687,7 +723,7 @@ export default function CoachSessionPage() {
                   </div>
                 </div>
                 <Button variant="destructive" size="sm" onClick={stopRecording}>
-                  <Square size={12} className="mr-2 fill-current" /> Stop
+                  <StopIcon size={12} className="mr-2 fill-current" /> Stop
                 </Button>
               </div>
             )}
@@ -764,5 +800,23 @@ export default function CoachSessionPage() {
         </div>
       </div>
     </Layout>
+  );
+}
+
+function ToolBtn({ icon, active, tooltip, onClick }: { icon: React.ReactNode; active?: boolean; tooltip: string; onClick?: () => void }) {
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      title={tooltip}
+      onClick={onClick}
+      className={`h-9 w-9 rounded-md shrink-0 transition-colors ${
+        active
+          ? "bg-primary/20 text-primary border border-primary/30"
+          : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+      }`}
+    >
+      {icon}
+    </Button>
   );
 }
