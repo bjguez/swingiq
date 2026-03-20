@@ -171,6 +171,16 @@ export const messages = pgTable("messages", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Player's saved MLB comps (auto-matched + manually added study players)
+export const userPlayerComps = pgTable("user_player_comps", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  mlbPlayerId: varchar("mlb_player_id").notNull().references(() => mlbPlayers.id, { onDelete: "cascade" }),
+  compType: text("comp_type").notNull().default("auto"), // "auto" | "manual"
+  rank: integer("rank"), // 1-3 for auto, null for manual
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,
@@ -199,3 +209,4 @@ export type CoachPlayer = typeof coachPlayers.$inferSelect;
 export type CoachSession = typeof coachSessions.$inferSelect;
 export type Notification = typeof notifications.$inferSelect;
 export type Message = typeof messages.$inferSelect;
+export type UserPlayerComp = typeof userPlayerComps.$inferSelect;

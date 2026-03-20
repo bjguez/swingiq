@@ -239,6 +239,19 @@ app.use((req, res, next) => {
     )
   `);
 
+  // Player MLB comps
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS user_player_comps (
+      id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id VARCHAR NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      mlb_player_id VARCHAR NOT NULL REFERENCES mlb_players(id) ON DELETE CASCADE,
+      comp_type TEXT NOT NULL DEFAULT 'auto',
+      rank INTEGER,
+      created_at TIMESTAMP DEFAULT NOW(),
+      UNIQUE(user_id, mlb_player_id)
+    )
+  `);
+
   if (r2Configured()) await configureR2Cors();
 
   await registerRoutes(httpServer, app);

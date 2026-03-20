@@ -11,6 +11,7 @@ import { uploadToR2, getVideoUrl, deleteFromR2, isR2Key, r2Configured, checkR2Ex
 import { createCheckoutSession, createPortalSession, handleWebhook, PRICES } from "./stripe";
 import { setupCoachRoutes } from "./coach";
 import { setupCoachingRoutes } from "./coaching";
+import { setupBiometricsRoutes } from "./biometrics";
 
 const uploadDir = path.resolve("uploads");
 if (!fs.existsSync(uploadDir)) {
@@ -1022,6 +1023,7 @@ export async function registerRoutes(
 
   setupCoachRoutes(app);
   setupCoachingRoutes(app);
+  setupBiometricsRoutes(app);
 
   // ── Coach recording upload ─────────────────────────────────────────────────
   // Accept webm blobs from the canvas recorder, store in R2 under recordings/
