@@ -48,6 +48,9 @@ export function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) {
   const isCoach = user?.accountType === "coach";
   const [form, setForm] = useState({
     age: user?.age ? String(user.age) : "",
+    heightFt: user?.heightInches ? String(Math.floor(user.heightInches / 12)) : "",
+    heightIn: user?.heightInches ? String(user.heightInches % 12) : "",
+    weight: user?.weightLbs ? String(user.weightLbs) : "",
     city: user?.city ?? "",
     state: user?.state ?? "",
     skillLevel: user?.skillLevel ?? "",
@@ -75,6 +78,9 @@ export function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) {
   const handleEdit = () => {
     setForm({
       age: user?.age ? String(user.age) : "",
+      heightFt: user?.heightInches ? String(Math.floor(user.heightInches / 12)) : "",
+      heightIn: user?.heightInches ? String(user.heightInches % 12) : "",
+      weight: user?.weightLbs ? String(user.weightLbs) : "",
       city: user?.city ?? "",
       state: user?.state ?? "",
       skillLevel: user?.skillLevel ?? "",
@@ -89,8 +95,11 @@ export function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    const totalInches = form.heightFt ? Number(form.heightFt) * 12 + (Number(form.heightIn) || 0) : undefined;
     await updateProfile({
       age: form.age ? Number(form.age) : undefined,
+      heightInches: totalInches || undefined,
+      weightLbs: form.weight ? Number(form.weight) : undefined,
       city: form.city || undefined,
       state: form.state || undefined,
       skillLevel: form.skillLevel || undefined,
@@ -184,6 +193,8 @@ export function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) {
                         { label: "Bats", value: user.bats },
                         { label: "Throws", value: user.throws },
                         { label: "Age", value: user.age },
+                        { label: "Height", value: user.heightInches ? `${Math.floor(user.heightInches / 12)}'${user.heightInches % 12}"` : null },
+                        { label: "Weight", value: user.weightLbs ? `${user.weightLbs} lbs` : null },
                         { label: "Location", value: [user.city, user.state].filter(Boolean).join(", ") || null },
                       ].map(({ label, value }) => value ? (
                         <div key={label} className="flex justify-between">
@@ -279,9 +290,25 @@ export function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) {
                     <div className="grid grid-cols-2 gap-2">
                       <Input placeholder="Age" type="number" min={5} max={100}
                         value={form.age} onChange={e => setForm(f => ({ ...f, age: e.target.value }))} />
-                      <Input placeholder="City"
-                        value={form.city} onChange={e => setForm(f => ({ ...f, city: e.target.value }))} />
+                      <Input placeholder="Weight (lbs)" type="number" min={50} max={400}
+                        value={form.weight} onChange={e => setForm(f => ({ ...f, weight: e.target.value }))} />
                     </div>
+
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <Input placeholder="Height ft" type="number" min={3} max={7}
+                          value={form.heightFt} onChange={e => setForm(f => ({ ...f, heightFt: e.target.value }))} />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">ft</span>
+                      </div>
+                      <div className="relative flex-1">
+                        <Input placeholder="in" type="number" min={0} max={11}
+                          value={form.heightIn} onChange={e => setForm(f => ({ ...f, heightIn: e.target.value }))} />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">in</span>
+                      </div>
+                    </div>
+
+                    <Input placeholder="City"
+                      value={form.city} onChange={e => setForm(f => ({ ...f, city: e.target.value }))} />
                     <select
                       value={form.state}
                       onChange={e => setForm(f => ({ ...f, state: e.target.value }))}
