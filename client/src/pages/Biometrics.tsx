@@ -67,7 +67,7 @@ function CompCard({
       {/* Photo */}
       <div className="aspect-4/3 bg-secondary flex items-center justify-center overflow-hidden">
         {p.imageUrl ? (
-          <img src={p.imageUrl} alt={p.name} className="w-full h-full object-cover object-top" />
+          <img src={p.imageUrl} alt={p.name} className="w-full h-full object-contain" />
         ) : (
           <span className="text-4xl font-bold text-primary/30">{p.name[0]}</span>
         )}
