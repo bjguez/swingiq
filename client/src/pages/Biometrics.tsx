@@ -16,7 +16,8 @@ import type { MlbPlayer, Video } from "@shared/schema";
 
 function fmt(n: number | null | undefined, decimals = 3) {
   if (n == null) return "—";
-  return n.toFixed(decimals);
+  const s = n.toFixed(decimals);
+  return n < 1 ? s.replace(/^0/, "") : s;
 }
 
 function fmtAvg(n: number | null | undefined) {
