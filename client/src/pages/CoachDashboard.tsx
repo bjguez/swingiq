@@ -266,7 +266,7 @@ export default function CoachDashboard() {
                         <FileVideo size={16} />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <p className="text-sm font-semibold">
                             {new Date(s.sharedAt || s.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
                           </p>
@@ -280,6 +280,12 @@ export default function CoachDashboard() {
                         </div>
                         {s.notes && <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{s.notes}</p>}
                       </div>
+                      <button
+                        onClick={() => navigate(`/coach/session/review?sessionId=${s.id}`)}
+                        className="cursor-pointer shrink-0 text-xs text-primary hover:underline font-semibold mt-0.5"
+                      >
+                        View
+                      </button>
                     </div>
                   ))}
                 </div>

@@ -17,6 +17,7 @@ import VerifyEmailPage from "@/pages/VerifyEmailPage";
 import PricingPage from "@/pages/PricingPage";
 import CoachDashboard from "@/pages/CoachDashboard";
 import CoachSessionPage from "@/pages/CoachSessionPage";
+import CoachSessionReviewPage from "@/pages/CoachSessionReviewPage";
 import CoachMessagesPage from "@/pages/CoachMessagesPage";
 import AcceptInvitePage from "@/pages/AcceptInvitePage";
 import { useAuth } from "@/hooks/use-auth";
@@ -50,6 +51,7 @@ function Router() {
       <Route path="/my-swings" component={MySwings} />
       <Route path="/coach" component={CoachDashboard} />
       <Route path="/coach/session" component={CoachSessionPage} />
+      <Route path="/coach/session/review" component={CoachSessionReviewPage} />
       <Route path="/coach/messages" component={CoachMessagesPage} />
       <Route path="/invite/accept" component={AcceptInvitePage} />
       <Route path="/admin" component={AdminRoute} />

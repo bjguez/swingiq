@@ -198,7 +198,7 @@ export function setupCoachingRoutes(app: Express) {
     } catch (err) { next(err); }
   });
 
-  // GET /api/coaching/sessions/:id — single session detail
+  // GET /api/coaching/sessions/:id — single session detail (with resolved video URLs)
   app.get("/api/coaching/sessions/:id", async (req, res, next) => {
     try {
       const user = req.user as User | undefined;
@@ -209,7 +209,22 @@ export function setupCoachingRoutes(app: Express) {
       if (session.coachId !== user.id && session.playerId !== user.id)
         return res.status(403).json({ message: "Access denied" });
 
-      res.json(session);
+      // Resolve video URLs
+      let playerVideoUrl: string | null = null;
+      let proVideoUrl: string | null = null;
+      if (session.playerVideoId) {
+        const [pv] = await db.select().from(videos).where(eq(videos.id, session.playerVideoId));
+        if (pv?.sourceUrl) playerVideoUrl = isR2Key(pv.sourceUrl) ? await getVideoUrl(pv.sourceUrl) : pv.sourceUrl;
+      }
+      if (session.proVideoId) {
+        const [prv] = await db.select().from(videos).where(eq(videos.id, session.proVideoId));
+        if (prv?.sourceUrl) proVideoUrl = isR2Key(prv.sourceUrl) ? await getVideoUrl(prv.sourceUrl) : prv.sourceUrl;
+      }
+      const voiceoverUrl = session.voiceoverUrl && isR2Key(session.voiceoverUrl)
+        ? await getVideoUrl(session.voiceoverUrl)
+        : session.voiceoverUrl;
+
+      res.json({ ...session, playerVideoUrl, proVideoUrl, voiceoverUrl });
     } catch (err) { next(err); }
   });
 
