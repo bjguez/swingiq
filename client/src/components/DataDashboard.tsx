@@ -422,12 +422,12 @@ function PlayerStatsSection({ player, awards = [] }: { player: MlbPlayer; awards
 
       {hasStats && (
         <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-          <StatTile label="AVG" value={player.battingAvg} isRate stat="avg" />
-          <StatTile label="HR" value={player.homeRuns} stat="hr" />
-          <StatTile label="RBI" value={player.rbi} stat="rbi" />
-          <StatTile label="OBP" value={player.obp} isRate stat="obp" />
-          <StatTile label="SLG" value={player.slg} isRate stat="slg" />
-          <StatTile label="OPS" value={player.ops} isRate stat="ops" />
+          <StatTile label="AVG" value={player.battingAvg} isRate />
+          <StatTile label="HR" value={player.homeRuns} />
+          <StatTile label="RBI" value={player.rbi} />
+          <StatTile label="OBP" value={player.obp} isRate />
+          <StatTile label="SLG" value={player.slg} isRate />
+          <StatTile label="OPS" value={player.ops} isRate />
         </div>
       )}
 
@@ -479,19 +479,23 @@ function PlayerStatsSection({ player, awards = [] }: { player: MlbPlayer; awards
         </div>
       )}
 
-      {/* Legend */}
-      {(hasStats || awards.length > 0) && (
+      {/* Legend — only shown alongside year-by-year table (thresholds are per-season) */}
+      {(showTable || awards.length > 0) && (
         <div className="border-t border-border/40 pt-3 space-y-2">
-          <p className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground/60">Legend</p>
-          <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
-            <span><span className="text-orange-400 font-semibold">Orange</span> = Great &nbsp;<span className="text-green-400 font-semibold">Green</span> = Elite</span>
-            <span>AVG <span className="text-orange-400">.275+</span> / <span className="text-green-400">.300+</span></span>
-            <span>HR <span className="text-orange-400">20+</span> / <span className="text-green-400">30+</span></span>
-            <span>RBI <span className="text-orange-400">75+</span> / <span className="text-green-400">100+</span></span>
-            <span>OBP <span className="text-orange-400">.350+</span> / <span className="text-green-400">.400+</span></span>
-            <span>SLG <span className="text-orange-400">.475+</span> / <span className="text-green-400">.550+</span></span>
-            <span>OPS <span className="text-orange-400">.800+</span> / <span className="text-green-400">.900+</span></span>
-          </div>
+          {showTable && (
+            <>
+              <p className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground/60">Season Thresholds</p>
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
+                <span><span className="text-orange-400 font-semibold">Orange</span> = Great &nbsp;<span className="text-green-400 font-semibold">Green</span> = Elite</span>
+                <span>AVG <span className="text-orange-400">.275+</span> / <span className="text-green-400">.300+</span></span>
+                <span>HR <span className="text-orange-400">20+</span> / <span className="text-green-400">30+</span></span>
+                <span>RBI <span className="text-orange-400">75+</span> / <span className="text-green-400">100+</span></span>
+                <span>OBP <span className="text-orange-400">.350+</span> / <span className="text-green-400">.400+</span></span>
+                <span>SLG <span className="text-orange-400">.475+</span> / <span className="text-green-400">.550+</span></span>
+                <span>OPS <span className="text-orange-400">.800+</span> / <span className="text-green-400">.900+</span></span>
+              </div>
+            </>
+          )}
           {awards.length > 0 && (
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
               <span>⭐ All-Star</span>
