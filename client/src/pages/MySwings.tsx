@@ -16,6 +16,12 @@ export default function MySwings() {
     queryFn: () => fetchVideos(),
   });
 
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [deleting, setDeleting] = useState<Set<string>>(new Set());
+  const [bulkMode, setBulkMode] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [activeCategory, setActiveCategory] = useState("All");
+
   const userVideos = (allVideos as Video[]).filter(v => !v.isProVideo && v.sourceUrl);
 
   const filteredVideos = userVideos.filter(v => {
@@ -27,12 +33,6 @@ export default function MySwings() {
       ((v as any).tags?.some((t: string) => t.toLowerCase().includes(q)));
     return matchCategory && matchSearch;
   });
-
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [deleting, setDeleting] = useState<Set<string>>(new Set());
-  const [bulkMode, setBulkMode] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [activeCategory, setActiveCategory] = useState("All");
 
   const toggleSelect = (id: string) => {
     setSelected(prev => {
