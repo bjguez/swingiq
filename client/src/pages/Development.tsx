@@ -121,9 +121,11 @@ export default function Development() {
 
   // Tab list — show Sessions/Messages only if player has a coach
   const tabs: { id: Tab; label: string }[] = [
+    ...(hasCoach ? [
+      { id: "sessions" as Tab, label: `Coaching Sessions${coachSessions.length > 0 ? ` (${coachSessions.length})` : ""}` },
+    ] : []),
     { id: "blueprint", label: "Blueprint" },
     ...(hasCoach ? [
-      { id: "sessions" as Tab, label: `Sessions${coachSessions.length > 0 ? ` (${coachSessions.length})` : ""}` },
       { id: "messages" as Tab, label: "Messages" },
     ] : []),
   ];
