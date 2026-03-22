@@ -287,7 +287,7 @@ export default function Admin() {
       </div>
 
       {/* Tab Bar */}
-      <div className="flex border-b border-border mb-6">
+      <div className="flex border-b border-border mb-6 overflow-x-auto scrollbar-none">
         <button
           onClick={() => setActiveTab("videos")}
           className={`px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors ${
@@ -337,14 +337,14 @@ export default function Admin() {
       {/* ── VIDEOS TAB ── */}
       {activeTab === "videos" && (
         <>
-          <div className="flex justify-between items-center mb-4">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 flex-1 mr-4">
+          <div className="flex flex-col gap-4 mb-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <StatCard label="Total Videos" value={allVideos.length} />
               <StatCard label="Pro Clips" value={proCount} />
               <StatCard label="User Uploads" value={uploadCount} />
               <StatCard label="With Files" value={withFileCount} />
             </div>
-            <div className="flex gap-2 shrink-0">
+            <div className="flex gap-2 flex-wrap">
               <Button
                 variant="outline"
                 size="sm"
@@ -416,7 +416,8 @@ export default function Admin() {
           </div>
 
           {/* Videos Table */}
-          <div className="border border-border rounded-xl overflow-hidden">
+          <div className="border border-border rounded-xl overflow-hidden overflow-x-auto">
+            <div className="min-w-[700px]">
             <div className="bg-secondary/50 p-3 text-xs font-semibold text-muted-foreground grid grid-cols-12 gap-2 uppercase tracking-wider items-center">
               <div className="col-span-3">Title</div>
               <div className="col-span-2">Player</div>
@@ -477,6 +478,7 @@ export default function Admin() {
                 )}
               </div>
             )}
+            </div>
           </div>
         </>
       )}
@@ -663,8 +665,8 @@ export default function Admin() {
       {/* ── PLAYERS TAB ── */}
       {activeTab === "players" && (
         <>
-          <div className="flex justify-between items-center mb-4">
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 flex-1 mr-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-4">
+            <div className="grid grid-cols-3 gap-4 flex-1">
               <StatCard label="Total Players" value={players.length} />
               <StatCard label="With Statcast" value={players.filter((p: MlbPlayer) => p.avgExitVelo != null).length} />
               <StatCard label="With Career Stats" value={players.filter((p: MlbPlayer) => p.battingAvg != null).length} />
@@ -746,7 +748,8 @@ export default function Admin() {
           </div>
 
           {/* Players Table */}
-          <div className="border border-border rounded-xl overflow-hidden">
+          <div className="border border-border rounded-xl overflow-hidden overflow-x-auto">
+            <div className="min-w-[700px]">
             <div className="bg-secondary/50 p-3 text-xs font-semibold text-muted-foreground grid grid-cols-12 gap-2 uppercase tracking-wider items-center">
               <div className="col-span-1"></div>
               <div className="col-span-3">Name</div>
@@ -780,6 +783,7 @@ export default function Admin() {
                 </div>
               )}
             </div>
+            </div>
           </div>
         </>
       )}
@@ -787,14 +791,14 @@ export default function Admin() {
       {/* ── R2 HEALTH TAB ── */}
       {activeTab === "health" && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 flex-1">
               <StatCard label="R2 Videos" value={r2Health?.total ?? 0} />
               <StatCard label="OK" value={r2Health?.ok ?? 0} />
               <StatCard label="Missing" value={r2Health?.missing ?? 0} />
               <StatCard label="Needs Transcode" value={r2Health?.videos.filter(v => /\.(mov|avi|webm)$/i.test(v.key)).length ?? 0} />
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 shrink-0">
               <Button
                 variant="outline"
                 size="sm"
@@ -842,7 +846,8 @@ export default function Admin() {
           )}
 
           {r2Health && (
-            <div className="border border-border rounded-xl overflow-hidden">
+            <div className="border border-border rounded-xl overflow-hidden overflow-x-auto">
+              <div className="min-w-[700px]">
               <div className="bg-secondary/50 p-3 text-xs font-semibold text-muted-foreground grid grid-cols-12 gap-2 uppercase tracking-wider">
                 <div className="col-span-1">Status</div>
                 <div className="col-span-3">Title</div>
@@ -878,6 +883,7 @@ export default function Admin() {
                     </div>
                   );
                 })}
+              </div>
               </div>
             </div>
           )}
