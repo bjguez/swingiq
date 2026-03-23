@@ -309,6 +309,9 @@ export default function Development() {
                       <p className="text-xs text-muted-foreground mt-0.5">{new Date(session.sharedAt).toLocaleDateString()}</p>
                     </div>
                   </div>
+                  <span className="text-xs text-primary font-semibold shrink-0">
+                    {isSelected ? "Close" : "View Session →"}
+                  </span>
                 </button>
                 {isSelected && (
                   <div className="px-4 pb-4 space-y-4 border-t border-border pt-4">
