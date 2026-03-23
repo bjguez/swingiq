@@ -1,18 +1,24 @@
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
-import { PlayCircle, Target, CheckCircle2, Dumbbell, Loader2, Lock, MessageSquare, Video, Send, GraduationCap } from "lucide-react";
+import { Target, Loader2, Lock, MessageSquare, Video, Send, GraduationCap, ChevronRight } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { fetchDrills, fetchVideos } from "@/lib/api";
+import { fetchVideos } from "@/lib/api";
 import { useState, useRef, useEffect } from "react";
 import { useLocation, useSearch } from "wouter";
-import type { Drill, Video as VideoType } from "@shared/schema";
+import type { Video as VideoType, MlbPlayer } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
 import { AuthGateModal } from "@/components/AuthGateModal";
 import { apiRequest } from "@/lib/queryClient";
-
-const phases = ["Gather", "Launch", "Swing"];
+import { CompTrainer } from "@/components/CompTrainer";
 
 type Tab = "blueprint" | "sessions" | "messages";
+
+type CompRow = {
+  id: string;
+  compType: string;
+  rank: number | null;
+  player: MlbPlayer;
+};
 
 type CoachSessionRow = {
   id: string;
@@ -53,7 +59,7 @@ export default function Development() {
   const [, navigate] = useLocation();
   const search = useSearch();
   const [authGateOpen, setAuthGateOpen] = useState(false);
-  const [focusPhase, setFocusPhase] = useState("Gather");
+  const [selectedComp, setSelectedComp] = useState<CompRow | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>(() => {
     const s = new URLSearchParams(search).get("session");
     return s ? "sessions" : "blueprint";
@@ -63,16 +69,15 @@ export default function Development() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
 
-  const { data: allDrills = [], isLoading: drillsLoading } = useQuery({
-    queryKey: ["/api/drills"],
-    queryFn: () => fetchDrills(),
+  const { data: allVideos = [], isLoading: videosLoading } = useQuery({
+    queryKey: ["/api/videos"],
+    queryFn: () => fetchVideos(),
     enabled: isProOrAdmin,
   });
 
-  const { data: allVideos = [], isLoading: videosLoading } = useQuery({
-    queryKey: ["/api/videos", "development"],
-    queryFn: () => fetchVideos(undefined, "development"),
-    enabled: isProOrAdmin,
+  const { data: comps = [], isLoading: compsLoading } = useQuery<CompRow[]>({
+    queryKey: ["/api/biometrics/comps"],
+    enabled: !!user && isProOrAdmin,
   });
 
   const { data: coachSessions = [], isLoading: sessionsLoading } = useQuery<CoachSessionRow[]>({
@@ -115,9 +120,11 @@ export default function Development() {
     }
   }, [msgs, activeTab]);
 
-  const phaseDrills = allDrills.filter((d: Drill) => d.phase === focusPhase);
-  const phaseVideos = allVideos.filter((v: VideoType) => v.category === focusPhase);
   const hasCoach = relationships.length > 0;
+
+  // Separate user uploads from pro library videos
+  const userVideos = (allVideos as VideoType[]).filter(v => !v.isProVideo);
+  const proVideos = (allVideos as VideoType[]).filter(v => v.isProVideo);
 
   // Tab list — show Sessions/Messages only if player has a coach
   const tabs: { id: Tab; label: string }[] = [
@@ -182,7 +189,7 @@ export default function Development() {
           <div>
             <h2 className="text-2xl font-bold font-display uppercase mb-2">Pro Feature</h2>
             <p className="text-muted-foreground max-w-md">
-              Phase-by-phase drill plans and pro model breakdowns require a Pro subscription.
+              Mirror your biometric comps and analyze your mechanics gap with a Pro subscription.
             </p>
           </div>
           <Button size="lg" onClick={() => navigate("/pricing")}>Upgrade to Pro</Button>
@@ -191,91 +198,98 @@ export default function Development() {
 
       {activeTab === "blueprint" && isProOrAdmin && (
         <>
-          {/* Phase selector */}
-          <div className="mt-4">
-            <h3 className="font-display font-bold text-xl mb-3">Swing Phases</h3>
-            <div className="grid grid-cols-3 gap-4">
-              {phases.map(phase => (
-                <PhaseCard key={phase} title={phase} active={focusPhase === phase} onClick={() => setFocusPhase(phase)} />
-              ))}
-            </div>
-          </div>
-
-          <div className="mt-8 space-y-6">
-            <div className="flex items-center justify-between border-b border-border pb-2">
-              <h2 className="text-2xl font-bold font-display flex items-center gap-2">
-                <Target className="text-primary w-6 h-6" /> Current Focus: {focusPhase}
-              </h2>
-            </div>
-
-            {(drillsLoading || videosLoading) ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          {selectedComp ? (
+            <CompTrainer
+              comp={selectedComp}
+              compVideos={proVideos.filter(v =>
+                v.playerName?.toLowerCase() === selectedComp.player.name.toLowerCase()
+              )}
+              userVideos={userVideos}
+              onBack={() => setSelectedComp(null)}
+            />
+          ) : (
+            <div className="space-y-6 mt-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold font-display uppercase flex items-center gap-2">
+                    <Target className="text-primary w-6 h-6" /> Mirror Your Comp
+                  </h2>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Pick a biometric comp and compare your swing mechanics side-by-side or overlaid.
+                  </p>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => navigate("/biometrics")}>
+                  Manage Comps
+                </Button>
               </div>
-            ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <div className="space-y-4">
-                  <h3 className="font-display text-xl uppercase tracking-wider text-muted-foreground mb-4">1. The Standard (Pro Models)</h3>
-                  {phaseVideos.length === 0 ? (
-                    <div className="bg-card border border-border rounded-xl p-8 text-center text-muted-foreground">No pro clips for this phase yet.</div>
-                  ) : phaseVideos.map((video: VideoType) => (
-                    <div key={video.id} className="bg-card border border-border rounded-xl p-4 space-y-4 hover:border-primary/30 transition-colors">
-                      <div className="relative rounded-lg overflow-hidden aspect-video bg-black group cursor-pointer">
-                        <div className="w-full h-full bg-linear-to-br from-secondary/60 to-background flex items-center justify-center">
-                          <PlayCircle className="w-12 h-12 text-muted-foreground/30" />
-                        </div>
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <div className="w-12 h-12 rounded-full bg-primary/90 text-primary-foreground flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
-                            <PlayCircle className="w-6 h-6 ml-0.5" />
+
+              {(compsLoading || videosLoading) ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                </div>
+              ) : comps.length === 0 ? (
+                <div className="border border-border rounded-xl p-10 text-center space-y-3">
+                  <Target className="w-10 h-10 text-primary/30 mx-auto" />
+                  <p className="font-semibold">No comps set up yet</p>
+                  <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+                    Head to Biometrics to find your MLB physical comps. Then come back here to mirror their mechanics.
+                  </p>
+                  <Button onClick={() => navigate("/biometrics")}>Go to Biometrics</Button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {comps.map(comp => {
+                    const videoCount = proVideos.filter(v =>
+                      v.playerName?.toLowerCase() === comp.player.name.toLowerCase()
+                    ).length;
+                    return (
+                      <button
+                        key={comp.id}
+                        onClick={() => setSelectedComp(comp)}
+                        className="bg-card border border-border rounded-xl p-4 text-left hover:border-primary/40 hover:bg-primary/5 transition-all group"
+                      >
+                        <div className="flex items-center gap-3 mb-3">
+                          {comp.player.imageUrl ? (
+                            <img
+                              src={comp.player.imageUrl}
+                              alt={comp.player.name}
+                              className="w-12 h-12 rounded-full object-contain bg-secondary border border-border shrink-0"
+                            />
+                          ) : (
+                            <div className="w-12 h-12 rounded-full bg-secondary border border-border flex items-center justify-center shrink-0 text-lg font-bold text-muted-foreground">
+                              {comp.player.name[0]}
+                            </div>
+                          )}
+                          <div className="min-w-0">
+                            <p className="font-bold text-sm leading-tight truncate">{comp.player.name}</p>
+                            <p className="text-xs text-muted-foreground">{comp.player.team}</p>
                           </div>
                         </div>
-                        <div className="absolute bottom-3 left-3 bg-black/60 backdrop-blur-sm px-2 py-1 rounded text-xs font-mono border border-white/10">
-                          {video.duration} / {video.playerName}
-                        </div>
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-lg">{video.title}</h4>
-                        <p className="text-sm text-muted-foreground mt-1">{video.playerName} • {video.source}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
 
-                <div className="space-y-4">
-                  <h3 className="font-display text-xl uppercase tracking-wider text-muted-foreground mb-4">2. Execution (Drills)</h3>
-                  {phaseDrills.length === 0 ? (
-                    <div className="bg-card border border-border rounded-xl p-8 text-center text-muted-foreground">No drills for this phase yet.</div>
-                  ) : phaseDrills.map((drill: Drill) => (
-                    <div key={drill.id} className="bg-secondary/30 border border-border rounded-xl overflow-hidden">
-                      <div className="p-4 border-b border-border flex justify-between items-center bg-card">
-                        <div className="flex items-center gap-2">
-                          <Dumbbell className="w-5 h-5 text-primary" />
-                          <h4 className="font-bold text-lg">{drill.name}</h4>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${
+                              comp.compType === "auto"
+                                ? "bg-primary/20 text-primary"
+                                : "bg-blue-500/10 text-blue-400"
+                            }`}>
+                              {comp.compType === "auto" ? `#${comp.rank} Comp` : "Studying"}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground">
+                              {videoCount} video{videoCount !== 1 ? "s" : ""}
+                            </span>
+                          </div>
+                          <span className="text-xs text-primary font-semibold flex items-center gap-0.5 group-hover:gap-1.5 transition-all">
+                            Train <ChevronRight className="w-3.5 h-3.5" />
+                          </span>
                         </div>
-                        {drill.reps && <span className="text-xs bg-primary/20 text-primary px-2 py-1 rounded font-bold">{drill.reps}</span>}
-                      </div>
-                      <div className="p-4">
-                        {drill.description && <p className="text-sm text-muted-foreground mb-4">{drill.description}</p>}
-                        {drill.steps && drill.steps.length > 0 && (
-                          <ul className="space-y-2 text-sm text-muted-foreground mb-4">
-                            {drill.steps.map((step: string, i: number) => (
-                              <li key={i} className="flex items-start gap-2">
-                                <CheckCircle2 className="w-4 h-4 text-primary shrink-0 mt-0.5" /> {step}
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                        <div className="flex gap-2">
-                          <Button variant="outline" size="sm" className="w-full">Log Set</Button>
-                          <Button variant="secondary" size="sm" className="w-full">Upload Attempt</Button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                      </button>
+                    );
+                  })}
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
         </>
       )}
 
@@ -423,13 +437,3 @@ function PlayerVideo({ videoId, highlightStart, highlightEnd }: { videoId: strin
   );
 }
 
-function PhaseCard({ title, active, onClick }: { title: string; active: boolean; onClick: () => void }) {
-  return (
-    <div onClick={onClick} className={`border rounded-xl p-4 cursor-pointer transition-all ${active ? "bg-primary/10 border-primary/50 shadow-[0_0_15px_rgba(20,184,102,0.1)]" : "bg-card border-border hover:border-primary/30"}`}>
-      <div className="text-sm uppercase tracking-wider font-bold flex justify-between items-center">
-        <span className={active ? "text-primary" : "text-muted-foreground"}>{title}</span>
-        {active && <Target className="w-4 h-4 text-primary" />}
-      </div>
-    </div>
-  );
-}
