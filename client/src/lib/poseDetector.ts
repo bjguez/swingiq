@@ -3,7 +3,7 @@ import { PoseLandmarker, FilesetResolver, DrawingUtils } from "@mediapipe/tasks-
 let poseLandmarker: PoseLandmarker | null = null;
 let initPromise: Promise<PoseLandmarker> | null = null;
 
-const MEDIAPIPE_CDN = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.32/wasm";
+const MEDIAPIPE_CDN = "/mediapipe/wasm";
 const MODEL_URL = "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task";
 
 export async function initPoseDetector(): Promise<PoseLandmarker> {
@@ -11,7 +11,7 @@ export async function initPoseDetector(): Promise<PoseLandmarker> {
   if (initPromise) return initPromise;
 
   initPromise = (async () => {
-    console.log("[PoseDetector] Loading WASM from CDN...");
+    console.log("[PoseDetector] Loading WASM...");
     const vision = await FilesetResolver.forVisionTasks(MEDIAPIPE_CDN);
     console.log("[PoseDetector] WASM loaded, creating PoseLandmarker...");
     try {
