@@ -116,6 +116,7 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
           src={src}
           className="w-full h-full object-contain"
           style={videoStyle}
+          crossOrigin="anonymous"
           playsInline
           muted
           preload="metadata"
