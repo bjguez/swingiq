@@ -252,6 +252,31 @@ app.use((req, res, next) => {
     )
   `);
 
+  // Blueprint content library
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS blueprint_content (
+      id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+      phase TEXT NOT NULL,
+      content_type TEXT NOT NULL DEFAULT 'drill',
+      title TEXT NOT NULL,
+      description TEXT,
+      source_url TEXT,
+      thumbnail_url TEXT,
+      sort_order INTEGER DEFAULT 0,
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
+  // Player phase focus (which phases a player is currently working on)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS player_phase_focus (
+      id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id VARCHAR NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      phase TEXT NOT NULL,
+      started_at TIMESTAMP DEFAULT NOW(),
+      UNIQUE(user_id, phase)
+    )
+  `);
+
   if (r2Configured()) await configureR2Cors();
 
   await registerRoutes(httpServer, app);

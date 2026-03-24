@@ -9,7 +9,7 @@ import type { Video, MlbPlayer } from "@shared/schema";
 import {
   Upload, Trash2, Pencil, Save, X, Plus, PlayCircle,
   Film, Loader2, CheckCircle2, AlertCircle, Search,
-  Users, UserPlus, Scissors,
+  Users, UserPlus, Scissors, BookOpen,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -57,7 +57,7 @@ interface MlbLookupResult {
 export default function Admin() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<"videos" | "users" | "players" | "health">("videos");
+  const [activeTab, setActiveTab] = useState<"videos" | "users" | "players" | "health" | "blueprint">("videos");
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [playingVideo, setPlayingVideo] = useState<{ title: string; url: string } | null>(null);
   const [tierDraft, setTierDraft] = useState<Record<string, string>>({});
@@ -331,6 +331,17 @@ export default function Admin() {
         >
           <AlertCircle className="w-4 h-4 inline mr-2" />
           R2 Health
+        </button>
+        <button
+          onClick={() => setActiveTab("blueprint")}
+          className={`px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors ${
+            activeTab === "blueprint"
+              ? "border-primary text-primary"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <BookOpen className="w-4 h-4 inline mr-2" />
+          Blueprint
         </button>
       </div>
 
@@ -889,7 +900,242 @@ export default function Admin() {
           )}
         </div>
       )}
+
+      {activeTab === "blueprint" && (
+        <BlueprintAdminTab />
+      )}
     </Layout>
+  );
+}
+
+function BlueprintAdminTab() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [form, setForm] = useState({
+    phase: "foundation",
+    contentType: "drill",
+    title: "",
+    description: "",
+    sourceUrl: "",
+  });
+
+  const { data: content = [], isLoading } = useQuery<any[]>({
+    queryKey: ["/api/blueprint/content"],
+    queryFn: () => fetch("/api/blueprint/content").then(r => r.json()),
+  });
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    setUploadProgress(0);
+    const fd = new FormData();
+    fd.append("video", file);
+    fd.append("title", form.title || file.name);
+    fd.append("skipRecord", "1");
+    try {
+      const xhr = new XMLHttpRequest();
+      xhr.upload.addEventListener("progress", (ev) => {
+        if (ev.lengthComputable) setUploadProgress(Math.round((ev.loaded / ev.total) * 100));
+      });
+      const response = await new Promise<any>((resolve, reject) => {
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) resolve(JSON.parse(xhr.responseText));
+          else reject(new Error("Upload failed"));
+        };
+        xhr.onerror = () => reject(new Error("Upload failed"));
+        xhr.open("POST", "/api/upload");
+        xhr.send(fd);
+      });
+      setForm(prev => ({ ...prev, sourceUrl: response.sourceUrl, title: prev.title || file.name }));
+      toast({ title: "Video uploaded" });
+    } catch {
+      toast({ title: "Upload failed", variant: "destructive" });
+    }
+    setUploading(false);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleSave = async () => {
+    if (!form.title) {
+      toast({ title: "Title is required", variant: "destructive" });
+      return;
+    }
+    try {
+      const res = await fetch("/api/blueprint/content", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      if (!res.ok) throw new Error();
+      setForm({ phase: "foundation", contentType: "drill", title: "", description: "", sourceUrl: "" });
+      queryClient.invalidateQueries({ queryKey: ["/api/blueprint/content"] });
+      toast({ title: "Content saved" });
+    } catch {
+      toast({ title: "Failed to save", variant: "destructive" });
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Delete this blueprint content?")) return;
+    await fetch(`/api/blueprint/content/${id}`, { method: "DELETE" });
+    queryClient.invalidateQueries({ queryKey: ["/api/blueprint/content"] });
+    toast({ title: "Deleted" });
+  };
+
+  const PHASES = [
+    { value: "foundation", label: "Foundation" },
+    { value: "gather", label: "Gather" },
+    { value: "lag", label: "Lag" },
+    { value: "on_plane", label: "On Plane" },
+    { value: "contact", label: "Contact" },
+    { value: "finish", label: "Finish" },
+  ];
+
+  const CONTENT_TYPES = [
+    { value: "drill", label: "Drill" },
+    { value: "reference", label: "Reference Clip" },
+    { value: "voiceover", label: "Voiceover" },
+  ];
+
+  const typeColor = (t: string) => t === "drill" ? "bg-blue-500/20 text-blue-400" : t === "reference" ? "bg-green-500/20 text-green-400" : "bg-purple-500/20 text-purple-400";
+
+  // Group content by phase
+  const grouped = PHASES.map(p => ({
+    ...p,
+    items: content.filter(c => c.phase === p.value),
+  }));
+
+  return (
+    <div className="space-y-6">
+      {/* Add content form */}
+      <div className="bg-card border border-border rounded-xl p-5 space-y-4">
+        <h3 className="font-bold text-base">Add Blueprint Content</h3>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Phase</label>
+            <select
+              value={form.phase}
+              onChange={e => setForm(p => ({ ...p, phase: e.target.value }))}
+              className="w-full h-9 rounded-md bg-secondary/30 border border-border px-3 text-sm"
+            >
+              {PHASES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+            </select>
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Type</label>
+            <select
+              value={form.contentType}
+              onChange={e => setForm(p => ({ ...p, contentType: e.target.value }))}
+              className="w-full h-9 rounded-md bg-secondary/30 border border-border px-3 text-sm"
+            >
+              {CONTENT_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+            </select>
+          </div>
+        </div>
+
+        <div className="space-y-1">
+          <label className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Title</label>
+          <Input
+            value={form.title}
+            onChange={e => setForm(p => ({ ...p, title: e.target.value }))}
+            placeholder="e.g. Back elbow drop drill"
+            className="h-9"
+          />
+        </div>
+
+        <div className="space-y-1">
+          <label className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Description (optional)</label>
+          <textarea
+            value={form.description}
+            onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
+            placeholder="What does this drill teach?"
+            rows={2}
+            className="w-full rounded-md bg-secondary/30 border border-border px-3 py-2 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-ring"
+          />
+        </div>
+
+        {/* Video upload */}
+        <div className="space-y-2">
+          <label className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Video</label>
+          <div className="flex items-center gap-3">
+            <input ref={fileInputRef} type="file" accept="video/*" className="hidden" onChange={handleFileUpload} />
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+            >
+              {uploading ? (
+                <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />{uploadProgress}%</>
+              ) : (
+                <><Upload className="w-3.5 h-3.5 mr-1.5" />Upload Video</>
+              )}
+            </Button>
+            {form.sourceUrl && (
+              <span className="text-xs text-green-400 flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5" /> Uploaded
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground">Or paste a URL directly:</p>
+          <Input
+            value={form.sourceUrl}
+            onChange={e => setForm(p => ({ ...p, sourceUrl: e.target.value }))}
+            placeholder="https://... or leave blank"
+            className="h-9"
+          />
+        </div>
+
+        <Button onClick={handleSave} className="w-full">
+          <Plus className="w-4 h-4 mr-1.5" /> Save Content
+        </Button>
+      </div>
+
+      {/* Content library by phase */}
+      <div className="space-y-4">
+        <h3 className="font-bold text-base">Content Library</h3>
+        {isLoading ? (
+          <div className="text-sm text-muted-foreground">Loading...</div>
+        ) : (
+          grouped.map(group => (
+            <div key={group.value} className="space-y-2">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{group.label} ({group.items.length})</h4>
+              {group.items.length === 0 ? (
+                <p className="text-xs text-muted-foreground pl-2">No content yet</p>
+              ) : (
+                <div className="border border-border rounded-xl overflow-hidden">
+                  {group.items.map((item: any, i: number) => (
+                    <div key={item.id} className={`flex items-center gap-3 px-4 py-3 ${i > 0 ? "border-t border-border/50" : ""}`}>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${typeColor(item.contentType)}`}>
+                        {item.contentType}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold truncate">{item.title}</p>
+                        {item.description && <p className="text-xs text-muted-foreground truncate">{item.description}</p>}
+                      </div>
+                      {item.videoUrl && (
+                        <a href={item.videoUrl} target="_blank" rel="noreferrer" className="text-xs text-primary hover:underline">
+                          <PlayCircle className="w-4 h-4" />
+                        </a>
+                      )}
+                      <button onClick={() => handleDelete(item.id)} className="text-muted-foreground hover:text-destructive transition-colors">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))
+        )}
+      </div>
+    </div>
   );
 }
 

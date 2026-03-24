@@ -1,24 +1,16 @@
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
-import { Target, Loader2, Lock, MessageSquare, Video, Send, GraduationCap, ChevronRight } from "lucide-react";
+import { Loader2, Lock, MessageSquare, Video, Send, GraduationCap, CheckCircle2, PlayCircle, BookOpen, Star } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchVideos } from "@/lib/api";
 import { useState, useRef, useEffect } from "react";
 import { useLocation, useSearch } from "wouter";
-import type { Video as VideoType, MlbPlayer } from "@shared/schema";
+import type { Video as VideoType } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
 import { AuthGateModal } from "@/components/AuthGateModal";
 import { apiRequest } from "@/lib/queryClient";
-import { CompTrainer } from "@/components/CompTrainer";
 
 type Tab = "blueprint" | "sessions" | "messages";
-
-type CompRow = {
-  id: string;
-  compType: string;
-  rank: number | null;
-  player: MlbPlayer;
-};
 
 type CoachSessionRow = {
   id: string;
@@ -52,33 +44,125 @@ type RelationshipRow = {
   status: string;
 };
 
+type BlueprintItem = {
+  id: string;
+  phase: string;
+  contentType: string;
+  title: string;
+  description: string | null;
+  videoUrl: string | null;
+};
+
+// ── Static blueprint curriculum ─────────────────────────────────────────────
+type PhaseId = "foundation" | "gather" | "lag" | "on_plane" | "contact" | "finish";
+
+const BLUEPRINT_PHASES: {
+  id: PhaseId;
+  label: string;
+  subtitle: string;
+  feelCue: string;
+  checkpoint?: string;
+  points: string[];
+}[] = [
+  {
+    id: "foundation",
+    label: "Foundation",
+    subtitle: "The Two Non-Negotiables",
+    feelCue: "Everything in the swing is generated from the ground up.",
+    points: [
+      "Your core drives weight from back side to front side — but only if your feet stay connected to the ground.",
+      "The moment you try to generate power with your knee or upper body, you relax the glutes — your primary power movers.",
+      "Get your posture right first. Everything else is built on top of it.",
+      "Enter every swing as if you're going to hit the hardest fastball as deep in the zone as possible.",
+    ],
+  },
+  {
+    id: "gather",
+    label: "Gather",
+    subtitle: "Phase 1 — Generate Controlled Inertia",
+    feelCue: "Controlled forward energy — like a coil winding toward the pitcher, not away from it. The inertia you generate here is what the rest of the swing feeds off of.",
+    points: [
+      "The head stays more forward — don't let it drift back with the load.",
+      "The front foot and lower leg come under the front hip, not out in front of it.",
+      "There's a controlled forward move toward the pitcher — building momentum into the swing, not away from it.",
+      "The landing position is more or less square to home plate: knees out, toes out, athletic stance.",
+    ],
+  },
+  {
+    id: "lag",
+    label: "Lag",
+    subtitle: "Phase 2 — Load and Set",
+    feelCue: "Like you're winding up to skip a rock or make a sidearm throw — slow and deliberate. The aggression comes later.",
+    checkpoint: "A clean 90-degree angle from elbow to hand, up through the shoulder. Palm up, barrel deep, front elbow quiet.",
+    points: [
+      "The first move is the back elbow dropping independently, without dragging the hands or shoulders with it.",
+      "The front elbow stays quiet and still — it waits for the back elbow to catch up.",
+      "The back shoulder rolls back toward the spine, like a pitcher getting into external rotation.",
+      "As the elbow drops, the knob follows it down and in — behind the back hip.",
+      "The arm forms a right angle: elbow to hand, up through the shoulder. Palm faces up.",
+      "The barrel points back toward the backstop — not flat toward the dugout.",
+    ],
+  },
+  {
+    id: "on_plane",
+    label: "On Plane",
+    subtitle: "Phase 3 — Getting On Plane Early and Deep",
+    feelCue: "Being 'short to the ball' means being short to the path of the pitch — not to a fixed contact point out in front of the plate.",
+    points: [
+      "From the lag position, the barrel gets onto the plane of the pitch — whatever angle that specific pitch is traveling on.",
+      "Faster pitches = catch deeper. Slower/offspeed = same path, catch it further out front.",
+      "The shoulders tilt like a Ferris wheel (vertical rotation), not a merry-go-round (flat rotation).",
+      "The goal is to be on plane as early as possible and stay there as long as possible.",
+    ],
+  },
+  {
+    id: "contact",
+    label: "Contact",
+    subtitle: "Phase 4 — Through Contact, The Snap",
+    feelCue: "Snap so late it feels like you'd wrap the towel around the ball and flip it back over your shoulder.",
+    points: [
+      "Accelerate through the ball — peak bat speed comes just after contact, not at it.",
+      "Think of snapping a towel: you can't snap it by coming around, only by staying direct and whipping out in front at the last second.",
+      "The wrist rollover happens late — almost as a byproduct of extension, not a deliberate action.",
+      "Maintain the gap between your arms through contact. Daylight between elbows proves you're extending rather than rolling.",
+    ],
+  },
+  {
+    id: "finish",
+    label: "Finish",
+    subtitle: "Phase 5 — The Finish",
+    feelCue: "It should feel like your front shoulder is being pulled out of its socket.",
+    points: [
+      "The back shoulder gets pulled through as a passive result of good hand path — don't actively rotate it.",
+      "It should feel like your front shoulder is being pulled out of its socket.",
+      "The finish comes over the body, not around it.",
+      "If you're doing this right, the finish takes care of itself.",
+    ],
+  },
+];
+
+const TYPE_COLORS: Record<string, string> = {
+  drill: "bg-blue-500/20 text-blue-400",
+  reference: "bg-green-500/20 text-green-400",
+  voiceover: "bg-purple-500/20 text-purple-400",
+};
+
+// ── Main page ────────────────────────────────────────────────────────────────
 export default function Development() {
   const { user } = useAuth();
-  const isProOrAdmin = user?.isAdmin || user?.subscriptionTier === "pro" || user?.subscriptionTier === "coach";
   const isPaidAny = user?.isAdmin || ["player", "pro", "coach"].includes(user?.subscriptionTier ?? "");
   const [, navigate] = useLocation();
   const search = useSearch();
   const [authGateOpen, setAuthGateOpen] = useState(false);
-  const [selectedComp, setSelectedComp] = useState<CompRow | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>(() => {
     const s = new URLSearchParams(search).get("session");
     return s ? "sessions" : "blueprint";
   });
+  const [blueprintPhase, setBlueprintPhase] = useState<PhaseId>("foundation");
   const [messageInput, setMessageInput] = useState("");
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(new URLSearchParams(search).get("session"));
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
-
-  const { data: allVideos = [], isLoading: videosLoading } = useQuery({
-    queryKey: ["/api/videos"],
-    queryFn: () => fetchVideos(),
-    enabled: isProOrAdmin,
-  });
-
-  const { data: comps = [], isLoading: compsLoading } = useQuery<CompRow[]>({
-    queryKey: ["/api/biometrics/comps"],
-    enabled: !!user && isProOrAdmin,
-  });
 
   const { data: coachSessions = [], isLoading: sessionsLoading } = useQuery<CoachSessionRow[]>({
     queryKey: ["/api/coaching/sessions/received"],
@@ -90,7 +174,6 @@ export default function Development() {
     enabled: !!user && isPaidAny,
   });
 
-  // For messaging, pick the first active relationship (can expand later)
   const myRelationship = relationships.find(r => r.playerId === user?.id);
 
   const { data: msgs = [], isLoading: msgsLoading } = useQuery<MessageRow[]>({
@@ -101,6 +184,24 @@ export default function Development() {
     },
     enabled: !!myRelationship && activeTab === "messages",
     refetchInterval: activeTab === "messages" ? 5000 : false,
+  });
+
+  const { data: blueprintContent = [] } = useQuery<BlueprintItem[]>({
+    queryKey: ["/api/blueprint/content"],
+    queryFn: () => fetch("/api/blueprint/content").then(r => r.json()),
+    enabled: !!user,
+  });
+
+  const { data: focusPhases = [] } = useQuery<string[]>({
+    queryKey: ["/api/blueprint/focus"],
+    queryFn: () => fetch("/api/blueprint/focus").then(r => r.json()),
+    enabled: !!user,
+  });
+
+  const toggleFocus = useMutation({
+    mutationFn: (phase: string) =>
+      fetch(`/api/blueprint/focus/${phase}`, { method: "POST" }).then(r => r.json()),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/blueprint/focus"] }),
   });
 
   const sendMutation = useMutation({
@@ -122,22 +223,14 @@ export default function Development() {
 
   const hasCoach = relationships.length > 0;
 
-  // Separate user uploads from pro library videos
-  const userVideos = (allVideos as VideoType[]).filter(v => !v.isProVideo);
-  const proVideos = (allVideos as VideoType[]).filter(v => v.isProVideo);
-
-  // Tab list — show Sessions/Messages only if player has a coach
   const tabs: { id: Tab; label: string }[] = [
-    ...(hasCoach ? [
-      { id: "sessions" as Tab, label: `Coaching Sessions${coachSessions.length > 0 ? ` (${coachSessions.length})` : ""}` },
-    ] : []),
     { id: "blueprint", label: "Blueprint" },
     ...(hasCoach ? [
+      { id: "sessions" as Tab, label: `Sessions${coachSessions.length > 0 ? ` (${coachSessions.length})` : ""}` },
       { id: "messages" as Tab, label: "Messages" },
     ] : []),
   ];
 
-  // Gate: no subscription
   if (!user) {
     return (
       <Layout>
@@ -154,6 +247,10 @@ export default function Development() {
     );
   }
 
+  const currentPhaseData = BLUEPRINT_PHASES.find(p => p.id === blueprintPhase)!;
+  const phaseContent = blueprintContent.filter(c => c.phase === blueprintPhase);
+  const isWorkingOn = focusPhases.includes(blueprintPhase);
+
   return (
     <Layout>
       {/* Header */}
@@ -167,14 +264,16 @@ export default function Development() {
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* Top-level tabs (Blueprint / Sessions / Messages) */}
       {tabs.length > 1 && (
-        <div className="flex gap-1 border-b border-border mb-6">
+        <div className="flex gap-1 border-b border-border mb-6 overflow-x-auto scrollbar-none">
           {tabs.map(t => (
             <button
               key={t.id}
               onClick={() => setActiveTab(t.id)}
-              className={`px-4 py-2 text-sm font-semibold border-b-2 transition-colors ${activeTab === t.id ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+              className={`px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors whitespace-nowrap ${
+                activeTab === t.id ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
             >
               {t.label}
             </button>
@@ -182,118 +281,141 @@ export default function Development() {
         </div>
       )}
 
-      {/* ── BLUEPRINT TAB ── */}
-      {activeTab === "blueprint" && !isProOrAdmin && (
-        <div className="flex flex-col items-center justify-center min-h-[50vh] gap-6 text-center px-4">
-          <Lock className="w-12 h-12 text-primary opacity-40" />
+      {/* ── BLUEPRINT TAB ─────────────────────────────────────────────────── */}
+      {activeTab === "blueprint" && (
+        <div className="space-y-5">
+          {/* Intro */}
           <div>
-            <h2 className="text-2xl font-bold font-display uppercase mb-2">Pro Feature</h2>
-            <p className="text-muted-foreground max-w-md">
-              Mirror your biometric comps and analyze your mechanics gap with a Pro subscription.
+            <div className="flex items-center gap-2 mb-1">
+              <BookOpen className="w-4 h-4 text-primary" />
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">The SwingStudio Hitting Blueprint</span>
+            </div>
+            <p className="text-sm text-muted-foreground max-w-2xl">
+              Elite hitting isn't one big secret — it's a collection of small pieces, each containing its own depth.
+              Work through each phase, absorb the feel cues, and use the content library to build toward each position.
             </p>
           </div>
-          <Button size="lg" onClick={() => navigate("/pricing")}>Upgrade to Pro</Button>
+
+          {/* Focus banner */}
+          {focusPhases.length > 0 && (
+            <div className="bg-primary/10 border border-primary/20 rounded-xl px-4 py-3 flex items-center gap-2 flex-wrap">
+              <Star className="w-4 h-4 text-primary shrink-0" />
+              <span className="text-sm font-semibold text-primary">Currently working on:</span>
+              {focusPhases.map(p => {
+                const phase = BLUEPRINT_PHASES.find(x => x.id === p);
+                return phase ? (
+                  <span key={p} className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full font-semibold">
+                    {phase.label}
+                  </span>
+                ) : null;
+              })}
+            </div>
+          )}
+
+          {/* Phase tab bar */}
+          <div className="flex border-b border-border overflow-x-auto scrollbar-none">
+            {BLUEPRINT_PHASES.map(phase => (
+              <button
+                key={phase.id}
+                onClick={() => setBlueprintPhase(phase.id)}
+                className={`px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors whitespace-nowrap flex items-center gap-1.5 ${
+                  blueprintPhase === phase.id
+                    ? "border-primary text-foreground"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {phase.label}
+                {focusPhases.includes(phase.id) && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary inline-block" />
+                )}
+              </button>
+            ))}
+          </div>
+
+          {/* Phase content */}
+          <div className="space-y-5 pb-6">
+            {/* Phase title */}
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-bold font-display uppercase">{currentPhaseData.label}</h2>
+                <p className="text-sm text-muted-foreground">{currentPhaseData.subtitle}</p>
+              </div>
+              <button
+                onClick={() => toggleFocus.mutate(blueprintPhase)}
+                disabled={toggleFocus.isPending}
+                className={`shrink-0 flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors border ${
+                  isWorkingOn
+                    ? "bg-primary/15 border-primary/40 text-primary"
+                    : "border-border text-muted-foreground hover:text-foreground hover:border-foreground/30"
+                }`}
+              >
+                <Star className={`w-3.5 h-3.5 ${isWorkingOn ? "fill-primary" : ""}`} />
+                {isWorkingOn ? "Working on this" : "Add to focus"}
+              </button>
+            </div>
+
+            {/* Feel cue */}
+            <div className="bg-primary/5 border-l-2 border-primary rounded-r-xl px-5 py-4">
+              <p className="text-xs font-bold text-primary uppercase tracking-wider mb-2">The Feel</p>
+              <p className="text-base leading-relaxed font-medium italic">"{currentPhaseData.feelCue}"</p>
+            </div>
+
+            {/* Checkpoint callout */}
+            {currentPhaseData.checkpoint && (
+              <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl px-4 py-3">
+                <p className="text-xs font-bold text-yellow-400 uppercase tracking-wider mb-1">The Checkpoint</p>
+                <p className="text-sm leading-relaxed">{currentPhaseData.checkpoint}</p>
+              </div>
+            )}
+
+            {/* Key points */}
+            <div className="space-y-2">
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Key Points</p>
+              <div className="space-y-2">
+                {currentPhaseData.points.map((point, i) => (
+                  <div key={i} className="flex items-start gap-3">
+                    <CheckCircle2 className="w-4 h-4 text-primary/60 shrink-0 mt-0.5" />
+                    <p className="text-sm leading-relaxed">{point}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Content library for this phase */}
+            {phaseContent.length > 0 && (
+              <div className="space-y-3">
+                <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Content Library</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {phaseContent.map(item => (
+                    <ContentCard key={item.id} item={item} />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Coming soon if no content */}
+            {phaseContent.length === 0 && (
+              <div className="border border-border/50 rounded-xl p-6 text-center text-muted-foreground space-y-1">
+                <PlayCircle className="w-8 h-8 mx-auto opacity-20 mb-2" />
+                <p className="text-sm font-semibold">Content coming soon</p>
+                <p className="text-xs">Drills and reference clips for this phase will appear here.</p>
+              </div>
+            )}
+
+            {/* Individual variation note (last phase only, but shown always as a footer) */}
+            {blueprintPhase === "finish" && (
+              <div className="bg-secondary/30 border border-border rounded-xl px-4 py-4 space-y-1">
+                <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">A Note on Individual Variation</p>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Every hitter gets to this framework differently. Body type, arm length, vision, and ingrained habits all affect how you build toward these positions. The framework describes <em>where</em> elite hitters arrive — not a rigid sequence that looks identical on everyone. The job in development is figuring out which pieces belong to your puzzle.
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
-      {activeTab === "blueprint" && isProOrAdmin && (
-        <>
-          {selectedComp ? (
-            <CompTrainer
-              comp={selectedComp}
-              compVideos={proVideos.filter(v =>
-                v.playerName?.toLowerCase() === selectedComp.player.name.toLowerCase()
-              )}
-              userVideos={userVideos}
-              onBack={() => setSelectedComp(null)}
-            />
-          ) : (
-            <div className="space-y-6 mt-2">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-2xl font-bold font-display uppercase flex items-center gap-2">
-                    <Target className="text-primary w-6 h-6" /> Mirror Your Comp
-                  </h2>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Pick a biometric comp and compare your swing mechanics side-by-side or overlaid.
-                  </p>
-                </div>
-                <Button variant="outline" size="sm" onClick={() => navigate("/biometrics")}>
-                  Manage Comps
-                </Button>
-              </div>
-
-              {(compsLoading || videosLoading) ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                </div>
-              ) : comps.length === 0 ? (
-                <div className="border border-border rounded-xl p-10 text-center space-y-3">
-                  <Target className="w-10 h-10 text-primary/30 mx-auto" />
-                  <p className="font-semibold">No comps set up yet</p>
-                  <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-                    Head to Biometrics to find your MLB physical comps. Then come back here to mirror their mechanics.
-                  </p>
-                  <Button onClick={() => navigate("/biometrics")}>Go to Biometrics</Button>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {comps.map(comp => {
-                    const videoCount = proVideos.filter(v =>
-                      v.playerName?.toLowerCase() === comp.player.name.toLowerCase()
-                    ).length;
-                    return (
-                      <button
-                        key={comp.id}
-                        onClick={() => setSelectedComp(comp)}
-                        className="bg-card border border-border rounded-xl p-4 text-left hover:border-primary/40 hover:bg-primary/5 transition-all group"
-                      >
-                        <div className="flex items-center gap-3 mb-3">
-                          {comp.player.imageUrl ? (
-                            <img
-                              src={comp.player.imageUrl}
-                              alt={comp.player.name}
-                              className="w-12 h-12 rounded-full object-contain bg-secondary border border-border shrink-0"
-                            />
-                          ) : (
-                            <div className="w-12 h-12 rounded-full bg-secondary border border-border flex items-center justify-center shrink-0 text-lg font-bold text-muted-foreground">
-                              {comp.player.name[0]}
-                            </div>
-                          )}
-                          <div className="min-w-0">
-                            <p className="font-bold text-sm leading-tight truncate">{comp.player.name}</p>
-                            <p className="text-xs text-muted-foreground">{comp.player.team}</p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${
-                              comp.compType === "auto"
-                                ? "bg-primary/20 text-primary"
-                                : "bg-blue-500/10 text-blue-400"
-                            }`}>
-                              {comp.compType === "auto" ? `#${comp.rank} Comp` : "Studying"}
-                            </span>
-                            <span className="text-[10px] text-muted-foreground">
-                              {videoCount} video{videoCount !== 1 ? "s" : ""}
-                            </span>
-                          </div>
-                          <span className="text-xs text-primary font-semibold flex items-center gap-0.5 group-hover:gap-1.5 transition-all">
-                            Train <ChevronRight className="w-3.5 h-3.5" />
-                          </span>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
-        </>
-      )}
-
-      {/* ── SESSIONS TAB ── */}
+      {/* ── SESSIONS TAB ─────────────────────────────────────────────────── */}
       {activeTab === "sessions" && (
         <div className="space-y-4">
           {sessionsLoading ? (
@@ -329,14 +451,12 @@ export default function Development() {
                 </button>
                 {isSelected && (
                   <div className="px-4 pb-4 space-y-4 border-t border-border pt-4">
-                    {/* Coach recording video — shown first and full-width */}
                     {session.voiceoverUrl && (
                       <div className="space-y-1">
                         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Coach Recording</p>
                         <video src={session.voiceoverUrl} controls className="w-full aspect-video rounded-lg bg-black border border-border object-contain" />
                       </div>
                     )}
-                    {/* Reference videos */}
                     {(session.playerVideoId || session.proVideoId) && (
                       <div className="grid grid-cols-2 gap-3">
                         {session.playerVideoId && (
@@ -353,7 +473,6 @@ export default function Development() {
                         )}
                       </div>
                     )}
-                    {/* Notes */}
                     {session.notes && (
                       <div className="bg-secondary/50 rounded-lg p-3">
                         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Coach Notes</p>
@@ -368,7 +487,7 @@ export default function Development() {
         </div>
       )}
 
-      {/* ── MESSAGES TAB ── */}
+      {/* ── MESSAGES TAB ─────────────────────────────────────────────────── */}
       {activeTab === "messages" && (
         <div className="flex flex-col h-[60vh] max-w-2xl">
           {!myRelationship ? (
@@ -422,10 +541,52 @@ export default function Development() {
   );
 }
 
+// ── Content card ─────────────────────────────────────────────────────────────
+function ContentCard({ item }: { item: BlueprintItem }) {
+  const [playing, setPlaying] = useState(false);
+  const typeColor = TYPE_COLORS[item.contentType] ?? "bg-secondary text-muted-foreground";
+
+  return (
+    <div className="bg-card border border-border rounded-xl overflow-hidden">
+      {item.videoUrl && playing ? (
+        <video
+          src={item.videoUrl}
+          controls
+          autoPlay
+          className="w-full aspect-video object-contain bg-black"
+        />
+      ) : item.videoUrl ? (
+        <button
+          onClick={() => setPlaying(true)}
+          className="w-full aspect-video bg-black/60 flex items-center justify-center group hover:bg-black/40 transition-colors"
+        >
+          <div className="w-12 h-12 rounded-full bg-primary/80 flex items-center justify-center group-hover:scale-105 transition-transform">
+            <PlayCircle className="w-6 h-6 text-white" />
+          </div>
+        </button>
+      ) : null}
+      <div className="p-3 space-y-1">
+        <div className="flex items-center gap-2">
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${typeColor}`}>
+            {item.contentType}
+          </span>
+        </div>
+        <p className="text-sm font-semibold leading-snug">{item.title}</p>
+        {item.description && <p className="text-xs text-muted-foreground leading-relaxed">{item.description}</p>}
+      </div>
+    </div>
+  );
+}
+
+// ── PlayerVideo (for Sessions tab) ───────────────────────────────────────────
 function PlayerVideo({ videoId, highlightStart, highlightEnd }: { videoId: string; highlightStart?: number | null; highlightEnd?: number | null }) {
   const { data: allVideos = [] } = useQuery({ queryKey: ["/api/videos"], queryFn: () => fetchVideos() });
   const video = (allVideos as VideoType[]).find(v => v.id === videoId);
-  if (!video?.sourceUrl) return <div className="aspect-video bg-secondary rounded-lg flex items-center justify-center"><Video size={20} className="text-muted-foreground opacity-30" /></div>;
+  if (!video?.sourceUrl) return (
+    <div className="aspect-video bg-secondary rounded-lg flex items-center justify-center">
+      <Video size={20} className="text-muted-foreground opacity-30" />
+    </div>
+  );
   const src = highlightStart != null ? `${video.sourceUrl}#t=${highlightStart},${highlightEnd ?? ""}` : video.sourceUrl;
   return (
     <div className="space-y-1">
@@ -436,4 +597,3 @@ function PlayerVideo({ videoId, highlightStart, highlightEnd }: { videoId: strin
     </div>
   );
 }
-

@@ -181,6 +181,25 @@ export const userPlayerComps = pgTable("user_player_comps", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const blueprintContent = pgTable("blueprint_content", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  phase: text("phase").notNull(), // "foundation"|"gather"|"lag"|"on_plane"|"contact"|"finish"
+  contentType: text("content_type").notNull().default("drill"), // "drill"|"reference"|"voiceover"
+  title: text("title").notNull(),
+  description: text("description"),
+  sourceUrl: text("source_url"), // R2 key
+  thumbnailUrl: text("thumbnail_url"),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const playerPhaseFocus = pgTable("player_phase_focus", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  phase: text("phase").notNull(),
+  startedAt: timestamp("started_at").defaultNow(),
+});
+
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,
@@ -210,3 +229,6 @@ export type CoachSession = typeof coachSessions.$inferSelect;
 export type Notification = typeof notifications.$inferSelect;
 export type Message = typeof messages.$inferSelect;
 export type UserPlayerComp = typeof userPlayerComps.$inferSelect;
+export type BlueprintContent = typeof blueprintContent.$inferSelect;
+export type InsertBlueprintContent = typeof blueprintContent.$inferInsert;
+export type PlayerPhaseFocus = typeof playerPhaseFocus.$inferSelect;
