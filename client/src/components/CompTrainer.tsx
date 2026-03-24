@@ -21,62 +21,120 @@ interface Props {
 }
 
 // ── Skeleton normalization ─────────────────────────────────────────────────
-// Centers each skeleton on hip midpoint, scales by torso length so both
-// skeletons are comparable regardless of framing differences.
-type NormalizedLandmark = { x: number; y: number; visibility: number };
+// Centers each skeleton on hip midpoint, scales by torso length.
+type NL = { x: number; y: number; visibility: number };
 
-function normalizeSkeleton(lm: PoseResult["landmarks"]): NormalizedLandmark[] {
+function normalizeSkeleton(lm: PoseResult["landmarks"]): NL[] {
   const hipMidX = (lm[23].x + lm[24].x) / 2;
   const hipMidY = (lm[23].y + lm[24].y) / 2;
   const shoulderMidX = (lm[11].x + lm[12].x) / 2;
   const shoulderMidY = (lm[11].y + lm[12].y) / 2;
   const torso = Math.sqrt((shoulderMidX - hipMidX) ** 2 + (shoulderMidY - hipMidY) ** 2);
-  if (torso === 0) return lm.map(p => ({ x: p.x, y: p.y, visibility: p.visibility }));
+  const t = torso || 1;
   return lm.map(p => ({
-    x: (p.x - hipMidX) / torso,
-    y: (p.y - hipMidY) / torso,
+    x: (p.x - hipMidX) / t,
+    y: (p.y - hipMidY) / t,
     visibility: p.visibility,
   }));
 }
 
-// ── Ghost canvas drawing ───────────────────────────────────────────────────
-function drawGhostSkeleton(
-  ctx: CanvasRenderingContext2D,
-  landmarks: NormalizedLandmark[],
-  color: string,
-  cx: number,
-  cy: number,
-  scale: number,
-  alpha = 1,
+// ── Ghost canvas renderer ──────────────────────────────────────────────────
+// Adaptive: computes bounding box of BOTH skeletons combined, then scales
+// to fit the canvas with padding. Arms during a swing won't clip.
+function renderGhostCanvas(
+  canvas: HTMLCanvasElement,
+  playerResult: PoseResult,
+  compResult: PoseResult,
+  compName: string,
+  playerPhase: string,
+  compPhase: string,
 ) {
-  const sx = (x: number) => cx + x * scale;
-  const sy = (y: number) => cy + y * scale;
+  const W = canvas.width;
+  const H = canvas.height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
 
-  ctx.globalAlpha = alpha;
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 2.5;
-  ctx.shadowColor = color;
-  ctx.shadowBlur = 8;
+  const playerNorm = normalizeSkeleton(playerResult.landmarks);
+  const compNorm   = normalizeSkeleton(compResult.landmarks);
 
-  for (const [i, j] of SKELETON_CONNECTIONS) {
-    const a = landmarks[i];
-    const b = landmarks[j];
-    if (!a || !b || a.visibility < 0.3 || b.visibility < 0.3) continue;
-    ctx.beginPath();
-    ctx.moveTo(sx(a.x), sy(a.y));
-    ctx.lineTo(sx(b.x), sy(b.y));
-    ctx.stroke();
+  // Collect all visible points to compute bounding box
+  const VIS = 0.1;
+  const allPts = [...playerNorm, ...compNorm].filter(p => p.visibility > VIS);
+
+  ctx.fillStyle = "#07070f";
+  ctx.fillRect(0, 0, W, H);
+
+  if (allPts.length === 0) {
+    ctx.fillStyle = "rgba(255,255,255,0.25)";
+    ctx.font = "13px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("No pose landmarks detected", W / 2, H / 2);
+    return;
   }
 
+  // Bounding box
+  const xs = allPts.map(p => p.x);
+  const ys = allPts.map(p => p.y);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+  const cx = (minX + maxX) / 2;
+  const cy = (minY + maxY) / 2;
+
+  // Scale to fit canvas with 12% padding each side
+  const PAD = 0.12;
+  const scaleX = (W * (1 - 2 * PAD)) / Math.max(maxX - minX, 0.01);
+  const scaleY = (H * (1 - 2 * PAD)) / Math.max(maxY - minY, 0.01);
+  const scale  = Math.min(scaleX, scaleY);
+
+  const toX = (nx: number) => W / 2 + (nx - cx) * scale;
+  const toY = (ny: number) => H / 2 + (ny - cy) * scale;
+
+  // Subtle grid
+  ctx.strokeStyle = "rgba(255,255,255,0.04)";
+  ctx.lineWidth = 1;
+  for (let gx = 0; gx < W; gx += 40) { ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, H); ctx.stroke(); }
+  for (let gy = 0; gy < H; gy += 40) { ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(W, gy); ctx.stroke(); }
+
+  const drawSkeleton = (norm: NL[], color: string, alpha: number) => {
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2.5;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 10;
+    for (const [i, j] of SKELETON_CONNECTIONS) {
+      const a = norm[i]; const b = norm[j];
+      if (!a || !b || a.visibility < VIS || b.visibility < VIS) continue;
+      ctx.beginPath();
+      ctx.moveTo(toX(a.x), toY(a.y));
+      ctx.lineTo(toX(b.x), toY(b.y));
+      ctx.stroke();
+    }
+    ctx.shadowBlur = 0;
+    for (const lm of norm) {
+      if (lm.visibility < VIS) continue;
+      ctx.beginPath();
+      ctx.arc(toX(lm.x), toY(lm.y), 3.5, 0, Math.PI * 2);
+      ctx.fillStyle = color;
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  };
+
+  // Comp behind (translucent), player on top
+  drawSkeleton(compNorm,   "#fb923c", 0.65);
+  drawSkeleton(playerNorm, "#4ade80", 1.0);
+
+  // Phase labels
+  const firstName = compName.split(" ")[0].toUpperCase();
   ctx.shadowBlur = 0;
-  for (const lm of landmarks) {
-    if (lm.visibility < 0.3) continue;
-    ctx.beginPath();
-    ctx.arc(sx(lm.x), sy(lm.y), 3.5, 0, Math.PI * 2);
-    ctx.fillStyle = color;
-    ctx.fill();
-  }
-  ctx.globalAlpha = 1;
+  ctx.font = "bold 11px monospace";
+  ctx.textAlign = "left";
+  ctx.fillStyle = "#4ade80";
+  ctx.fillText(`YOU · ${playerPhase}`, 12, H - 22);
+  ctx.fillStyle = "#fb923c";
+  ctx.fillText(`${firstName} · ${compPhase}`, 12, H - 8);
 }
 
 // ── Phase badge color ──────────────────────────────────────────────────────
@@ -203,7 +261,6 @@ export function CompTrainer({ comp, compVideos, userVideos, onBack }: Props) {
   const [playerLocked, setPlayerLocked] = useState<PoseResult | null>(null);
   const [compLocked, setCompLocked] = useState<PoseResult | null>(null);
   const [ghostVisible, setGhostVisible] = useState(false);
-  const ghostCanvasRef = useRef<HTMLCanvasElement>(null);
 
   const selectedCompVideo = compVideos.find(v => v.id === selectedCompVideoId);
   const selectedUserVideo = userVideos.find(v => v.id === selectedUserVideoId);
@@ -214,46 +271,18 @@ export function CompTrainer({ comp, compVideos, userVideos, onBack }: Props) {
   useEffect(() => { setPlayerLocked(null); setGhostVisible(false); }, [selectedUserVideoId]);
   useEffect(() => { setCompLocked(null); setGhostVisible(false); }, [selectedCompVideoId]);
 
-  // Draw ghost canvas whenever both are locked and ghost is visible
-  useEffect(() => {
-    if (!ghostVisible || !playerLocked || !compLocked) return;
-    const canvas = ghostCanvasRef.current;
-    if (!canvas) return;
-
-    const W = canvas.width;
-    const H = canvas.height;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    // Background
-    ctx.fillStyle = "#0a0a0f";
-    ctx.fillRect(0, 0, W, H);
-
-    // Subtle grid lines
-    ctx.strokeStyle = "rgba(255,255,255,0.04)";
-    ctx.lineWidth = 1;
-    for (let x = 0; x < W; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
-    for (let y = 0; y < H; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
-
-    const cx = W / 2;
-    const cy = H * 0.62; // hip anchor slightly below center
-    const scale = H * 0.28;
-
-    const playerNorm = normalizeSkeleton(playerLocked.landmarks);
-    const compNorm = normalizeSkeleton(compLocked.landmarks);
-
-    // Draw comp skeleton first (behind), more transparent
-    drawGhostSkeleton(ctx, compNorm, "#fb923c", cx, cy, scale, 0.65);
-    // Draw player skeleton on top
-    drawGhostSkeleton(ctx, playerNorm, "#4ade80", cx, cy, scale, 1);
-
-    // Phase labels
-    ctx.font = "bold 11px monospace";
-    ctx.fillStyle = "#4ade80";
-    ctx.fillText(`YOU · ${playerLocked.phase}`, 12, H - 24);
-    ctx.fillStyle = "#fb923c";
-    ctx.fillText(`${comp.player.name.toUpperCase()} · ${compLocked.phase}`, 12, H - 10);
-  }, [ghostVisible, playerLocked, compLocked, comp.player.name]);
+  // Callback ref — fires the moment the canvas element mounts, guaranteed non-null.
+  const ghostCanvasRef = useCallback((canvas: HTMLCanvasElement | null) => {
+    if (!canvas || !playerLocked || !compLocked) return;
+    renderGhostCanvas(
+      canvas,
+      playerLocked,
+      compLocked,
+      comp.player.name,
+      playerLocked.phase,
+      compLocked.phase,
+    );
+  }, [playerLocked, compLocked, comp.player.name]); // eslint-disable-line
 
   return (
     <div className="space-y-5">
