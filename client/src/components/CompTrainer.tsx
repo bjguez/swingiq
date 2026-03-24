@@ -1,10 +1,10 @@
 import { useRef, useState, useEffect, useCallback } from "react";
-import { Button } from "@/components/ui/button";
 import { MechanicsGap } from "@/components/MechanicsGap";
 import { detectPose, SKELETON_CONNECTIONS } from "@/lib/poseDetector";
-import type { PoseResult } from "@/lib/poseDetector";
+import type { PoseResult, SwingPhase } from "@/lib/poseDetector";
 import type { MlbPlayer, Video } from "@shared/schema";
-import { ArrowLeft, Layers, LayoutPanelLeft, Scan, ChevronDown } from "lucide-react";
+import { ArrowLeft, Lock, Ghost, ChevronDown, RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface Comp {
   id: string;
@@ -20,158 +20,240 @@ interface Props {
   onBack: () => void;
 }
 
-function drawSkeleton(
+// ── Skeleton normalization ─────────────────────────────────────────────────
+// Centers each skeleton on hip midpoint, scales by torso length so both
+// skeletons are comparable regardless of framing differences.
+type NormalizedLandmark = { x: number; y: number; visibility: number };
+
+function normalizeSkeleton(lm: PoseResult["landmarks"]): NormalizedLandmark[] {
+  const hipMidX = (lm[23].x + lm[24].x) / 2;
+  const hipMidY = (lm[23].y + lm[24].y) / 2;
+  const shoulderMidX = (lm[11].x + lm[12].x) / 2;
+  const shoulderMidY = (lm[11].y + lm[12].y) / 2;
+  const torso = Math.sqrt((shoulderMidX - hipMidX) ** 2 + (shoulderMidY - hipMidY) ** 2);
+  if (torso === 0) return lm.map(p => ({ x: p.x, y: p.y, visibility: p.visibility }));
+  return lm.map(p => ({
+    x: (p.x - hipMidX) / torso,
+    y: (p.y - hipMidY) / torso,
+    visibility: p.visibility,
+  }));
+}
+
+// ── Ghost canvas drawing ───────────────────────────────────────────────────
+function drawGhostSkeleton(
   ctx: CanvasRenderingContext2D,
-  landmarks: PoseResult["landmarks"],
+  landmarks: NormalizedLandmark[],
   color: string,
-  w: number,
-  h: number,
+  cx: number,
+  cy: number,
+  scale: number,
+  alpha = 1,
 ) {
+  const sx = (x: number) => cx + x * scale;
+  const sy = (y: number) => cy + y * scale;
+
+  ctx.globalAlpha = alpha;
   ctx.strokeStyle = color;
-  ctx.lineWidth = 2;
+  ctx.lineWidth = 2.5;
   ctx.shadowColor = color;
-  ctx.shadowBlur = 4;
+  ctx.shadowBlur = 8;
+
   for (const [i, j] of SKELETON_CONNECTIONS) {
     const a = landmarks[i];
     const b = landmarks[j];
-    if (!a || !b || a.visibility < 0.4 || b.visibility < 0.4) continue;
+    if (!a || !b || a.visibility < 0.3 || b.visibility < 0.3) continue;
     ctx.beginPath();
-    ctx.moveTo(a.x * w, a.y * h);
-    ctx.lineTo(b.x * w, b.y * h);
+    ctx.moveTo(sx(a.x), sy(a.y));
+    ctx.lineTo(sx(b.x), sy(b.y));
     ctx.stroke();
   }
+
   ctx.shadowBlur = 0;
   for (const lm of landmarks) {
-    if (lm.visibility < 0.4) continue;
+    if (lm.visibility < 0.3) continue;
     ctx.beginPath();
-    ctx.arc(lm.x * w, lm.y * h, 3, 0, Math.PI * 2);
+    ctx.arc(sx(lm.x), sy(lm.y), 3.5, 0, Math.PI * 2);
     ctx.fillStyle = color;
     ctx.fill();
   }
+  ctx.globalAlpha = 1;
 }
 
+// ── Phase badge color ──────────────────────────────────────────────────────
+function phaseColor(phase: SwingPhase | null) {
+  if (!phase || phase === "Unknown") return "bg-secondary text-muted-foreground";
+  const map: Record<string, string> = {
+    Gather: "bg-blue-500/20 text-blue-400",
+    Touchdown: "bg-yellow-500/20 text-yellow-400",
+    Thrust: "bg-orange-500/20 text-orange-400",
+    Contact: "bg-primary/20 text-primary",
+    "Post-Contact": "bg-purple-500/20 text-purple-400",
+  };
+  return map[phase] ?? "bg-secondary text-muted-foreground";
+}
+
+// ── ScrubPanel ─────────────────────────────────────────────────────────────
+// One video panel with live phase detection + lock button.
+function ScrubPanel({
+  label,
+  color,
+  videoUrl,
+  lockedPose,
+  onLock,
+  onUnlock,
+}: {
+  label: string;
+  color: string;
+  videoUrl: string;
+  lockedPose: PoseResult | null;
+  onLock: (pose: PoseResult) => void;
+  onUnlock: () => void;
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [livePose, setLivePose] = useState<PoseResult | null>(null);
+  const [detecting, setDetecting] = useState(false);
+  const lastDetectRef = useRef(0);
+
+  const runDetect = useCallback(async () => {
+    const vid = videoRef.current;
+    if (!vid || vid.readyState < 2) return;
+    const now = performance.now();
+    if (now - lastDetectRef.current < 150) return; // throttle to ~6fps
+    lastDetectRef.current = now;
+    setDetecting(true);
+    const result = await detectPose(vid, now);
+    setDetecting(false);
+    if (result) setLivePose(result);
+  }, []);
+
+  useEffect(() => {
+    const vid = videoRef.current;
+    if (!vid) return;
+    vid.addEventListener("timeupdate", runDetect);
+    vid.addEventListener("seeked", runDetect);
+    vid.addEventListener("pause", runDetect);
+    return () => {
+      vid.removeEventListener("timeupdate", runDetect);
+      vid.removeEventListener("seeked", runDetect);
+      vid.removeEventListener("pause", runDetect);
+    };
+  }, [runDetect, videoUrl]);
+
+  // Reset live pose when video changes
+  useEffect(() => { setLivePose(null); }, [videoUrl]);
+
+  const displayPhase = lockedPose?.phase ?? livePose?.phase ?? null;
+  const isLocked = !!lockedPose;
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-semibold uppercase tracking-wider" style={{ color }}>
+          {label}
+        </p>
+        {displayPhase && (
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${phaseColor(displayPhase)} ${isLocked ? "ring-1 ring-current" : ""}`}>
+            {isLocked ? "🔒 " : ""}{displayPhase}
+          </span>
+        )}
+      </div>
+
+      <div className="relative rounded-lg overflow-hidden bg-black aspect-video">
+        <video
+          ref={videoRef}
+          src={videoUrl}
+          crossOrigin="anonymous"
+          controls
+          playsInline
+          className="w-full h-full object-contain"
+        />
+        {detecting && (
+          <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-primary animate-pulse" />
+        )}
+        {isLocked && (
+          <div className="absolute inset-0 ring-2 rounded-lg pointer-events-none" style={{ boxShadow: `inset 0 0 0 2px ${color}` }} />
+        )}
+      </div>
+
+      <div className="flex gap-2">
+        {!isLocked ? (
+          <Button
+            size="sm"
+            className="flex-1"
+            disabled={!livePose}
+            onClick={() => livePose && onLock(livePose)}
+          >
+            <Lock className="w-3.5 h-3.5 mr-1.5" />
+            {livePose ? `Lock at ${livePose.phase}` : "Scrub to detect pose"}
+          </Button>
+        ) : (
+          <Button size="sm" variant="outline" className="flex-1" onClick={onUnlock}>
+            <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Unlock
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Main CompTrainer ───────────────────────────────────────────────────────
 export function CompTrainer({ comp, compVideos, userVideos, onBack }: Props) {
-  const [selectedCompVideoId, setSelectedCompVideoId] = useState<string>(compVideos[0]?.id ?? "");
-  const [selectedUserVideoId, setSelectedUserVideoId] = useState<string>(userVideos[0]?.id ?? "");
-  const [poseEnabled, setPoseEnabled] = useState(false);
-  const [overlayMode, setOverlayMode] = useState(false);
-  const [overlayOpacity, setOverlayOpacity] = useState(0.45);
-
-  const playerVideoRef = useRef<HTMLVideoElement>(null);
-  const compVideoRef = useRef<HTMLVideoElement>(null);
-  const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
-
-  const playerPoseRef = useRef<PoseResult | null>(null);
-  const compPoseRef = useRef<PoseResult | null>(null);
-  const [playerPose, setPlayerPose] = useState<PoseResult | null>(null);
-  const [compPose, setCompPose] = useState<PoseResult | null>(null);
-
-  const poseLoopRef = useRef<number | null>(null);
-  const detectTargetRef = useRef<"player" | "comp">("player");
-  const canvasLoopRef = useRef<number | null>(null);
+  const [selectedCompVideoId, setSelectedCompVideoId] = useState(compVideos[0]?.id ?? "");
+  const [selectedUserVideoId, setSelectedUserVideoId] = useState(userVideos[0]?.id ?? "");
+  const [playerLocked, setPlayerLocked] = useState<PoseResult | null>(null);
+  const [compLocked, setCompLocked] = useState<PoseResult | null>(null);
+  const [ghostVisible, setGhostVisible] = useState(false);
+  const ghostCanvasRef = useRef<HTMLCanvasElement>(null);
 
   const selectedCompVideo = compVideos.find(v => v.id === selectedCompVideoId);
   const selectedUserVideo = userVideos.find(v => v.id === selectedUserVideoId);
+  const bothLocked = !!playerLocked && !!compLocked;
   const compFirst = comp.player.name.split(" ")[0];
 
-  // ── Overlay canvas render loop ────────────────────────────────────────────
-  const startCanvasLoop = useCallback(() => {
-    const loop = () => {
-      const canvas = overlayCanvasRef.current;
-      const pVid = playerVideoRef.current;
-      const cVid = compVideoRef.current;
-      if (!canvas || !pVid || !cVid) { canvasLoopRef.current = requestAnimationFrame(loop); return; }
+  // Reset locks when video selection changes
+  useEffect(() => { setPlayerLocked(null); setGhostVisible(false); }, [selectedUserVideoId]);
+  useEffect(() => { setCompLocked(null); setGhostVisible(false); }, [selectedCompVideoId]);
 
-      const w = pVid.videoWidth || 640;
-      const h = pVid.videoHeight || 360;
-      if (canvas.width !== w) canvas.width = w;
-      if (canvas.height !== h) canvas.height = h;
-
-      const ctx = canvas.getContext("2d");
-      if (!ctx) { canvasLoopRef.current = requestAnimationFrame(loop); return; }
-
-      ctx.clearRect(0, 0, w, h);
-
-      // Draw player video (base layer, full opacity)
-      if (pVid.readyState >= 2) ctx.drawImage(pVid, 0, 0, w, h);
-
-      // Draw comp video (overlay, semi-transparent, tinted slightly)
-      if (cVid.readyState >= 2) {
-        ctx.globalAlpha = overlayOpacity;
-        ctx.drawImage(cVid, 0, 0, w, h);
-        ctx.globalAlpha = 1;
-      }
-
-      // Draw pose skeletons
-      if (poseEnabled) {
-        if (playerPoseRef.current?.landmarks) {
-          drawSkeleton(ctx, playerPoseRef.current.landmarks, "#4ade80", w, h);
-        }
-        if (compPoseRef.current?.landmarks) {
-          drawSkeleton(ctx, compPoseRef.current.landmarks, "#fb923c", w, h);
-        }
-      }
-
-      canvasLoopRef.current = requestAnimationFrame(loop);
-    };
-    canvasLoopRef.current = requestAnimationFrame(loop);
-  }, [overlayOpacity, poseEnabled]);
-
+  // Draw ghost canvas whenever both are locked and ghost is visible
   useEffect(() => {
-    if (!overlayMode) {
-      if (canvasLoopRef.current) cancelAnimationFrame(canvasLoopRef.current);
-      return;
-    }
-    startCanvasLoop();
-    return () => { if (canvasLoopRef.current) cancelAnimationFrame(canvasLoopRef.current); };
-  }, [overlayMode, startCanvasLoop]);
+    if (!ghostVisible || !playerLocked || !compLocked) return;
+    const canvas = ghostCanvasRef.current;
+    if (!canvas) return;
 
-  // ── Pose detection loop (alternates player / comp) ────────────────────────
-  useEffect(() => {
-    if (!poseEnabled) {
-      if (poseLoopRef.current) cancelAnimationFrame(poseLoopRef.current);
-      playerPoseRef.current = null;
-      compPoseRef.current = null;
-      setPlayerPose(null);
-      setCompPose(null);
-      return;
-    }
+    const W = canvas.width;
+    const H = canvas.height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
 
-    const loop = async () => {
-      const target = detectTargetRef.current;
-      const vid = target === "player" ? playerVideoRef.current : compVideoRef.current;
+    // Background
+    ctx.fillStyle = "#0a0a0f";
+    ctx.fillRect(0, 0, W, H);
 
-      if (vid && !vid.paused && vid.readyState >= 2) {
-        const result = await detectPose(vid, performance.now());
-        if (result) {
-          if (target === "player") {
-            playerPoseRef.current = result;
-            setPlayerPose(result);
-          } else {
-            compPoseRef.current = result;
-            setCompPose(result);
-          }
-        }
-      }
+    // Subtle grid lines
+    ctx.strokeStyle = "rgba(255,255,255,0.04)";
+    ctx.lineWidth = 1;
+    for (let x = 0; x < W; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+    for (let y = 0; y < H; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
 
-      detectTargetRef.current = target === "player" ? "comp" : "player";
-      poseLoopRef.current = requestAnimationFrame(loop) as unknown as number;
-    };
+    const cx = W / 2;
+    const cy = H * 0.62; // hip anchor slightly below center
+    const scale = H * 0.28;
 
-    poseLoopRef.current = requestAnimationFrame(loop) as unknown as number;
-    return () => { if (poseLoopRef.current) cancelAnimationFrame(poseLoopRef.current); };
-  }, [poseEnabled]);
+    const playerNorm = normalizeSkeleton(playerLocked.landmarks);
+    const compNorm = normalizeSkeleton(compLocked.landmarks);
 
-  // Reset poses when videos change
-  useEffect(() => {
-    playerPoseRef.current = null;
-    setPlayerPose(null);
-  }, [selectedUserVideoId]);
+    // Draw comp skeleton first (behind), more transparent
+    drawGhostSkeleton(ctx, compNorm, "#fb923c", cx, cy, scale, 0.65);
+    // Draw player skeleton on top
+    drawGhostSkeleton(ctx, playerNorm, "#4ade80", cx, cy, scale, 1);
 
-  useEffect(() => {
-    compPoseRef.current = null;
-    setCompPose(null);
-  }, [selectedCompVideoId]);
+    // Phase labels
+    ctx.font = "bold 11px monospace";
+    ctx.fillStyle = "#4ade80";
+    ctx.fillText(`YOU · ${playerLocked.phase}`, 12, H - 24);
+    ctx.fillStyle = "#fb923c";
+    ctx.fillText(`${comp.player.name.toUpperCase()} · ${compLocked.phase}`, 12, H - 10);
+  }, [ghostVisible, playerLocked, compLocked, comp.player.name]);
 
   return (
     <div className="space-y-5">
@@ -181,7 +263,7 @@ export function CompTrainer({ comp, compVideos, userVideos, onBack }: Props) {
           onClick={onBack}
           className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
-          <ArrowLeft className="w-4 h-4" /> Back to Comps
+          <ArrowLeft className="w-4 h-4" /> Back
         </button>
         <div className="h-4 w-px bg-border" />
         {comp.player.imageUrl && (
@@ -190,7 +272,9 @@ export function CompTrainer({ comp, compVideos, userVideos, onBack }: Props) {
         )}
         <div>
           <p className="font-bold text-sm leading-tight">{comp.player.name}</p>
-          <p className="text-xs text-muted-foreground">{comp.player.team} · {comp.compType === "auto" ? `#${comp.rank} biometric comp` : "Studying"}</p>
+          <p className="text-xs text-muted-foreground">
+            {comp.player.team} · {comp.compType === "auto" ? `#${comp.rank} biometric comp` : "Studying"}
+          </p>
         </div>
       </div>
 
@@ -200,7 +284,7 @@ export function CompTrainer({ comp, compVideos, userVideos, onBack }: Props) {
           <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">My Swing</label>
           {userVideos.length === 0 ? (
             <div className="h-10 flex items-center text-xs text-muted-foreground bg-secondary/30 rounded-md px-3 border border-border">
-              No uploads yet — go to My Swings
+              No uploads yet
             </div>
           ) : (
             <div className="relative">
@@ -209,9 +293,7 @@ export function CompTrainer({ comp, compVideos, userVideos, onBack }: Props) {
                 onChange={e => setSelectedUserVideoId(e.target.value)}
                 className="w-full h-10 rounded-md bg-secondary/30 border border-border px-3 pr-8 text-sm appearance-none focus:outline-none focus:ring-1 focus:ring-ring"
               >
-                {userVideos.map(v => (
-                  <option key={v.id} value={v.id}>{v.title}</option>
-                ))}
+                {userVideos.map(v => <option key={v.id} value={v.id}>{v.title}</option>)}
               </select>
               <ChevronDown className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
             </div>
@@ -222,7 +304,7 @@ export function CompTrainer({ comp, compVideos, userVideos, onBack }: Props) {
           <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{compFirst}'s Swing</label>
           {compVideos.length === 0 ? (
             <div className="h-10 flex items-center text-xs text-muted-foreground bg-secondary/30 rounded-md px-3 border border-border">
-              No videos found for {comp.player.name}
+              No videos for {comp.player.name}
             </div>
           ) : (
             <div className="relative">
@@ -231,9 +313,7 @@ export function CompTrainer({ comp, compVideos, userVideos, onBack }: Props) {
                 onChange={e => setSelectedCompVideoId(e.target.value)}
                 className="w-full h-10 rounded-md bg-secondary/30 border border-border px-3 pr-8 text-sm appearance-none focus:outline-none focus:ring-1 focus:ring-ring"
               >
-                {compVideos.map(v => (
-                  <option key={v.id} value={v.id}>{v.title} {v.season ? `(${v.season})` : ""}</option>
-                ))}
+                {compVideos.map(v => <option key={v.id} value={v.id}>{v.title}{v.season ? ` (${v.season})` : ""}</option>)}
               </select>
               <ChevronDown className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
             </div>
@@ -241,164 +321,82 @@ export function CompTrainer({ comp, compVideos, userVideos, onBack }: Props) {
         </div>
       </div>
 
-      {/* Mode + controls bar */}
-      <div className="flex items-center gap-3 flex-wrap">
-        {/* View mode toggle */}
-        <div className="flex items-center gap-0.5 bg-secondary/50 border border-border rounded-md p-0.5">
-          <button
-            onClick={() => setOverlayMode(false)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold transition-colors ${!overlayMode ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
-          >
-            <LayoutPanelLeft className="w-3.5 h-3.5" /> Side by Side
-          </button>
-          <button
-            onClick={() => setOverlayMode(true)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold transition-colors ${overlayMode ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
-          >
-            <Layers className="w-3.5 h-3.5" /> Overlay
-          </button>
-        </div>
-
-        {/* Opacity slider (overlay mode only) */}
-        {overlayMode && (
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span>Opacity</span>
-            <input
-              type="range" min={0.1} max={0.9} step={0.05}
-              value={overlayOpacity}
-              onChange={e => setOverlayOpacity(parseFloat(e.target.value))}
-              className="w-24 accent-primary"
-            />
-            <span>{Math.round(overlayOpacity * 100)}%</span>
-          </div>
-        )}
-
-        {/* Pose toggle */}
-        <button
-          onClick={() => setPoseEnabled(p => !p)}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs font-semibold transition-colors ml-auto ${
-            poseEnabled
-              ? "bg-primary/10 text-primary border-primary/30"
-              : "border-border text-muted-foreground hover:text-foreground hover:border-primary/30"
-          }`}
-        >
-          <Scan className="w-3.5 h-3.5" />
-          {poseEnabled ? "Pose On" : "Pose Detection"}
-        </button>
-      </div>
-
-      {/* Video area */}
-      {overlayMode ? (
-        <div className="relative rounded-lg overflow-hidden bg-black aspect-video">
-          {/* Hidden video elements used as canvas sources */}
-          <video
-            ref={playerVideoRef}
-            src={selectedUserVideo?.sourceUrl ?? ""}
-            crossOrigin="anonymous"
-            className="hidden"
-            playsInline
-            muted
-          />
-          <video
-            ref={compVideoRef}
-            src={selectedCompVideo?.sourceUrl ?? ""}
-            crossOrigin="anonymous"
-            className="hidden"
-            playsInline
-            muted
-          />
-          <canvas ref={overlayCanvasRef} className="w-full h-full object-contain" />
-
-          {/* Overlay controls */}
-          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-2">
-            <button
-              onClick={() => {
-                playerVideoRef.current?.paused ? playerVideoRef.current?.play() : playerVideoRef.current?.pause();
-                compVideoRef.current?.paused ? compVideoRef.current?.play() : compVideoRef.current?.pause();
-              }}
-              className="bg-black/70 border border-white/20 text-white text-xs font-semibold px-4 py-1.5 rounded-full hover:bg-black/90 transition-colors"
-            >
-              Play / Pause Both
-            </button>
-          </div>
-
-          {/* Legend */}
-          <div className="absolute top-3 right-3 bg-black/70 rounded-lg px-2.5 py-1.5 flex items-center gap-3 text-xs font-semibold">
-            <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-green-400 rounded inline-block" />You</span>
-            <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-orange-400 rounded inline-block" />{compFirst}</span>
-          </div>
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1.5">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Your Swing</p>
-            <div className="relative rounded-lg overflow-hidden bg-black aspect-video">
-              {selectedUserVideo?.sourceUrl ? (
-                <video
-                  ref={playerVideoRef}
-                  src={selectedUserVideo.sourceUrl}
-                  crossOrigin="anonymous"
-                  controls
-                  playsInline
-                  className="w-full h-full object-contain"
-                />
-              ) : (
-                <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground">
-                  No video selected
-                </div>
-              )}
-              {poseEnabled && playerPose && (
-                <PoseDot phase={playerPose.phase} color="green" />
-              )}
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{compFirst}'s Swing</p>
-            <div className="relative rounded-lg overflow-hidden bg-black aspect-video">
-              {selectedCompVideo?.sourceUrl ? (
-                <video
-                  ref={compVideoRef}
-                  src={selectedCompVideo.sourceUrl}
-                  crossOrigin="anonymous"
-                  controls
-                  playsInline
-                  className="w-full h-full object-contain"
-                />
-              ) : (
-                <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground">
-                  No video
-                </div>
-              )}
-              {poseEnabled && compPose && (
-                <PoseDot phase={compPose.phase} color="orange" />
-              )}
-            </div>
-          </div>
+      {/* Instructions */}
+      {!bothLocked && (
+        <div className="bg-secondary/30 border border-border rounded-lg px-4 py-3 text-xs text-muted-foreground flex items-start gap-2">
+          <span className="text-primary mt-0.5">→</span>
+          <span>
+            Scrub each video to the frame you want to compare — the phase badge updates live as MediaPipe detects your position.
+            Hit <strong className="text-foreground">Lock</strong> on each to freeze the pose, then compare.
+          </span>
         </div>
       )}
 
-      {/* Mechanics Gap analysis */}
-      <div className="space-y-2">
-        <h3 className="font-display font-bold text-lg uppercase tracking-wide flex items-center gap-2">
-          <Scan className="w-5 h-5 text-primary" /> Mechanics Gap
-        </h3>
+      {/* Scrub panels */}
+      <div className="grid grid-cols-2 gap-4">
+        <ScrubPanel
+          label="Your swing"
+          color="#4ade80"
+          videoUrl={selectedUserVideo?.sourceUrl ?? ""}
+          lockedPose={playerLocked}
+          onLock={setPlayerLocked}
+          onUnlock={() => { setPlayerLocked(null); setGhostVisible(false); }}
+        />
+        <ScrubPanel
+          label={`${compFirst}'s swing`}
+          color="#fb923c"
+          videoUrl={selectedCompVideo?.sourceUrl ?? ""}
+          lockedPose={compLocked}
+          onLock={setCompLocked}
+          onUnlock={() => { setCompLocked(null); setGhostVisible(false); }}
+        />
+      </div>
+
+      {/* Ghost comparison CTA */}
+      {bothLocked && (
+        <Button
+          className="w-full gap-2"
+          onClick={() => setGhostVisible(v => !v)}
+        >
+          <Ghost className="w-4 h-4" />
+          {ghostVisible ? "Hide Ghost Comparison" : "View Ghost Comparison"}
+        </Button>
+      )}
+
+      {/* Ghost canvas */}
+      {ghostVisible && bothLocked && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span className="font-semibold uppercase tracking-wider">Ghost Overlay</span>
+            <span className="flex items-center gap-3">
+              <span className="flex items-center gap-1.5">
+                <span className="w-3 h-0.5 bg-green-400 rounded inline-block" />You
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-3 h-0.5 bg-orange-400 rounded inline-block" />{compFirst}
+              </span>
+            </span>
+          </div>
+          <canvas
+            ref={ghostCanvasRef}
+            width={480}
+            height={560}
+            className="w-full rounded-xl border border-border"
+            style={{ background: "#0a0a0f" }}
+          />
+        </div>
+      )}
+
+      {/* Mechanics Gap */}
+      <div className="space-y-2 pt-2 border-t border-border">
+        <h3 className="font-display font-bold text-lg uppercase tracking-wide">Mechanics Gap</h3>
         <MechanicsGap
-          playerAngles={playerPose?.jointAngles ?? null}
-          compAngles={compPose?.jointAngles ?? null}
-          playerPhase={playerPose?.phase ?? "Unknown"}
+          playerAngles={playerLocked?.jointAngles ?? null}
+          compAngles={compLocked?.jointAngles ?? null}
+          playerPhase={playerLocked?.phase ?? "Unknown"}
           compName={comp.player.name}
         />
       </div>
-    </div>
-  );
-}
-
-function PoseDot({ phase, color }: { phase: string; color: "green" | "orange" }) {
-  return (
-    <div className="absolute top-2 left-2 bg-black/70 rounded px-1.5 py-0.5 text-[10px] font-bold"
-      style={{ color: color === "green" ? "#4ade80" : "#fb923c" }}>
-      {phase}
     </div>
   );
 }
