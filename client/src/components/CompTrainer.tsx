@@ -1,9 +1,15 @@
-import { useRef, useState, useEffect, useCallback } from "react";
+import { useRef, useState, useEffect } from "react";
 import { MechanicsGap } from "@/components/MechanicsGap";
-import { detectPose, SKELETON_CONNECTIONS } from "@/lib/poseDetector";
+import PoseOverlay from "@/components/PoseOverlay";
+import DrawingCanvas from "@/components/DrawingCanvas";
+import type { Tool, DrawAction } from "@/components/DrawingCanvas";
+import { detectPose } from "@/lib/poseDetector";
 import type { PoseResult, SwingPhase } from "@/lib/poseDetector";
 import type { MlbPlayer, Video } from "@shared/schema";
-import { ArrowLeft, Lock, Ghost, ChevronDown, RefreshCw } from "lucide-react";
+import {
+  ArrowLeft, Lock, ChevronDown, RefreshCw,
+  Eye, EyeOff, Pencil, Minus, Circle, Square, Type, Trash2, MousePointer,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface Comp {
@@ -20,124 +26,18 @@ interface Props {
   onBack: () => void;
 }
 
-// ── Skeleton normalization ─────────────────────────────────────────────────
-// Centers each skeleton on hip midpoint, scales by torso length.
-type NL = { x: number; y: number; visibility: number };
+// ── Drawing toolbar config ─────────────────────────────────────────────────
+const DRAW_COLORS = ["#ffffff", "#ef4444", "#22c55e", "#3b82f6", "#f59e0b", "#a855f7", "#06b6d4"];
+const DRAW_TOOLS: { id: Tool; icon: React.ReactNode; label: string }[] = [
+  { id: "select",  icon: <MousePointer className="w-3.5 h-3.5" />, label: "Select (no draw)" },
+  { id: "pen",     icon: <Pencil className="w-3.5 h-3.5" />,       label: "Pen" },
+  { id: "line",    icon: <Minus className="w-3.5 h-3.5" />,        label: "Line" },
+  { id: "circle",  icon: <Circle className="w-3.5 h-3.5" />,       label: "Circle" },
+  { id: "rect",    icon: <Square className="w-3.5 h-3.5" />,       label: "Rectangle" },
+  { id: "text",    icon: <Type className="w-3.5 h-3.5" />,         label: "Text" },
+];
 
-function normalizeSkeleton(lm: PoseResult["landmarks"]): NL[] {
-  const hipMidX = (lm[23].x + lm[24].x) / 2;
-  const hipMidY = (lm[23].y + lm[24].y) / 2;
-  const shoulderMidX = (lm[11].x + lm[12].x) / 2;
-  const shoulderMidY = (lm[11].y + lm[12].y) / 2;
-  const torso = Math.sqrt((shoulderMidX - hipMidX) ** 2 + (shoulderMidY - hipMidY) ** 2);
-  const t = torso || 1;
-  return lm.map(p => ({
-    x: (p.x - hipMidX) / t,
-    y: (p.y - hipMidY) / t,
-    visibility: p.visibility,
-  }));
-}
-
-// ── Ghost canvas renderer ──────────────────────────────────────────────────
-// Adaptive: computes bounding box of BOTH skeletons combined, then scales
-// to fit the canvas with padding. Arms during a swing won't clip.
-function renderGhostCanvas(
-  canvas: HTMLCanvasElement,
-  playerResult: PoseResult,
-  compResult: PoseResult,
-  compName: string,
-  playerPhase: string,
-  compPhase: string,
-) {
-  const W = canvas.width;
-  const H = canvas.height;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return;
-
-  const playerNorm = normalizeSkeleton(playerResult.landmarks);
-  const compNorm   = normalizeSkeleton(compResult.landmarks);
-
-  // Collect all visible points to compute bounding box
-  const VIS = 0.1;
-  const allPts = [...playerNorm, ...compNorm].filter(p => p.visibility > VIS);
-
-  ctx.fillStyle = "#07070f";
-  ctx.fillRect(0, 0, W, H);
-
-  if (allPts.length === 0) {
-    ctx.fillStyle = "rgba(255,255,255,0.25)";
-    ctx.font = "13px sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText("No pose landmarks detected", W / 2, H / 2);
-    return;
-  }
-
-  // Bounding box
-  const xs = allPts.map(p => p.x);
-  const ys = allPts.map(p => p.y);
-  const minX = Math.min(...xs);
-  const maxX = Math.max(...xs);
-  const minY = Math.min(...ys);
-  const maxY = Math.max(...ys);
-  const cx = (minX + maxX) / 2;
-  const cy = (minY + maxY) / 2;
-
-  // Scale to fit canvas with 12% padding each side
-  const PAD = 0.12;
-  const scaleX = (W * (1 - 2 * PAD)) / Math.max(maxX - minX, 0.01);
-  const scaleY = (H * (1 - 2 * PAD)) / Math.max(maxY - minY, 0.01);
-  const scale  = Math.min(scaleX, scaleY);
-
-  const toX = (nx: number) => W / 2 + (nx - cx) * scale;
-  const toY = (ny: number) => H / 2 + (ny - cy) * scale;
-
-  // Subtle grid
-  ctx.strokeStyle = "rgba(255,255,255,0.04)";
-  ctx.lineWidth = 1;
-  for (let gx = 0; gx < W; gx += 40) { ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, H); ctx.stroke(); }
-  for (let gy = 0; gy < H; gy += 40) { ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(W, gy); ctx.stroke(); }
-
-  const drawSkeleton = (norm: NL[], color: string, alpha: number) => {
-    ctx.globalAlpha = alpha;
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 2.5;
-    ctx.shadowColor = color;
-    ctx.shadowBlur = 10;
-    for (const [i, j] of SKELETON_CONNECTIONS) {
-      const a = norm[i]; const b = norm[j];
-      if (!a || !b || a.visibility < VIS || b.visibility < VIS) continue;
-      ctx.beginPath();
-      ctx.moveTo(toX(a.x), toY(a.y));
-      ctx.lineTo(toX(b.x), toY(b.y));
-      ctx.stroke();
-    }
-    ctx.shadowBlur = 0;
-    for (const lm of norm) {
-      if (lm.visibility < VIS) continue;
-      ctx.beginPath();
-      ctx.arc(toX(lm.x), toY(lm.y), 3.5, 0, Math.PI * 2);
-      ctx.fillStyle = color;
-      ctx.fill();
-    }
-    ctx.globalAlpha = 1;
-  };
-
-  // Comp behind (translucent), player on top
-  drawSkeleton(compNorm,   "#fb923c", 0.65);
-  drawSkeleton(playerNorm, "#4ade80", 1.0);
-
-  // Phase labels
-  const firstName = compName.split(" ")[0].toUpperCase();
-  ctx.shadowBlur = 0;
-  ctx.font = "bold 11px monospace";
-  ctx.textAlign = "left";
-  ctx.fillStyle = "#4ade80";
-  ctx.fillText(`YOU · ${playerPhase}`, 12, H - 22);
-  ctx.fillStyle = "#fb923c";
-  ctx.fillText(`${firstName} · ${compPhase}`, 12, H - 8);
-}
-
-// ── Phase badge color ──────────────────────────────────────────────────────
+// ── Phase badge ────────────────────────────────────────────────────────────
 function phaseColor(phase: SwingPhase | null) {
   if (!phase || phase === "Unknown") return "bg-secondary text-muted-foreground";
   const map: Record<string, string> = {
@@ -150,143 +50,200 @@ function phaseColor(phase: SwingPhase | null) {
   return map[phase] ?? "bg-secondary text-muted-foreground";
 }
 
-// ── ScrubPanel ─────────────────────────────────────────────────────────────
-// One video panel with live phase detection + lock button.
-function ScrubPanel({
-  label,
-  color,
-  videoUrl,
-  lockedPose,
-  onLock,
-  onUnlock,
-}: {
-  label: string;
-  color: string;
-  videoUrl: string;
-  lockedPose: PoseResult | null;
-  onLock: (pose: PoseResult) => void;
-  onUnlock: () => void;
-}) {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const [livePose, setLivePose] = useState<PoseResult | null>(null);
-  const [detecting, setDetecting] = useState(false);
-  const lastDetectRef = useRef(0);
-
-  const runDetect = useCallback(async () => {
-    const vid = videoRef.current;
-    if (!vid || vid.readyState < 2) return;
-    const now = performance.now();
-    if (now - lastDetectRef.current < 150) return; // throttle to ~6fps
-    lastDetectRef.current = now;
-    setDetecting(true);
-    const result = await detectPose(vid, now);
-    setDetecting(false);
-    if (result) setLivePose(result);
-  }, []);
-
-  useEffect(() => {
-    const vid = videoRef.current;
-    if (!vid) return;
-    vid.addEventListener("timeupdate", runDetect);
-    vid.addEventListener("seeked", runDetect);
-    vid.addEventListener("pause", runDetect);
-    return () => {
-      vid.removeEventListener("timeupdate", runDetect);
-      vid.removeEventListener("seeked", runDetect);
-      vid.removeEventListener("pause", runDetect);
-    };
-  }, [runDetect, videoUrl]);
-
-  // Reset live pose when video changes
-  useEffect(() => { setLivePose(null); }, [videoUrl]);
-
-  const displayPhase = lockedPose?.phase ?? livePose?.phase ?? null;
-  const isLocked = !!lockedPose;
-
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <p className="text-xs font-semibold uppercase tracking-wider" style={{ color }}>
-          {label}
-        </p>
-        {displayPhase && (
-          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${phaseColor(displayPhase)} ${isLocked ? "ring-1 ring-current" : ""}`}>
-            {isLocked ? "🔒 " : ""}{displayPhase}
-          </span>
-        )}
-      </div>
-
-      <div className="relative rounded-lg overflow-hidden bg-black aspect-video">
-        <video
-          ref={videoRef}
-          src={videoUrl}
-          crossOrigin="anonymous"
-          controls
-          playsInline
-          className="w-full h-full object-contain"
-        />
-        {detecting && (
-          <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-primary animate-pulse" />
-        )}
-        {isLocked && (
-          <div className="absolute inset-0 ring-2 rounded-lg pointer-events-none" style={{ boxShadow: `inset 0 0 0 2px ${color}` }} />
-        )}
-      </div>
-
-      <div className="flex gap-2">
-        {!isLocked ? (
-          <Button
-            size="sm"
-            className="flex-1"
-            disabled={!livePose}
-            onClick={() => livePose && onLock(livePose)}
-          >
-            <Lock className="w-3.5 h-3.5 mr-1.5" />
-            {livePose ? `Lock at ${livePose.phase}` : "Scrub to detect pose"}
-          </Button>
-        ) : (
-          <Button size="sm" variant="outline" className="flex-1" onClick={onUnlock}>
-            <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Unlock
-          </Button>
-        )}
-      </div>
-    </div>
-  );
-}
-
 // ── Main CompTrainer ───────────────────────────────────────────────────────
 export function CompTrainer({ comp, compVideos, userVideos, onBack }: Props) {
-  const [selectedCompVideoId, setSelectedCompVideoId] = useState(compVideos[0]?.id ?? "");
+  // Video selection
   const [selectedUserVideoId, setSelectedUserVideoId] = useState(userVideos[0]?.id ?? "");
+  const [selectedCompVideoId, setSelectedCompVideoId] = useState(compVideos[0]?.id ?? "");
+
+  // Pose detection
+  const [poseEnabled, setPoseEnabled] = useState(false);
+  const [playerLivePose, setPlayerLivePose] = useState<PoseResult | null>(null);
+  const [compLivePose, setCompLivePose]     = useState<PoseResult | null>(null);
+
+  // Dim overlay (0–70%)
+  const [dimLevel, setDimLevel] = useState(0);
+
+  // Drawing tools
+  const [drawTool, setDrawTool]             = useState<Tool>("select");
+  const [drawColor, setDrawColor]           = useState("#ffffff");
+  const [leftAnnotations, setLeftAnnotations]   = useState<DrawAction[]>([]);
+  const [rightAnnotations, setRightAnnotations] = useState<DrawAction[]>([]);
+
+  // Locked poses (for Mechanics Gap)
   const [playerLocked, setPlayerLocked] = useState<PoseResult | null>(null);
-  const [compLocked, setCompLocked] = useState<PoseResult | null>(null);
-  const [ghostVisible, setGhostVisible] = useState(false);
+  const [compLocked, setCompLocked]     = useState<PoseResult | null>(null);
 
-  const selectedCompVideo = compVideos.find(v => v.id === selectedCompVideoId);
+  // Video element refs for detection
+  const playerVideoRef = useRef<HTMLVideoElement>(null);
+  const compVideoRef   = useRef<HTMLVideoElement>(null);
+
   const selectedUserVideo = userVideos.find(v => v.id === selectedUserVideoId);
-  const bothLocked = !!playerLocked && !!compLocked;
-  const compFirst = comp.player.name.split(" ")[0];
+  const selectedCompVideo = compVideos.find(v => v.id === selectedCompVideoId);
+  const compFirst  = comp.player.name.split(" ")[0];
 
-  // Reset locks when video selection changes
-  useEffect(() => { setPlayerLocked(null); setGhostVisible(false); }, [selectedUserVideoId]);
-  useEffect(() => { setCompLocked(null); setGhostVisible(false); }, [selectedCompVideoId]);
+  // ── Pose detection interval (alternates player / comp each tick) ──────────
+  useEffect(() => {
+    if (!poseEnabled) {
+      setPlayerLivePose(null);
+      setCompLivePose(null);
+      return;
+    }
+    let turn = 0;
+    const id = setInterval(async () => {
+      if (turn % 2 === 0) {
+        const vid = playerVideoRef.current;
+        if (vid && vid.readyState >= 2) {
+          const r = await detectPose(vid, performance.now());
+          if (r) setPlayerLivePose(r);
+        }
+      } else {
+        const vid = compVideoRef.current;
+        if (vid && vid.readyState >= 2) {
+          const r = await detectPose(vid, performance.now());
+          if (r) setCompLivePose(r);
+        }
+      }
+      turn++;
+    }, 100); // 10 fps alternating ≈ 5 fps per video
+    return () => clearInterval(id);
+  }, [poseEnabled]);
 
-  // Callback ref — fires the moment the canvas element mounts, guaranteed non-null.
-  const ghostCanvasRef = useCallback((canvas: HTMLCanvasElement | null) => {
-    if (!canvas || !playerLocked || !compLocked) return;
-    renderGhostCanvas(
-      canvas,
-      playerLocked,
-      compLocked,
-      comp.player.name,
-      playerLocked.phase,
-      compLocked.phase,
+  // Reset when videos change
+  useEffect(() => {
+    setPlayerLocked(null);
+    setPlayerLivePose(null);
+  }, [selectedUserVideoId]);
+  useEffect(() => {
+    setCompLocked(null);
+    setCompLivePose(null);
+  }, [selectedCompVideoId]);
+
+  const playerDisplayPose = playerLocked ?? playerLivePose;
+  const compDisplayPose   = compLocked   ?? compLivePose;
+
+  // ── Video panel helper ─────────────────────────────────────────────────────
+  const VideoPanel = ({
+    label,
+    accentColor,
+    videoRef,
+    videoSrc,
+    livePose,
+    lockedPose,
+    annotations,
+    onAnnotationsChange,
+    onLock,
+    onUnlock,
+    onClear,
+  }: {
+    label: string;
+    accentColor: string;
+    videoRef: React.RefObject<HTMLVideoElement>;
+    videoSrc: string | undefined;
+    livePose: PoseResult | null;
+    lockedPose: PoseResult | null;
+    annotations: DrawAction[];
+    onAnnotationsChange: (a: DrawAction[]) => void;
+    onLock: () => void;
+    onUnlock: () => void;
+    onClear: () => void;
+  }) => {
+    const isLocked = !!lockedPose;
+    const displayPose = lockedPose ?? livePose;
+    const phase = displayPose?.phase ?? null;
+
+    return (
+      <div className="space-y-2">
+        {/* Panel header */}
+        <div className="flex items-center justify-between min-h-5.5">
+          <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: accentColor }}>
+            {label}
+          </p>
+          {phase && (
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${phaseColor(phase)} ${isLocked ? "ring-1 ring-current" : ""}`}>
+              {isLocked ? "🔒 " : ""}{phase}
+            </span>
+          )}
+        </div>
+
+        {/* Video container */}
+        <div className="relative rounded-lg overflow-hidden bg-black aspect-video">
+          {videoSrc ? (
+            <video
+              ref={videoRef}
+              src={videoSrc}
+              crossOrigin="anonymous"
+              controls
+              playsInline
+              className="w-full h-full object-contain"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground">
+              No video selected
+            </div>
+          )}
+
+          {/* Dim overlay — behind pose and drawing */}
+          <div
+            className="absolute inset-0 z-10 pointer-events-none bg-black transition-opacity"
+            style={{ opacity: dimLevel / 100 }}
+          />
+
+          {/* Pose overlay (z-20, pointer-events-none) */}
+          {poseEnabled && videoSrc && (
+            <PoseOverlay
+              poseResult={displayPose}
+              visible={poseEnabled}
+              videoElement={videoRef.current}
+            />
+          )}
+
+          {/* Drawing canvas (z-20, auto pointer-events when tool active) */}
+          {videoSrc && (
+            <DrawingCanvas
+              tool={drawTool}
+              color={drawColor}
+              annotations={annotations}
+              onAnnotationsChange={onAnnotationsChange}
+            />
+          )}
+
+          {/* Locked ring indicator */}
+          {isLocked && (
+            <div
+              className="absolute inset-0 rounded-lg pointer-events-none z-40"
+              style={{ boxShadow: `inset 0 0 0 2px ${accentColor}` }}
+            />
+          )}
+        </div>
+
+        {/* Lock / clear row */}
+        <div className="flex gap-2">
+          {poseEnabled && (
+            isLocked ? (
+              <Button size="sm" variant="outline" className="flex-1" onClick={onUnlock}>
+                <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Unlock
+              </Button>
+            ) : (
+              <Button size="sm" className="flex-1" disabled={!livePose} onClick={onLock}>
+                <Lock className="w-3.5 h-3.5 mr-1.5" />
+                {livePose ? `Lock · ${livePose.phase}` : "Scrub to detect pose"}
+              </Button>
+            )
+          )}
+          {annotations.length > 0 && (
+            <Button size="sm" variant="outline" onClick={onClear} title="Clear drawings">
+              <Trash2 className="w-3.5 h-3.5" />
+            </Button>
+          )}
+        </div>
+      </div>
     );
-  }, [playerLocked, compLocked, comp.player.name]); // eslint-disable-line
+  };
 
   return (
     <div className="space-y-5">
-      {/* Header */}
+      {/* ── Header ────────────────────────────────────────────────────── */}
       <div className="flex items-center gap-3">
         <button
           onClick={onBack}
@@ -296,8 +253,11 @@ export function CompTrainer({ comp, compVideos, userVideos, onBack }: Props) {
         </button>
         <div className="h-4 w-px bg-border" />
         {comp.player.imageUrl && (
-          <img src={comp.player.imageUrl} alt={comp.player.name}
-            className="w-8 h-8 rounded-full object-contain bg-secondary border border-border" />
+          <img
+            src={comp.player.imageUrl}
+            alt={comp.player.name}
+            className="w-8 h-8 rounded-full object-contain bg-secondary border border-border"
+          />
         )}
         <div>
           <p className="font-bold text-sm leading-tight">{comp.player.name}</p>
@@ -307,7 +267,7 @@ export function CompTrainer({ comp, compVideos, userVideos, onBack }: Props) {
         </div>
       </div>
 
-      {/* Video selectors */}
+      {/* ── Video selectors ───────────────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
           <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">My Swing</label>
@@ -342,7 +302,9 @@ export function CompTrainer({ comp, compVideos, userVideos, onBack }: Props) {
                 onChange={e => setSelectedCompVideoId(e.target.value)}
                 className="w-full h-10 rounded-md bg-secondary/30 border border-border px-3 pr-8 text-sm appearance-none focus:outline-none focus:ring-1 focus:ring-ring"
               >
-                {compVideos.map(v => <option key={v.id} value={v.id}>{v.title}{v.season ? ` (${v.season})` : ""}</option>)}
+                {compVideos.map(v => (
+                  <option key={v.id} value={v.id}>{v.title}{v.season ? ` (${v.season})` : ""}</option>
+                ))}
               </select>
               <ChevronDown className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
             </div>
@@ -350,79 +312,123 @@ export function CompTrainer({ comp, compVideos, userVideos, onBack }: Props) {
         </div>
       </div>
 
-      {/* Instructions */}
-      {!bothLocked && (
-        <div className="bg-secondary/30 border border-border rounded-lg px-4 py-3 text-xs text-muted-foreground flex items-start gap-2">
-          <span className="text-primary mt-0.5">→</span>
-          <span>
-            Scrub each video to the frame you want to compare — the phase badge updates live as MediaPipe detects your position.
-            Hit <strong className="text-foreground">Lock</strong> on each to freeze the pose, then compare.
-          </span>
-        </div>
-      )}
-
-      {/* Scrub panels */}
-      <div className="grid grid-cols-2 gap-4">
-        <ScrubPanel
-          label="Your swing"
-          color="#4ade80"
-          videoUrl={selectedUserVideo?.sourceUrl ?? ""}
+      {/* ── Side-by-side video panels ─────────────────────────────────── */}
+      <div className="grid grid-cols-2 gap-3">
+        <VideoPanel
+          label="Your Swing"
+          accentColor="#4ade80"
+          videoRef={playerVideoRef}
+          videoSrc={selectedUserVideo?.sourceUrl}
+          livePose={playerLivePose}
           lockedPose={playerLocked}
-          onLock={setPlayerLocked}
-          onUnlock={() => { setPlayerLocked(null); setGhostVisible(false); }}
+          annotations={leftAnnotations}
+          onAnnotationsChange={setLeftAnnotations}
+          onLock={() => playerLivePose && setPlayerLocked(playerLivePose)}
+          onUnlock={() => setPlayerLocked(null)}
+          onClear={() => setLeftAnnotations([])}
         />
-        <ScrubPanel
-          label={`${compFirst}'s swing`}
-          color="#fb923c"
-          videoUrl={selectedCompVideo?.sourceUrl ?? ""}
+        <VideoPanel
+          label={`${compFirst}'s Swing`}
+          accentColor="#fb923c"
+          videoRef={compVideoRef}
+          videoSrc={selectedCompVideo?.sourceUrl}
+          livePose={compLivePose}
           lockedPose={compLocked}
-          onLock={setCompLocked}
-          onUnlock={() => { setCompLocked(null); setGhostVisible(false); }}
+          annotations={rightAnnotations}
+          onAnnotationsChange={setRightAnnotations}
+          onLock={() => compLivePose && setCompLocked(compLivePose)}
+          onUnlock={() => setCompLocked(null)}
+          onClear={() => setRightAnnotations([])}
         />
       </div>
 
-      {/* Ghost comparison CTA */}
-      {bothLocked && (
-        <Button
-          className="w-full gap-2"
-          onClick={() => setGhostVisible(v => !v)}
+      {/* ── Controls bar ──────────────────────────────────────────────── */}
+      <div className="flex flex-wrap items-center gap-4 bg-secondary/30 border border-border rounded-xl px-4 py-3">
+        {/* Pose toggle */}
+        <button
+          onClick={() => setPoseEnabled(v => !v)}
+          className={`flex items-center gap-2 text-sm font-semibold px-3 py-1.5 rounded-lg transition-colors ${
+            poseEnabled
+              ? "bg-primary text-primary-foreground"
+              : "bg-secondary text-muted-foreground hover:text-foreground"
+          }`}
         >
-          <Ghost className="w-4 h-4" />
-          {ghostVisible ? "Hide Ghost Comparison" : "View Ghost Comparison"}
-        </Button>
-      )}
+          {poseEnabled ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+          Pose {poseEnabled ? "ON" : "OFF"}
+        </button>
 
-      {/* Ghost canvas */}
-      {ghostVisible && bothLocked && (
-        <div className="space-y-2">
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span className="font-semibold uppercase tracking-wider">Ghost Overlay</span>
-            <span className="flex items-center gap-3">
-              <span className="flex items-center gap-1.5">
-                <span className="w-3 h-0.5 bg-green-400 rounded inline-block" />You
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="w-3 h-0.5 bg-orange-400 rounded inline-block" />{compFirst}
-              </span>
-            </span>
-          </div>
-          <canvas
-            ref={ghostCanvasRef}
-            width={480}
-            height={560}
-            className="w-full rounded-xl border border-border"
-            style={{ background: "#0a0a0f" }}
+        {/* Dim slider */}
+        <div className="flex items-center gap-2 flex-1 min-w-35">
+          <span className="text-xs text-muted-foreground whitespace-nowrap">Dim</span>
+          <input
+            type="range"
+            min={0}
+            max={70}
+            value={dimLevel}
+            onChange={e => setDimLevel(Number(e.target.value))}
+            className="flex-1 h-1.5 accent-primary cursor-pointer"
           />
+          <span className="text-xs text-muted-foreground w-8 text-right">{dimLevel}%</span>
         </div>
-      )}
+      </div>
 
-      {/* Mechanics Gap */}
+      {/* ── Drawing toolbar ───────────────────────────────────────────── */}
+      <div className="flex flex-wrap items-center gap-2">
+        {/* Tool buttons */}
+        <div className="flex items-center gap-0.5 bg-secondary/30 border border-border rounded-lg p-1">
+          {DRAW_TOOLS.map(t => (
+            <button
+              key={t.id}
+              title={t.label}
+              onClick={() => setDrawTool(t.id)}
+              className={`p-1.5 rounded-md transition-colors ${
+                drawTool === t.id
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+              }`}
+            >
+              {t.icon}
+            </button>
+          ))}
+        </div>
+
+        {/* Color swatches */}
+        <div className="flex items-center gap-1 bg-secondary/30 border border-border rounded-lg p-1.5">
+          {DRAW_COLORS.map(c => (
+            <button
+              key={c}
+              title={c}
+              onClick={() => setDrawColor(c)}
+              className={`w-5 h-5 rounded-full transition-transform ${
+                drawColor === c ? "scale-125 ring-2 ring-offset-1 ring-offset-background ring-white/50" : ""
+              }`}
+              style={{ backgroundColor: c }}
+            />
+          ))}
+        </div>
+
+        {/* Clear buttons */}
+        <div className="ml-auto flex gap-1.5">
+          {leftAnnotations.length > 0 && (
+            <Button size="sm" variant="outline" onClick={() => setLeftAnnotations([])} className="text-xs gap-1">
+              <Trash2 className="w-3 h-3" /> Left
+            </Button>
+          )}
+          {rightAnnotations.length > 0 && (
+            <Button size="sm" variant="outline" onClick={() => setRightAnnotations([])} className="text-xs gap-1">
+              <Trash2 className="w-3 h-3" /> Right
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* ── Mechanics Gap ─────────────────────────────────────────────── */}
       <div className="space-y-2 pt-2 border-t border-border">
         <h3 className="font-display font-bold text-lg uppercase tracking-wide">Mechanics Gap</h3>
         <MechanicsGap
-          playerAngles={playerLocked?.jointAngles ?? null}
-          compAngles={compLocked?.jointAngles ?? null}
-          playerPhase={playerLocked?.phase ?? "Unknown"}
+          playerAngles={playerDisplayPose?.jointAngles ?? null}
+          compAngles={compDisplayPose?.jointAngles ?? null}
+          playerPhase={playerDisplayPose?.phase ?? "Unknown"}
           compName={comp.player.name}
         />
       </div>
