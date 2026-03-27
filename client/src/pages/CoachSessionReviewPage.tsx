@@ -35,7 +35,7 @@ export default function CoachSessionReviewPage() {
       <Layout>
         <div className="flex flex-col items-center justify-center h-64 gap-4">
           <p className="text-muted-foreground">Session not found.</p>
-          <Button variant="ghost" onClick={() => navigate(-1 as any)}><ArrowLeft size={16} className="mr-2" /> Back</Button>
+          <Button variant="ghost" onClick={() => navigate("/coach")}><ArrowLeft size={16} className="mr-2" /> Back</Button>
         </div>
       </Layout>
     );
@@ -50,7 +50,7 @@ export default function CoachSessionReviewPage() {
       <div className="max-w-5xl mx-auto w-full py-6 px-4 space-y-6">
         {/* Header */}
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" onClick={() => navigate(-1 as any)}>
+          <Button variant="ghost" size="sm" onClick={() => navigate("/coach")}>
             <ArrowLeft size={16} className="mr-1" /> Back
           </Button>
           <div>
