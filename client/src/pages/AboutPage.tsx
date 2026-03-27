@@ -65,7 +65,7 @@ export default function AboutPage() {
             { value: "10", label: "Years as a Pro" },
             { value: "4+", label: "Countries Played" },
             { value: "2012", label: "World Baseball Classic" },
-            { value: "2013", label: "The Year Everything Changed" },
+            { value: "2014", label: "The Year Everything Changed" },
           ].map(({ value, label }) => (
             <div key={label}>
               <p className="font-display font-bold text-4xl text-primary">{value}</p>
@@ -85,10 +85,10 @@ export default function AboutPage() {
         body={
           <>
             <p>
-              Ben Guez spent nearly a decade playing professional baseball — climbing through the Detroit Tigers and Milwaukee Brewers organizations, competing in winter leagues in Mexico and Venezuela, and representing Israel in the 2012 World Baseball Classic qualifier. Baseball took him all over the world.
+              Ben Guez spent nearly a decade playing professional baseball, climbing through the Detroit Tigers and Milwaukee Brewers organizations, competing in winter leagues in Mexico and Venezuela, and representing Israel in the 2012 World Baseball Classic qualifier. Baseball took him all over the world.
             </p>
             <p>
-              He was never the most naturally gifted guy in the room. He was a grinder — drafted out of George Mason in the 19th round, the kind of player who had to outwork, outstudy, and out-prepare everyone around him just to stay on the field.
+              He was never the most naturally gifted guy in the room. He was a grinder, drafted out of William & Mary in the 19th round, the kind of player who had to outwork, outstudy, and out-prepare everyone around him just to stay on the field.
             </p>
           </>
         }
@@ -100,14 +100,14 @@ export default function AboutPage() {
       {/* The Turning Point */}
       <Section
         eyebrow="The Turning Point"
-        headline="In 2013, he finally saw the swing."
+        headline="In 2014, he finally saw the swing."
         body={
           <>
             <p>
-              In 2013, Ben met Craig Wallenbrock and Robert Van Scoyoc — two of the most respected hitting minds in professional baseball. The experience was unlike anything he'd encountered in his career.
+              In 2014, Ben met Craig Wallenbrock and Robert Van Scoyoc, two of the most respected hitting minds in professional baseball. The experience was unlike anything he'd encountered in his career.
             </p>
             <p>
-              For the first time, he could see mechanics he'd never been able to see before — in his own swing, in elite hitters, in footage he'd watched hundreds of times. It wasn't just coaching. It was a framework. A language for understanding what the swing was actually doing, and what it needed to become.
+              For the first time, he could see mechanics he'd never been able to see before, in his own swing, in elite hitters, in footage he'd watched hundreds of times. It wasn't just coaching. It was a framework. A language for understanding what the swing was actually doing, and what it needed to become.
             </p>
             <p>
               He left that experience with a question that never went away: <em>what if he'd had access to this earlier?</em>
@@ -126,10 +126,10 @@ export default function AboutPage() {
         body={
           <>
             <p>
-              Swing Studio was built on a simple belief: the right coaching, the right tools, and the right analysis — earlier in a player's development — can change trajectories.
+              Swing Studio was built on a simple belief: the right coaching, the right tools, and the right analysis, earlier in a player's development, can change trajectories.
             </p>
             <p>
-              Most players never get access to elite-level feedback. They work hard, take reps, and hope something clicks. Swing Studio exists to close that gap — AI-powered swing analysis, a structured development curriculum, and a platform built for both players and coaches to actually work together.
+              Most players never get access to elite-level feedback. They work hard, take reps, and hope something clicks. Swing Studio exists to close that gap. AI-powered swing analysis, a structured development curriculum, and a platform built for both players and coaches to actually work together.
             </p>
             <p>
               Not just exchanging clips. Building toward something.
@@ -148,10 +148,10 @@ export default function AboutPage() {
         body={
           <>
             <p>
-              Swing Studio is built for the player who shows up early, stays late, and is hungry to understand their game on a deeper level. And it's built for the coaches who see things others miss — and need better tools to show their players what they see.
+              Swing Studio is built for the player who shows up early, stays late, and is hungry to understand their game on a deeper level. And it's built for the coaches who see things others miss and need better tools to show their players what they see.
             </p>
             <p>
-              We're still early. There's a lot more to build. But if Swing Studio helps one player see their swing clearly for the first time — or gives one coach the tools to communicate what they've always known — then we're on the right track.
+              We're still early. There's a lot more to build. But if Swing Studio helps one player see their swing clearly for the first time, or gives one coach the tools to communicate what they've always known, then we're on the right track.
             </p>
           </>
         }
