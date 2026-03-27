@@ -71,7 +71,7 @@ export default function Layout({ children, showScoreTicker = false }: { children
       { href: "/pricing", label: "Upgrade Plan" },
     ]},
     { section: "Company", links: [
-      { href: "https://swingstudio.ai", label: "About" },
+      { href: "/about", label: "About" },
       { href: "/pricing", label: "Pricing" },
     ]},
   ];
