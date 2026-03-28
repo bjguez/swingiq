@@ -84,12 +84,7 @@ function buildClues(player: any) {
   const isPitcher = stats.type === "pitcher" ||
     (stats.type !== "hitter" && ["P", "SP", "RP", "CL"].includes(player.position));
 
-  const careerSpan =
-    player.careerStart && player.careerEnd
-      ? player.careerStart === player.careerEnd
-        ? String(player.careerStart)
-        : `${player.careerStart} - ${player.careerEnd}`
-      : "Unknown";
+  const debutYear = player.careerStart ? String(player.careerStart) : "Unknown";
 
   let keyStats = "N/A";
   if (isPitcher && stats.wins != null) {
@@ -105,7 +100,7 @@ function buildClues(player: any) {
     { label: "Position", value: player.position },
     { label: "Born in", value: player.birthCountry ?? "Unknown" },
     { label: "Career stats", value: keyStats },
-    { label: "Career", value: careerSpan },
+    { label: "MLB debut", value: debutYear },
     { label: "Teams", value: Array.isArray(player.teams) && player.teams.length ? player.teams.join(", ") : "N/A" },
     { label: "Bats / Throws", value: `${player.bats ?? "?"}/${player.throwsHand ?? "?"}` },
     { label: "Career WAR", value: player.careerWar != null ? player.careerWar.toFixed(1) : "N/A" },
