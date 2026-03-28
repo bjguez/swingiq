@@ -32,6 +32,9 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel, ex
   const [rightDuration, setRightDuration] = useState(1);
   const [currentTime, setCurrentTime] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isPortrait, setIsPortrait] = useState(
+    typeof window !== "undefined" ? window.innerHeight > window.innerWidth : true
+  );
 
   const [activeTool, setActiveTool] = useState<Tool>("select");
   const [activeColor, setActiveColor] = useState("#ef4444");
@@ -108,6 +111,13 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel, ex
       document.removeEventListener("fullscreenchange", handleChange);
       document.removeEventListener("webkitfullscreenchange", handleChange);
     };
+  }, []);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(orientation: portrait)");
+    const handler = (e: MediaQueryListEvent) => setIsPortrait(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
   }, []);
 
   const toggleFullscreen = useCallback(() => {
@@ -368,11 +378,17 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel, ex
       }
     >
       {/* Videos Container */}
-      <div className={isFullscreen ? 'absolute inset-0 grid grid-cols-2 gap-px' : 'grid grid-cols-1 md:grid-cols-2 gap-4'}>
+      <div className={
+        isFullscreen
+          ? `absolute inset-0 grid gap-px ${isPortrait ? 'grid-cols-1 grid-rows-2' : 'grid-cols-2'}`
+          : 'grid grid-cols-1 md:grid-cols-2 gap-4'
+      }>
         
         {/* Left (Amateur) Video */}
         <div
-          className={`relative rounded-lg overflow-hidden bg-black cursor-pointer transition-shadow ${isFullscreen ? 'h-full min-h-0' : 'aspect-video'} ${
+          className={`relative rounded-lg overflow-hidden bg-black cursor-pointer transition-shadow ${
+            isFullscreen ? (isPortrait ? 'h-[50dvh] min-h-0' : 'h-full min-h-0') : 'aspect-video'
+          } ${
             synced ? 'ring-2 ring-blue-400/60 border border-blue-400/30' :
             activePanel === 'left' ? 'ring-2 ring-primary border border-primary/50' :
             'border border-border'
@@ -426,6 +442,23 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel, ex
             </div>
           </div>
           
+          {/* Always-visible upload prompt in fullscreen when no video loaded */}
+          {isFullscreen && !leftVideoSrc && (
+            <div className="absolute inset-0 flex items-center justify-center z-40 pointer-events-auto" onPointerDown={e => e.stopPropagation()}>
+              <VideoLibraryModal
+                mode="user"
+                onVideoSelected={handleLeftUpload}
+                onCompSelected={handleRightUpload}
+                trigger={
+                  <button className="flex flex-col items-center gap-3 bg-black/70 hover:bg-black/80 rounded-2xl px-8 py-6 border border-white/20 transition-colors">
+                    <Upload className="w-8 h-8 text-white/80" />
+                    <span className="text-white/80 text-sm font-medium">Upload your swing</span>
+                  </button>
+                }
+              />
+            </div>
+          )}
+
           <VideoPlayer
             ref={leftVideoRef}
             src={leftVideoSrc}
@@ -497,7 +530,9 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel, ex
 
         {/* Right (Pro) Video */}
         <div
-          className={`relative rounded-lg overflow-hidden bg-black cursor-pointer transition-shadow ${isFullscreen ? 'h-full min-h-0' : 'aspect-video'} ${
+          className={`relative rounded-lg overflow-hidden bg-black cursor-pointer transition-shadow ${
+            isFullscreen ? (isPortrait ? 'h-[50dvh] min-h-0' : 'h-full min-h-0') : 'aspect-video'
+          } ${
             synced ? 'ring-2 ring-blue-400/60 border border-blue-400/30' :
             activePanel === 'right' ? 'ring-2 ring-primary border border-primary/50' :
             'border border-border'
@@ -550,6 +585,22 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel, ex
             </div>
           </div>
           
+          {/* Always-visible upload prompt in fullscreen when no video loaded */}
+          {isFullscreen && !rightVideoSrc && (
+            <div className="absolute inset-0 flex items-center justify-center z-40 pointer-events-auto" onPointerDown={e => e.stopPropagation()}>
+              <VideoLibraryModal
+                mode="pro"
+                onVideoSelected={handleRightUpload}
+                trigger={
+                  <button className="flex flex-col items-center gap-3 bg-black/70 hover:bg-black/80 rounded-2xl px-8 py-6 border border-white/20 transition-colors">
+                    <Upload className="w-8 h-8 text-white/80" />
+                    <span className="text-white/80 text-sm font-medium">Import pro comparison</span>
+                  </button>
+                }
+              />
+            </div>
+          )}
+
           <VideoPlayer
             ref={rightVideoRef}
             src={rightVideoSrc}
@@ -722,8 +773,9 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel, ex
             />
           </div>
           
-          <div className="text-sm font-mono text-muted-foreground w-24 text-right" data-testid="text-time">
-            {formatTime(currentTime)}
+          <div className="text-xs font-mono text-muted-foreground w-16 sm:w-24 text-right shrink-0" data-testid="text-time">
+            <span className="hidden sm:inline">{formatTime(currentTime)}</span>
+            <span className="sm:hidden">{Math.floor(currentTime)}s</span>
           </div>
         </div>
 
@@ -752,7 +804,7 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel, ex
                 <button
                   key={s}
                   onClick={() => applyRate(s)}
-                  className={`px-1.5 py-0.5 rounded text-xs font-mono font-semibold transition-colors ${
+                  className={`px-1.5 py-0.5 rounded text-xs font-mono font-semibold transition-colors ${s === 0.25 ? 'hidden sm:block' : ''} ${
                     playbackRate === s
                       ? "bg-primary text-primary-foreground"
                       : "text-muted-foreground hover:text-foreground hover:bg-secondary"
