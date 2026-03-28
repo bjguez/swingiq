@@ -21,6 +21,7 @@ import CoachSessionReviewPage from "@/pages/CoachSessionReviewPage";
 import CoachMessagesPage from "@/pages/CoachMessagesPage";
 import AcceptInvitePage from "@/pages/AcceptInvitePage";
 import AboutPage from "@/pages/AboutPage";
+import StudioStatdle from "@/pages/StudioStatdle";
 import { useAuth } from "@/hooks/use-auth";
 
 function AdminRoute() {
@@ -55,6 +56,7 @@ function Router() {
       <Route path="/coach/session/review" component={CoachSessionReviewPage} />
       <Route path="/coach/messages" component={CoachMessagesPage} />
       <Route path="/about" component={AboutPage} />
+      <Route path="/statdle" component={StudioStatdle} />
       <Route path="/invite/accept" component={AcceptInvitePage} />
       <Route path="/admin" component={AdminRoute} />
       <Route component={NotFound} />

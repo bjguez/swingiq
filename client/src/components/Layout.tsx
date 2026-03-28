@@ -74,6 +74,9 @@ export default function Layout({ children, showScoreTicker = false }: { children
       { href: "/about", label: "About" },
       { href: "/pricing", label: "Pricing" },
     ]},
+    { section: "Games", links: [
+      { href: "/statdle", label: "StudioStatdle" },
+    ]},
   ];
 
   return (

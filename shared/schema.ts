@@ -200,6 +200,26 @@ export const playerPhaseFocus = pgTable("player_phase_focus", {
   startedAt: timestamp("started_at").defaultNow(),
 });
 
+export const statlePlayers = pgTable("statdle_players", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  mlbId: text("mlb_id").unique().notNull(),
+  name: text("name").notNull(),
+  position: text("position").notNull(),
+  bats: text("bats"),
+  throwsHand: text("throws_hand"),
+  birthCountry: text("birth_country"),
+  careerStart: integer("career_start"),
+  careerEnd: integer("career_end"),
+  teams: jsonb("teams").$type<string[]>(),
+  careerWar: real("career_war"),
+  careerStats: jsonb("career_stats").$type<Record<string, any>>(),
+  active: boolean("active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type StatdlePlayer = typeof statlePlayers.$inferSelect;
+export type InsertStatdlePlayer = typeof statlePlayers.$inferInsert;
+
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,
