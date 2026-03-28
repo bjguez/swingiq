@@ -62,10 +62,13 @@ async function getActivePlayers() {
     ))
     .orderBy(asc(statlePlayers.mlbId));
 
-  // Only players with careers of 10+ years
-  return players.filter(p =>
-    p.careerStart != null && p.careerEnd != null && (p.careerEnd - p.careerStart) >= 10
-  );
+  // Only established players: 300+ games for hitters, 100+ appearances for pitchers
+  return players.filter(p => {
+    const stats = (p.careerStats ?? {}) as Record<string, any>;
+    const games = stats.games ?? 0;
+    if (stats.type === "pitcher") return games >= 100;
+    return games >= 300;
+  });
 }
 
 async function getDailyPlayer(dateStr: string) {
