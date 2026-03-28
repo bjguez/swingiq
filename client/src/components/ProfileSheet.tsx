@@ -541,6 +541,29 @@ export function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) {
                   </div>
                 )}
 
+                {/* Admin: account type switcher */}
+                {user?.isAdmin && (
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Account Type</p>
+                    <div className="flex gap-1.5">
+                      {(["player", "coach", "parent"] as const).map(type => (
+                        <button
+                          key={type}
+                          type="button"
+                          onClick={() => updateProfile({ accountType: type })}
+                          className={`flex-1 py-1.5 rounded-md text-xs font-semibold border capitalize transition-colors ${
+                            user.accountType === type
+                              ? "bg-primary text-primary-foreground border-primary"
+                              : "border-border text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          {type}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* My Coaches — player accounts only */}
                 {!isCoach && coaches.length > 0 && (
                   <div>
