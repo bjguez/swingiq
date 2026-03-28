@@ -72,8 +72,10 @@ async function getDailyPlayer(dateStr: string) {
 }
 
 function buildClues(player: any) {
-  const isPitcher = ["P", "SP", "RP", "CL"].includes(player.position);
   const stats = (player.careerStats ?? {}) as Record<string, any>;
+  // Use stored type from seed; fall back to position-based detection
+  const isPitcher = stats.type === "pitcher" ||
+    (stats.type !== "hitter" && ["P", "SP", "RP", "CL"].includes(player.position));
 
   const careerSpan =
     player.careerStart && player.careerEnd
@@ -84,18 +86,18 @@ function buildClues(player: any) {
 
   let keyStats = "N/A";
   if (isPitcher && stats.wins != null) {
-    keyStats = `${stats.wins}W  ${stats.era ?? "?"}ERA  ${stats.so ?? "?"}K`;
-  } else if (!isPitcher && stats.hr != null) {
+    keyStats = `${stats.wins}W  ${stats.losses ?? "?"}L  ${stats.era ?? "?"}ERA  ${stats.so ?? "?"}K`;
+  } else if (stats.hr != null) {
     const avgStr = stats.avg != null
       ? `.${String(Math.round(stats.avg * 1000)).padStart(3, "0")}`
       : ".???";
-    keyStats = `${stats.hr}HR  ${stats.rbi ?? "?"}RBI  ${avgStr} AVG`;
+    keyStats = `${stats.hr}HR  ${stats.rbi ?? "?"}RBI  ${avgStr}AVG`;
   }
 
   return [
     { label: "Position", value: player.position },
     { label: "Born in", value: player.birthCountry ?? "Unknown" },
-    { label: isPitcher ? "Career pitching" : "Career hitting", value: keyStats },
+    { label: "Career stats", value: keyStats },
     { label: "Career", value: careerSpan },
     { label: "Teams", value: Array.isArray(player.teams) && player.teams.length ? player.teams.join(", ") : "N/A" },
     { label: "Bats / Throws", value: `${player.bats ?? "?"}/${player.throwsHand ?? "?"}` },
