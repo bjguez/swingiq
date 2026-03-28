@@ -85,7 +85,7 @@ export default function AboutPage() {
         body={
           <>
             <p>
-              Ben Guez spent nearly a decade playing professional baseball, climbing through the Detroit Tigers and Milwaukee Brewers organizations, competing in winter leagues in Mexico and Venezuela, and representing Israel in the 2012 World Baseball Classic qualifier. Baseball took him all over the world.
+              Ben Guez spent nearly a decade playing professional baseball, climbing through the Detroit Tigers and Milwaukee Brewers organizations, competing in winter leagues in Mexico and Venezuela, and even a World Baseball Classic in 2012. Baseball took him all over the world.
             </p>
             <p>
               He was never the most naturally gifted guy in the room. He was a grinder, drafted out of William & Mary in the 19th round, the kind of player who had to outwork, outstudy, and out-prepare everyone around him just to stay on the field.
