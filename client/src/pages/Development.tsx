@@ -562,12 +562,19 @@ function ContentCard({ item }: { item: BlueprintItem }) {
   return (
     <div className="bg-card border border-border rounded-lg overflow-hidden group">
       {playing ? (
-        <video
-          src={item.videoUrl!}
-          controls
-          autoPlay
-          className="w-full aspect-video object-contain bg-black"
-        />
+        <>
+          <video
+            src={item.videoUrl!}
+            controls
+            autoPlay
+            className="w-full aspect-video object-contain bg-black"
+          />
+          {item.description && (
+            <div className="px-2 py-1.5 border-t border-border/50">
+              <p className="text-xs text-muted-foreground leading-relaxed">{item.description}</p>
+            </div>
+          )}
+        </>
       ) : item.videoUrl ? (
         <div
           ref={containerRef}
