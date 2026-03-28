@@ -42,9 +42,15 @@ function buildClues(player: any) {
         : `${player.careerStart} - ${player.careerEnd}`
       : "Unknown";
 
-  const keyStats = isPitcher
-    ? `${stats.wins ?? "?"}W  ${stats.era ?? "?"}ERA  ${stats.so ?? "?"}K`
-    : `${stats.hr ?? "?"}HR  ${stats.rbi ?? "?"}RBI  .${String(Math.round((stats.avg ?? 0) * 1000)).padStart(3, "0")} AVG`;
+  let keyStats = "N/A";
+  if (isPitcher && stats.wins != null) {
+    keyStats = `${stats.wins}W  ${stats.era ?? "?"}ERA  ${stats.so ?? "?"}K`;
+  } else if (!isPitcher && stats.hr != null) {
+    const avgStr = stats.avg != null
+      ? `.${String(Math.round(stats.avg * 1000)).padStart(3, "0")}`
+      : ".???";
+    keyStats = `${stats.hr}HR  ${stats.rbi ?? "?"}RBI  ${avgStr} AVG`;
+  }
 
   // Better clues first: teams, stats, birthplace — then narrowing clues
   return [

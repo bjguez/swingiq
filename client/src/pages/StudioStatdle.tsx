@@ -344,12 +344,29 @@ function GamePanel({ date, isArchive = false }: { date: string; isArchive?: bool
 
       {/* Input */}
       {!gameOver && (
-        <div className="space-y-2">
-          <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+        <div className="space-y-3">
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
             <span>{guessesLeft} guess{guessesLeft !== 1 ? "es" : ""} remaining</span>
             <span>{MAX_GUESSES - guessesLeft}/{MAX_GUESSES}</span>
           </div>
           <PlayerSearch onSelect={submitGuess} disabled={submitting} />
+          <button
+            onClick={async () => {
+              const res = await fetch(`${API_BASE}/guess`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ date, guessName: "__reveal__", reveal: true }),
+              });
+              const data = await res.json();
+              const next: GameState = { guesses: gameState.guesses, won: false, lost: true };
+              setGameState(next);
+              saveState(date, next);
+              if (data.answer?.name) setAnswer(data.answer.name);
+            }}
+            className="w-full text-xs text-muted-foreground hover:text-foreground transition-colors py-1"
+          >
+            Give up and show the answer
+          </button>
         </div>
       )}
 
