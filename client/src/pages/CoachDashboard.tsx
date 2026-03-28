@@ -224,21 +224,44 @@ export default function CoachDashboard() {
                     <button
                       key={v.id}
                       onClick={() => navigate(`/coach/session?playerId=${selectedPlayer.playerId}&videoId=${v.id}`)}
-                      className="group relative aspect-video rounded-lg overflow-hidden border border-border bg-secondary hover:border-primary/50 transition-colors text-left"
+                      className="group flex flex-col rounded-lg overflow-hidden border border-border bg-secondary hover:border-primary/50 transition-colors text-left"
                     >
-                      {v.thumbnailUrl ? (
-                        <img src={v.thumbnailUrl} alt={v.title} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <Video size={24} className="text-muted-foreground opacity-40" />
+                      {/* Thumbnail */}
+                      <div className="relative aspect-video w-full bg-black">
+                        {v.thumbnailUrl ? (
+                          <img src={v.thumbnailUrl} alt={v.title} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <Video size={24} className="text-muted-foreground opacity-40" />
+                          </div>
+                        )}
+                        {v.duration && (
+                          <span className="absolute bottom-1 right-1 text-[10px] bg-black/70 text-white px-1 py-0.5 rounded">
+                            {v.duration}
+                          </span>
+                        )}
+                        <div className="absolute inset-0 bg-primary/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <span className="text-xs font-bold text-white bg-primary px-2 py-1 rounded">Start Session</span>
                         </div>
-                      )}
-                      <div className="absolute inset-x-0 bottom-0 bg-linear-to-t from-black/80 to-transparent p-2">
-                        <p className="text-xs text-white font-semibold truncate">{v.title}</p>
-                        {v.category && <p className="text-xs text-white/60">{v.category}</p>}
                       </div>
-                      <div className="absolute inset-0 bg-primary/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <span className="text-xs font-bold text-white bg-primary px-2 py-1 rounded">Start Session</span>
+                      {/* Metadata */}
+                      <div className="px-2 py-2 flex flex-col gap-0.5">
+                        <p className="text-xs font-semibold text-foreground truncate">{v.title}</p>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {v.category && (
+                            <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-medium">
+                              {v.category}
+                            </span>
+                          )}
+                          {v.tags && v.tags.length > 0 && v.tags.slice(0, 2).map(tag => (
+                            <span key={tag} className="text-[10px] bg-secondary text-muted-foreground border border-border px-1.5 py-0.5 rounded">
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">
+                          {v.createdAt ? new Date(v.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : ""}
+                        </p>
                       </div>
                     </button>
                   ))}
