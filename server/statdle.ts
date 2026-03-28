@@ -1,7 +1,7 @@
 import { Express } from "express";
 import { db } from "./db";
 import { statlePlayers } from "../shared/schema";
-import { eq, ilike, asc, and, isNotNull, gte } from "drizzle-orm";
+import { eq, asc, and, isNotNull, gte } from "drizzle-orm";
 
 const EPOCH = new Date("2025-01-01T00:00:00Z");
 const MAX_GUESSES = 6;
@@ -14,6 +14,42 @@ function getDayIndex(dateStr: string): number {
 
 function todayStr(): string {
   return new Date().toISOString().split("T")[0];
+}
+
+// Normalize a string to plain a-z letters only
+function normalizeLetters(s: string): string {
+  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z]/g, "");
+}
+
+// Returns letter counts per word (spaces excluded), e.g. "Mike Trout" → [4, 5]
+function getNameStructure(name: string): number[] {
+  return name.split(" ").map(w => normalizeLetters(w).length).filter(n => n > 0);
+}
+
+// Wordle-style letter comparison
+function compareLetters(guessLetters: string, answerName: string): ("correct" | "present" | "absent")[] {
+  const answer = normalizeLetters(answerName).split("");
+  const guess = normalizeLetters(guessLetters).split("").slice(0, answer.length);
+  while (guess.length < answer.length) guess.push("");
+
+  const result: ("correct" | "present" | "absent")[] = Array(answer.length).fill("absent");
+  const remaining = [...answer];
+
+  for (let i = 0; i < answer.length; i++) {
+    if (guess[i] === answer[i]) {
+      result[i] = "correct";
+      remaining[i] = "_";
+    }
+  }
+  for (let i = 0; i < answer.length; i++) {
+    if (result[i] === "correct") continue;
+    const idx = remaining.indexOf(guess[i]);
+    if (idx !== -1) {
+      result[i] = "present";
+      remaining[idx] = "_";
+    }
+  }
+  return result;
 }
 
 async function getActivePlayers() {
@@ -36,7 +72,7 @@ async function getDailyPlayer(dateStr: string) {
 }
 
 function buildClues(player: any) {
-  const isPitcher = player.position === "P" || player.position === "SP" || player.position === "RP" || player.position === "CL";
+  const isPitcher = ["P", "SP", "RP", "CL"].includes(player.position);
   const stats = (player.careerStats ?? {}) as Record<string, any>;
 
   const careerSpan =
@@ -56,7 +92,6 @@ function buildClues(player: any) {
     keyStats = `${stats.hr}HR  ${stats.rbi ?? "?"}RBI  ${avgStr} AVG`;
   }
 
-  // Better clues first: teams, stats, birthplace — then narrowing clues
   return [
     { label: "Teams", value: Array.isArray(player.teams) && player.teams.length ? player.teams.join(", ") : "N/A" },
     { label: isPitcher ? "Career pitching" : "Career hitting", value: keyStats },
@@ -68,6 +103,17 @@ function buildClues(player: any) {
   ];
 }
 
+function buildGameResponse(player: any, date: string) {
+  return {
+    date,
+    clues: buildClues(player),
+    totalClues: 7,
+    maxGuesses: MAX_GUESSES,
+    mlbId: player.mlbId,
+    nameStructure: getNameStructure(player.name),
+  };
+}
+
 export function setupStatdleRoutes(app: Express) {
 
   // GET /api/statdle/daily
@@ -76,26 +122,26 @@ export function setupStatdleRoutes(app: Express) {
       const date = todayStr();
       const player = await getDailyPlayer(date);
       if (!player) return res.status(503).json({ error: "No players in pool yet" });
-      res.json({ date, clues: buildClues(player), totalClues: 7, maxGuesses: MAX_GUESSES, mlbId: player.mlbId, nameLength: player.name });
+      res.json(buildGameResponse(player, date));
     } catch {
       res.status(500).json({ error: "Server error" });
     }
   });
 
-  // GET /api/statdle/game/:date — clues for an archive date
+  // GET /api/statdle/game/:date
   app.get("/api/statdle/game/:date", async (req, res) => {
     try {
       const { date } = req.params;
       if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: "Invalid date" });
       const player = await getDailyPlayer(date);
       if (!player) return res.status(503).json({ error: "No players in pool yet" });
-      res.json({ date, clues: buildClues(player), totalClues: 7, maxGuesses: MAX_GUESSES, mlbId: player.mlbId, nameLength: player.name });
+      res.json(buildGameResponse(player, date));
     } catch {
       res.status(500).json({ error: "Server error" });
     }
   });
 
-  // GET /api/statdle/archive — last 30 days, player name revealed
+  // GET /api/statdle/archive — last 30 days, dates only (no player names)
   app.get("/api/statdle/archive", async (_req, res) => {
     try {
       const players = await getActivePlayers();
@@ -108,9 +154,7 @@ export function setupStatdleRoutes(app: Express) {
         const d = new Date(today + "T00:00:00Z");
         d.setUTCDate(d.getUTCDate() - i);
         const dateStr = d.toISOString().split("T")[0];
-        const idx = getDayIndex(dateStr) % players.length;
-        const p = players[idx];
-        archive.push({ date: dateStr, playerName: p.name, position: p.position });
+        archive.push({ date: dateStr });
       }
 
       res.json(archive);
@@ -119,44 +163,32 @@ export function setupStatdleRoutes(app: Express) {
     }
   });
 
-  // GET /api/statdle/players/search?q=
-  app.get("/api/statdle/players/search", async (req, res) => {
-    try {
-      const q = ((req.query.q as string) ?? "").trim();
-      if (!q || q.length < 2) return res.json([]);
-
-      const results = await db
-        .select({ id: statlePlayers.id, name: statlePlayers.name })
-        .from(statlePlayers)
-        .where(and(ilike(statlePlayers.name, `%${q}%`), eq(statlePlayers.active, true)))
-        .orderBy(asc(statlePlayers.name))
-        .limit(10);
-
-      res.json(results);
-    } catch {
-      res.status(500).json({ error: "Server error" });
-    }
-  });
-
   // POST /api/statdle/guess
   app.post("/api/statdle/guess", async (req, res) => {
     try {
-      const { date, guessName, reveal } = req.body as {
+      const { date, guessLetters, reveal } = req.body as {
         date: string;
-        guessName: string;
+        guessLetters?: string;
         reveal?: boolean;
       };
 
-      if (!date || !guessName) return res.status(400).json({ error: "Missing date or guessName" });
+      if (!date) return res.status(400).json({ error: "Missing date" });
 
       const player = await getDailyPlayer(date);
       if (!player) return res.status(503).json({ error: "No player found" });
 
-      const correct = player.name.toLowerCase() === guessName.toLowerCase();
-      const response: any = { correct };
+      if (reveal) {
+        return res.json({ correct: false, answer: { name: player.name } });
+      }
 
-      if (correct || reveal) {
-        response.answer = { name: player.name, clues: buildClues(player) };
+      if (!guessLetters) return res.status(400).json({ error: "Missing guessLetters" });
+
+      const correct = normalizeLetters(guessLetters) === normalizeLetters(player.name);
+      const letterResults = compareLetters(guessLetters, player.name);
+      const response: any = { correct, letterResults };
+
+      if (correct) {
+        response.answer = { name: player.name };
       }
 
       res.json(response);
