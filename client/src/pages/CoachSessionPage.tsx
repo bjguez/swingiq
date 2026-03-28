@@ -179,9 +179,10 @@ export default function CoachSessionPage() {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d")!;
-    const W = 1280, H = 720;
-    const headerH = 50, footerH = 30;
-    const videoH = H - headerH - footerH;
+    // 16:9 video panels so annotations align exactly with no letterboxing
+    const W = 1280, headerH = 50, footerH = 30;
+    const videoH = 360; // W/2 × 9/16 = 640 × 0.5625 = 360
+    const H = headerH + videoH + footerH; // 440
 
     function drawVid(vid: HTMLVideoElement, dx: number, dy: number, dw: number, dh: number, flipH: boolean, zoom: number, panX: number, panY: number, rotation: 0 | 90 | 180 | 270 = 0) {
       const vw = vid.videoWidth || dw;
@@ -412,7 +413,7 @@ export default function CoachSessionPage() {
   return (
     <Layout>
       {/* Hidden recording canvas */}
-      <canvas ref={canvasRef} width={1280} height={720} className="hidden" />
+      <canvas ref={canvasRef} width={1280} height={440} className="hidden" />
 
       <div className="max-w-6xl mx-auto w-full py-6 space-y-5">
         {/* Header */}
@@ -543,7 +544,7 @@ export default function CoachSessionPage() {
                   color={activeColor}
                   annotations={leftAnnotations}
                   onAnnotationsChange={setLeftAnnotations}
-                  recordingSize={proVideoSrc ? { width: 639, height: 640 } : { width: 1280, height: 640 }}
+                  recordingSize={proVideoSrc ? { width: 639, height: 360 } : { width: 1280, height: 360 }}
                 />
                 <div className="absolute top-2 left-2 text-[10px] font-bold text-white/60 bg-black/40 px-1.5 py-0.5 rounded pointer-events-none">Player</div>
                 <div className="absolute top-2 right-2 flex items-center gap-1 pointer-events-auto z-30" onPointerDown={e => e.stopPropagation()}>
@@ -612,7 +613,7 @@ export default function CoachSessionPage() {
                       color={activeColor}
                       annotations={rightAnnotations}
                       onAnnotationsChange={setRightAnnotations}
-                      recordingSize={{ width: 639, height: 640 }}
+                      recordingSize={{ width: 639, height: 360 }}
                     />
                     <div className="absolute top-2 left-2 text-[10px] font-bold text-white/60 bg-black/40 px-1.5 py-0.5 rounded pointer-events-none">Pro</div>
                     <div className="absolute top-2 right-2 flex items-center gap-1 pointer-events-auto z-30" onPointerDown={e => e.stopPropagation()}>
