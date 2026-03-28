@@ -13,10 +13,13 @@ import {
   Circle, Undo, Trash2, Scissors, RotateCw, Link2,
   FlipHorizontal2, ZoomIn, ZoomOut,
   MousePointer2, PenTool, Type, Timer,
-  Play, Pause, SkipBack, SkipForward,
+  Play, Pause, SkipBack, SkipForward, PersonStanding,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import type { Video as VideoType } from "@shared/schema";
+import { detectPose, SKELETON_CONNECTIONS, UPPER_BODY_INDICES } from "@/lib/poseDetector";
+import type { PoseResult } from "@/lib/poseDetector";
+import PoseOverlay from "@/components/PoseOverlay";
 
 type RecordingState = "idle" | "recording" | "preview" | "uploading" | "done";
 
@@ -93,6 +96,10 @@ export default function CoachSessionPage() {
   const [previewUrl, setPreviewUrl] = useState("");
   const [voiceoverKey, setVoiceoverKey] = useState("");
   const [recordingError, setRecordingError] = useState("");
+
+  // Pose detection
+  const [poseEnabled, setPoseEnabled] = useState(false);
+  const [poseResult, setPoseResult] = useState<PoseResult | null>(null);
 
   // Blueprint mode
   const [blueprintTitle, setBlueprintTitle] = useState("");
@@ -180,6 +187,29 @@ export default function CoachSessionPage() {
     else setRightAnnotations([]);
   };
 
+  // Draw pose skeleton onto recording canvas panel
+  function drawPoseSkeleton(ctx: CanvasRenderingContext2D, result: PoseResult, px: number, py: number, pw: number, ph: number) {
+    const MIN_VIS = 0.5;
+    const toC = (lm: { x: number; y: number }) => ({ x: px + lm.x * pw, y: py + lm.y * ph });
+    ctx.lineWidth = 2;
+    for (const [i, j] of SKELETON_CONNECTIONS) {
+      const a = result.landmarks[i], b = result.landmarks[j];
+      if ((a.visibility ?? 0) < MIN_VIS || (b.visibility ?? 0) < MIN_VIS) continue;
+      const isUpper = UPPER_BODY_INDICES.has(i) && UPPER_BODY_INDICES.has(j);
+      ctx.strokeStyle = isUpper ? "#22c55e" : "#60a5fa";
+      ctx.shadowColor = ctx.strokeStyle; ctx.shadowBlur = 4;
+      ctx.beginPath(); ctx.moveTo(...Object.values(toC(a)) as [number, number]); ctx.lineTo(...Object.values(toC(b)) as [number, number]); ctx.stroke();
+    }
+    ctx.shadowBlur = 0;
+    for (let i = 11; i < 33; i++) {
+      const p = result.landmarks[i];
+      if ((p.visibility ?? 0) < MIN_VIS) continue;
+      const cp = toC(p);
+      ctx.fillStyle = "rgba(255,255,255,0.9)";
+      ctx.beginPath(); ctx.arc(cp.x, cp.y, 3, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
   // Canvas draw loop — composites videos + annotation layers
   const startDrawLoop = useCallback(() => {
     const canvas = canvasRef.current;
@@ -246,6 +276,7 @@ export default function CoachSessionPage() {
         if (leftAnnotationRef.current) {
           ctx.drawImage(leftAnnotationRef.current, 0, headerH, W / 2 - 1, videoH);
         }
+        if (poseResult && poseEnabled) drawPoseSkeleton(ctx, poseResult, 0, headerH, W / 2 - 1, videoH);
         drawVid(proVid, W / 2 + 1, headerH, W / 2 - 1, videoH, rightFlipH, rightZoom, rightPanX, rightPanY, rightRotation);
         if (rightAnnotationRef.current) {
           ctx.drawImage(rightAnnotationRef.current, W / 2 + 1, headerH, W / 2 - 1, videoH);
@@ -269,6 +300,7 @@ export default function CoachSessionPage() {
         if (leftAnnotationRef.current) {
           ctx.drawImage(leftAnnotationRef.current, panelX, headerH, panelW, videoH);
         }
+        if (poseResult && poseEnabled) drawPoseSkeleton(ctx, poseResult, panelX, headerH, panelW, videoH);
         ctx.fillStyle = "rgba(0,0,0,0.65)";
         ctx.fillRect(panelX, headerH, 160, 22);
         ctx.fillStyle = "#fff";
@@ -299,7 +331,7 @@ export default function CoachSessionPage() {
       rafRef.current = requestAnimationFrame(draw);
     }
     draw();
-  }, [playerVideoSrc, proVideoSrc, blueprintMode, leftFlipH, leftZoom, leftPanX, leftPanY, leftRotation, rightFlipH, rightZoom, rightPanX, rightPanY, rightRotation]);
+  }, [playerVideoSrc, proVideoSrc, blueprintMode, poseEnabled, poseResult, leftFlipH, leftZoom, leftPanX, leftPanY, leftRotation, rightFlipH, rightZoom, rightPanX, rightPanY, rightRotation]);
 
   const stopDrawLoop = () => cancelAnimationFrame(rafRef.current);
 
@@ -378,6 +410,19 @@ export default function CoachSessionPage() {
       setRecordingState("preview");
     }
   }
+
+  // Pose detection loop — 10fps on the primary video
+  useEffect(() => {
+    if (!poseEnabled || !playerVideoSrc) { setPoseResult(null); return; }
+    const id = setInterval(async () => {
+      const vid = playerVideoRef.current;
+      if (vid && vid.readyState >= 2) {
+        const r = await detectPose(vid, performance.now());
+        if (r) setPoseResult(r);
+      }
+    }, 100);
+    return () => clearInterval(id);
+  }, [poseEnabled, playerVideoSrc]);
 
   const saveToBlueprintMutation = useMutation({
     mutationFn: async () => {
@@ -566,6 +611,9 @@ export default function CoachSessionPage() {
               <ToolBtn icon={<Undo className="w-4 h-4" />} tooltip="Undo" onClick={undoAnnotation} />
               <ToolBtn icon={<Trash2 className="w-4 h-4" />} tooltip="Clear All" onClick={clearAnnotations} />
 
+              <div className="w-px h-6 bg-border mx-1 shrink-0" />
+              <ToolBtn icon={<PersonStanding className="w-4 h-4" />} active={poseEnabled} tooltip="Pose Detection" onClick={() => setPoseEnabled(v => !v)} />
+
               <div className="ml-auto shrink-0">
                 <button
                   onClick={() => { setPlayerVideoSrc(""); setPlayerVideoId(""); setLeftAnnotations([]); }}
@@ -624,6 +672,7 @@ export default function CoachSessionPage() {
                   annotations={leftAnnotations}
                   onAnnotationsChange={setLeftAnnotations}
                 />
+                <PoseOverlay poseResult={poseResult} visible={poseEnabled} videoElement={playerVideoRef.current} />
                 <div className="absolute top-2 left-2 text-[10px] font-bold text-white/60 bg-black/40 px-1.5 py-0.5 rounded pointer-events-none">{blueprintMode ? "Pro" : "Player"}</div>
                 <div className="absolute top-2 right-2 flex items-center gap-1 pointer-events-auto z-30" onPointerDown={e => e.stopPropagation()}>
                   <button onClick={e => { e.stopPropagation(); setLeftFlipH(f => !f); }} title="Flip horizontal" className="bg-black/50 hover:bg-black/70 text-white/70 hover:text-white rounded p-1 transition-colors">
