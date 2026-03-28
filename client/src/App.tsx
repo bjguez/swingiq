@@ -33,6 +33,15 @@ function AdminRoute() {
   return <Admin />;
 }
 
+// Requires login + completed onboarding
+function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
+  const { user, isLoading } = useAuth();
+  if (isLoading) return null;
+  if (!user) return <Redirect to="/auth" />;
+  if (!user.profileComplete) return <Redirect to="/onboarding" />;
+  return <Component />;
+}
+
 function Router() {
   const { user, isLoading } = useAuth();
 
@@ -46,19 +55,37 @@ function Router() {
       </Route>
       <Route path="/check-email" component={CheckEmailPage} />
       <Route path="/verify" component={VerifyEmailPage} />
-      <Route path="/" component={Home} />
-      <Route path="/biometrics" component={Biometrics} />
-      <Route path="/development" component={Development} />
-      <Route path="/library" component={Library} />
-      <Route path="/pricing" component={PricingPage} />
-      <Route path="/my-swings" component={MySwings} />
-      <Route path="/coach" component={CoachDashboard} />
-      <Route path="/coach/session" component={CoachSessionPage} />
-      <Route path="/coach/session/review" component={CoachSessionReviewPage} />
-      <Route path="/coach/messages" component={CoachMessagesPage} />
       <Route path="/about" component={AboutPage} />
       <Route path="/statdle" component={StudioStatdle} />
       <Route path="/invite/accept" component={AcceptInvitePage} />
+      <Route path="/pricing" component={PricingPage} />
+      <Route path="/">
+        <ProtectedRoute component={Home} />
+      </Route>
+      <Route path="/biometrics">
+        <ProtectedRoute component={Biometrics} />
+      </Route>
+      <Route path="/development">
+        <ProtectedRoute component={Development} />
+      </Route>
+      <Route path="/library">
+        <ProtectedRoute component={Library} />
+      </Route>
+      <Route path="/my-swings">
+        <ProtectedRoute component={MySwings} />
+      </Route>
+      <Route path="/coach">
+        <ProtectedRoute component={CoachDashboard} />
+      </Route>
+      <Route path="/coach/session">
+        <ProtectedRoute component={CoachSessionPage} />
+      </Route>
+      <Route path="/coach/session/review">
+        <ProtectedRoute component={CoachSessionReviewPage} />
+      </Route>
+      <Route path="/coach/messages">
+        <ProtectedRoute component={CoachMessagesPage} />
+      </Route>
       <Route path="/admin" component={AdminRoute} />
       <Route component={NotFound} />
     </Switch>
