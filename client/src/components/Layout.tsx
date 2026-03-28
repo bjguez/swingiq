@@ -73,6 +73,8 @@ export default function Layout({ children, showScoreTicker = false }: { children
     { section: "Company", links: [
       { href: "/about", label: "About" },
       { href: "/pricing", label: "Pricing" },
+    ]},
+    { section: "Games", links: [
       { href: "/statdle", label: "StudioStatdle" },
     ]},
   ];
@@ -223,7 +225,7 @@ export default function Layout({ children, showScoreTicker = false }: { children
       {/* Footer */}
       <footer className="border-t border-border bg-card/50 mt-auto">
         <div className="container mx-auto px-4 py-10">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-8">
             {/* Brand */}
             <div className="col-span-2 md:col-span-1">
               <div className="flex items-center gap-2 text-primary font-display font-bold text-xl tracking-tighter mb-3">
