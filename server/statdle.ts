@@ -1,7 +1,7 @@
 import { Express } from "express";
 import { db } from "./db";
 import { statlePlayers } from "../shared/schema";
-import { eq, ilike, asc, and } from "drizzle-orm";
+import { eq, ilike, asc, and, isNotNull, gte } from "drizzle-orm";
 
 const EPOCH = new Date("2025-01-01T00:00:00Z");
 const MAX_GUESSES = 6;
@@ -20,7 +20,11 @@ async function getActivePlayers() {
   return db
     .select()
     .from(statlePlayers)
-    .where(eq(statlePlayers.active, true))
+    .where(and(
+      eq(statlePlayers.active, true),
+      isNotNull(statlePlayers.careerStats),
+      gte(statlePlayers.careerStart, 2000),
+    ))
     .orderBy(asc(statlePlayers.mlbId));
 }
 
