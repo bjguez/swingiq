@@ -48,6 +48,7 @@ export default function CoachSessionPage() {
   const [playerVideoSrc, setPlayerVideoSrc] = useState<string>("");
   const [proVideoSrc, setProVideoSrc] = useState<string>("");
   const [shared, setShared] = useState(false);
+  const [sharedSessionId, setSharedSessionId] = useState<string | null>(null);
   const [showHighlight, setShowHighlight] = useState(false);
   const [highlightStart, setHighlightStart] = useState(0);
   const [highlightEnd, setHighlightEnd] = useState(5);
@@ -369,7 +370,7 @@ export default function CoachSessionPage() {
       if (!res.ok) { const d = await res.json(); throw new Error(d.message); }
       return res.json();
     },
-    onSuccess: () => setShared(true),
+    onSuccess: (data) => { setShared(true); setSharedSessionId(data.id ?? null); },
   });
 
   if (shared) {
@@ -379,10 +380,15 @@ export default function CoachSessionPage() {
           <CheckCircle className="w-14 h-14 text-green-500 mx-auto" />
           <h2 className="font-display text-2xl uppercase tracking-wider">Session Shared</h2>
           <p className="text-muted-foreground">The player has been notified via email and in-app notification.</p>
-          <div className="flex gap-3 justify-center pt-2">
+          <div className="flex gap-3 justify-center pt-2 flex-wrap">
             <Button variant="outline" onClick={() => navigate("/coach")}>Back to My Teams</Button>
+            {sharedSessionId && (
+              <Button variant="outline" onClick={() => navigate(`/coach/session/review?sessionId=${sharedSessionId}`)}>
+                View Session
+              </Button>
+            )}
             <Button onClick={() => {
-              setShared(false); setNotes(""); setVoiceoverKey("");
+              setShared(false); setSharedSessionId(null); setNotes(""); setVoiceoverKey("");
               setRecordingState("idle"); setShowHighlight(false);
               setLeftAnnotations([]); setRightAnnotations([]);
             }}>Share Another</Button>
