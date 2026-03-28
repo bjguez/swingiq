@@ -91,11 +91,9 @@ export default function Layout({ children, showScoreTicker = false }: { children
           <div className="flex items-center gap-4">
             {/* Logo — always visible. Brand name hidden on smaller screens */}
             <Link href="/">
-              <div className="flex items-center gap-2 text-primary font-display font-bold text-2xl tracking-tighter cursor-pointer">
-                <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center text-primary-foreground shrink-0">
-                  <Video size={18} />
-                </div>
-                <span className="hidden lg:block">Swing Studio</span>
+              <div className="flex items-center gap-2 cursor-pointer">
+                <img src="/logo-option-b-square.svg" alt="Swing Studio" className="w-9 h-9 shrink-0" />
+                <span className="hidden lg:block font-display font-bold text-2xl tracking-tighter text-foreground">Swing Studio</span>
               </div>
             </Link>
 

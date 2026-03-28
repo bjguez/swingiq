@@ -1,9 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <!-- Background -->
-  <rect width="512" height="512" rx="112" fill="hsl(142, 71%, 45%)"/>
-  <!-- Lucide Video icon centered, scaled to fill nicely -->
-  <g transform="translate(112, 144)" stroke="white" stroke-width="24" stroke-linecap="round" stroke-linejoin="round" fill="none">
-    <path d="m240 80-96 64 96 64V80z"/>
-    <rect width="224" height="192" x="16" y="48" rx="24" ry="24"/>
-  </g>
-</svg>
