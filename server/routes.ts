@@ -7,7 +7,7 @@ import path from "path";
 import fs from "fs";
 import express from "express";
 import { execFile } from "child_process";
-import { uploadToR2, getVideoUrl, deleteFromR2, isR2Key, r2Configured, checkR2Exists } from "./r2";
+import { uploadToR2, getVideoUrl, getPresignedUrl, deleteFromR2, isR2Key, r2Configured, checkR2Exists } from "./r2";
 import { createCheckoutSession, createPortalSession, handleWebhook, PRICES } from "./stripe";
 import { setupCoachRoutes } from "./coach";
 import { setupCoachingRoutes } from "./coaching";
@@ -168,7 +168,7 @@ export async function registerRoutes(
         // Legacy local file or external URL — return as-is
         return res.json({ url: video.sourceUrl });
       }
-      const url = await getVideoUrl(key);
+      const url = await getPresignedUrl(key);
       res.json({ url });
     } catch (err: any) {
       console.error("Presigned URL error:", err);
