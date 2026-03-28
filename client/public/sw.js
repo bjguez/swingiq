@@ -1,4 +1,4 @@
-const CACHE = "swingstudio-v1";
+const CACHE = "swingstudio-v2";
 
 // App shell — always available offline
 const PRECACHE = ["/", "/manifest.json", "/favicon.svg"];
