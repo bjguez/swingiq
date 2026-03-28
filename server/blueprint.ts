@@ -43,7 +43,8 @@ export function setupBlueprintRoutes(app: Express) {
   app.post("/api/blueprint/content", async (req, res) => {
     try {
       const user = req.user as User | undefined;
-      if (!user || user.username !== "admin") {
+      const adminUsername = process.env.ADMIN_USERNAME;
+      if (!user || !adminUsername || user.username !== adminUsername) {
         return res.status(403).json({ message: "Admin only" });
       }
       const { phase, contentType, title, description, sourceUrl, thumbnailUrl, sortOrder } = req.body;
@@ -74,7 +75,8 @@ export function setupBlueprintRoutes(app: Express) {
   app.patch("/api/blueprint/content/:id", async (req, res) => {
     try {
       const user = req.user as User | undefined;
-      if (!user || user.username !== "admin") {
+      const adminUsername = process.env.ADMIN_USERNAME;
+      if (!user || !adminUsername || user.username !== adminUsername) {
         return res.status(403).json({ message: "Admin only" });
       }
       const { title, description, contentType, sortOrder } = req.body;
@@ -93,7 +95,8 @@ export function setupBlueprintRoutes(app: Express) {
   app.delete("/api/blueprint/content/:id", async (req, res) => {
     try {
       const user = req.user as User | undefined;
-      if (!user || user.username !== "admin") {
+      const adminUsername = process.env.ADMIN_USERNAME;
+      if (!user || !adminUsername || user.username !== adminUsername) {
         return res.status(403).json({ message: "Admin only" });
       }
       await db.delete(blueprintContent).where(eq(blueprintContent.id, req.params.id));
