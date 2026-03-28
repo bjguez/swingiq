@@ -1041,7 +1041,9 @@ export async function registerRoutes(
     try {
       const user = req.user as any;
       if (!user) return res.status(401).json({ message: "Not authenticated" });
-      if (user.accountType !== "coach") return res.status(403).json({ message: "Coach account required" });
+      const adminUsername = process.env.ADMIN_USERNAME;
+      const isAdmin = adminUsername && user.username === adminUsername;
+      if (user.accountType !== "coach" && !isAdmin) return res.status(403).json({ message: "Coach account required" });
       if (!req.file) return res.status(400).json({ message: "No file provided" });
       if (!r2Configured()) return res.status(503).json({ message: "Storage not configured" });
 
