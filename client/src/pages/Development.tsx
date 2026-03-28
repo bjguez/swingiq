@@ -385,7 +385,7 @@ export default function Development() {
             {phaseContent.length > 0 && (
               <div className="space-y-3">
                 <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Content Library</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-3 gap-2">
                   {phaseContent.map(item => (
                     <ContentCard key={item.id} item={item} />
                   ))}
@@ -547,7 +547,7 @@ function ContentCard({ item }: { item: BlueprintItem }) {
   const typeColor = TYPE_COLORS[item.contentType] ?? "bg-secondary text-muted-foreground";
 
   return (
-    <div className="bg-card border border-border rounded-xl overflow-hidden">
+    <div className="bg-card border border-border rounded-lg overflow-hidden group">
       {item.videoUrl && playing ? (
         <video
           src={item.videoUrl}
@@ -558,21 +558,22 @@ function ContentCard({ item }: { item: BlueprintItem }) {
       ) : item.videoUrl ? (
         <button
           onClick={() => setPlaying(true)}
-          className="w-full aspect-video bg-black/60 flex items-center justify-center group hover:bg-black/40 transition-colors"
+          className="w-full aspect-video bg-black/60 flex items-center justify-center hover:bg-black/40 transition-colors"
         >
-          <div className="w-12 h-12 rounded-full bg-primary/80 flex items-center justify-center group-hover:scale-105 transition-transform">
-            <PlayCircle className="w-6 h-6 text-white" />
+          <div className="w-8 h-8 rounded-full bg-primary/80 flex items-center justify-center group-hover:scale-105 transition-transform">
+            <PlayCircle className="w-4 h-4 text-white" />
           </div>
         </button>
-      ) : null}
-      <div className="p-3 space-y-1">
-        <div className="flex items-center gap-2">
-          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${typeColor}`}>
-            {item.contentType}
-          </span>
+      ) : (
+        <div className="w-full aspect-video bg-secondary/40 flex items-center justify-center">
+          <PlayCircle className="w-5 h-5 text-muted-foreground opacity-30" />
         </div>
-        <p className="text-sm font-semibold leading-snug">{item.title}</p>
-        {item.description && <p className="text-xs text-muted-foreground leading-relaxed">{item.description}</p>}
+      )}
+      <div className="p-1.5 space-y-0.5">
+        <p className="text-[11px] font-semibold leading-tight truncate">{item.title}</p>
+        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${typeColor}`}>
+          {item.contentType}
+        </span>
       </div>
     </div>
   );
