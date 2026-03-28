@@ -276,6 +276,19 @@ export default function CoachSessionPage() {
         ctx.fillText(blueprintMode ? "Pro Analysis" : "Player Swing", panelX + 8, headerH + 15);
       }
 
+      // Moving watermark — cycles through 4 corners every ~4s
+      const wmPositions = [
+        { x: 24,      y: headerH + 48 },
+        { x: W - 130, y: headerH + 48 },
+        { x: 24,      y: H - footerH - 18 },
+        { x: W - 130, y: H - footerH - 18 },
+      ];
+      const wmIdx = Math.floor(Date.now() / 4000) % 4;
+      const wm = wmPositions[wmIdx];
+      ctx.font = "bold 13px Arial, sans-serif";
+      ctx.fillStyle = "rgba(255,255,255,0.18)";
+      ctx.fillText("swingstudio.ai", wm.x, wm.y);
+
       // Footer
       ctx.fillStyle = "#111";
       ctx.fillRect(0, H - footerH, W, footerH);

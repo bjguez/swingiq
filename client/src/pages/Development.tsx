@@ -9,6 +9,7 @@ import type { Video as VideoType } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
 import { AuthGateModal } from "@/components/AuthGateModal";
 import { apiRequest } from "@/lib/queryClient";
+import { MovingWatermark } from "@/components/MovingWatermark";
 
 type Tab = "blueprint" | "sessions" | "messages";
 
@@ -591,6 +592,7 @@ function ContentCard({ item }: { item: BlueprintItem }) {
             preload="metadata"
             muted
           />
+          <MovingWatermark />
           {!hovered && (
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="w-8 h-8 rounded-full bg-primary/80 flex items-center justify-center group-hover:scale-105 transition-transform">
