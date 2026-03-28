@@ -3,11 +3,26 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
-import { useQuery } from "@tanstack/react-query";
+import { useAthletes, type AthleteProfile } from "@/hooks/use-athletes";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchVideos } from "@/lib/api";
-import { LogOut, User, CheckCircle2, GraduationCap } from "lucide-react";
+import { LogOut, User, CheckCircle2, GraduationCap, Plus, ChevronDown, ChevronUp, Pencil, Trash2 } from "lucide-react";
 import type { Video } from "@shared/schema";
 import { AuthGateModal } from "@/components/AuthGateModal";
+
+const BATS_OPTIONS = ["R", "L", "S"] as const;
+const THROWS_OPTIONS = ["R", "L"] as const;
+const PLAYER_SKILL_OPTIONS = [
+  { value: "little_league", label: "Little League" },
+  { value: "select", label: "Select" },
+  { value: "high_school", label: "High School" },
+  { value: "college", label: "College" },
+  { value: "pro", label: "Pro" },
+] as const;
+
+const emptyAthleteForm = () => ({
+  firstName: "", lastName: "", bats: "", throws: "", skillLevel: "", age: "", city: "", state: "",
+});
 
 const SKILL_LEVELS = [
   { value: "little_league", label: "Little League" },
@@ -42,10 +57,85 @@ interface ProfileSheetProps {
 
 export function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) {
   const { user, logout, updateProfile, isUpdatingProfile } = useAuth();
+  const { athletes, setActiveAthleteId } = useAthletes();
+  const queryClient = useQueryClient();
   const [authGateOpen, setAuthGateOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [saved, setSaved] = useState(false);
   const isCoach = user?.accountType === "coach";
+  const isParent = user?.accountType === "parent";
+
+  // Athlete add/edit state
+  const [addingAthlete, setAddingAthlete] = useState(false);
+  const [editingAthleteId, setEditingAthleteId] = useState<string | null>(null);
+  const [athleteForm, setAthleteForm] = useState(emptyAthleteForm());
+
+  const createAthleteMutation = useMutation({
+    mutationFn: async (data: object) => {
+      const res = await fetch("/api/athletes", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error((await res.json()).message);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/athletes"] });
+      setAddingAthlete(false);
+      setAthleteForm(emptyAthleteForm());
+    },
+  });
+
+  const updateAthleteMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: object }) => {
+      const res = await fetch(`/api/athletes/${id}`, {
+        method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error((await res.json()).message);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/athletes"] });
+      setEditingAthleteId(null);
+    },
+  });
+
+  const deleteAthleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/athletes/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error((await res.json()).message);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/athletes"] }),
+  });
+
+  function startEditAthlete(a: AthleteProfile) {
+    setAthleteForm({
+      firstName: a.firstName, lastName: a.lastName,
+      bats: a.bats ?? "", throws: a.throws ?? "",
+      skillLevel: a.skillLevel ?? "", age: a.age ? String(a.age) : "",
+      city: a.city ?? "", state: a.state ?? "",
+    });
+    setEditingAthleteId(a.id);
+    setAddingAthlete(false);
+  }
+
+  async function handleAthleteFormSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const payload = {
+      firstName: athleteForm.firstName.trim(),
+      lastName: athleteForm.lastName.trim(),
+      bats: athleteForm.bats || null,
+      throws: athleteForm.throws || null,
+      skillLevel: athleteForm.skillLevel || null,
+      age: athleteForm.age ? parseInt(athleteForm.age, 10) : null,
+      city: athleteForm.city.trim() || null,
+      state: athleteForm.state || null,
+    };
+    if (editingAthleteId) {
+      await updateAthleteMutation.mutateAsync({ id: editingAthleteId, data: payload });
+    } else {
+      await createAthleteMutation.mutateAsync(payload);
+    }
+  }
   const [form, setForm] = useState({
     age: user?.age ? String(user.age) : "",
     heightFt: user?.heightInches ? String(Math.floor(user.heightInches / 12)) : "",
@@ -132,8 +222,8 @@ export function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) {
                 </SheetTitle>
                 <SheetDescription className="sr-only">Your profile and account settings</SheetDescription>
                 {user ? (
-                  <span className={`text-xs font-semibold px-2 py-0.5 rounded ${isCoach ? "bg-blue-500/20 text-blue-400" : isPaid ? "bg-primary/20 text-primary" : "bg-secondary text-muted-foreground"}`}>
-                    {isCoach ? "Coach" : isPaid ? "Pro" : "Free"}
+                  <span className={`text-xs font-semibold px-2 py-0.5 rounded ${isCoach ? "bg-blue-500/20 text-blue-400" : isParent ? "bg-purple-500/20 text-purple-400" : isPaid ? "bg-primary/20 text-primary" : "bg-secondary text-muted-foreground"}`}>
+                    {isCoach ? "Coach" : isParent ? "Parent" : isPaid ? "Pro" : "Free"}
                   </span>
                 ) : (
                   <p className="text-xs text-muted-foreground">Not signed in</p>
@@ -325,6 +415,130 @@ export function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) {
                       <Button type="button" variant="ghost" onClick={() => setEditing(false)}>Cancel</Button>
                     </div>
                   </form>
+                )}
+
+                {/* Athletes — parent accounts only */}
+                {isParent && (
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Athletes</p>
+                      {!addingAthlete && !editingAthleteId && (
+                        <button
+                          onClick={() => { setAddingAthlete(true); setAthleteForm(emptyAthleteForm()); }}
+                          className="text-xs text-primary hover:underline flex items-center gap-1"
+                        >
+                          <Plus className="w-3 h-3" /> Add
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Athlete list */}
+                    {!addingAthlete && !editingAthleteId && (
+                      <div className="space-y-2">
+                        {athletes.map(a => (
+                          <div key={a.id} className="flex items-center gap-3 p-2.5 rounded-lg bg-secondary/40 border border-border">
+                            <div
+                              className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 cursor-pointer hover:bg-primary/20 transition-colors"
+                              onClick={() => setActiveAthleteId(a.id)}
+                              title="Switch to this athlete"
+                            >
+                              <span className="text-xs font-bold text-primary uppercase">{a.firstName[0]}</span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-semibold truncate">{a.firstName} {a.lastName}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {[a.skillLevel?.replace("_", " "), a.bats ? `Bats ${a.bats}` : null].filter(Boolean).join(" · ")}
+                              </p>
+                            </div>
+                            <div className="flex gap-1 shrink-0">
+                              <button onClick={() => startEditAthlete(a)} className="p-1 text-muted-foreground hover:text-foreground transition-colors">
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => { if (confirm(`Remove ${a.firstName}?`)) deleteAthleteMutation.mutate(a.id); }}
+                                className="p-1 text-muted-foreground hover:text-destructive transition-colors"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                        {athletes.length === 0 && (
+                          <p className="text-xs text-muted-foreground">No athletes yet.</p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Add / Edit athlete form */}
+                    {(addingAthlete || editingAthleteId) && (
+                      <form onSubmit={handleAthleteFormSubmit} className="space-y-3">
+                        <div className="grid grid-cols-2 gap-2">
+                          <Input placeholder="First name" value={athleteForm.firstName}
+                            onChange={e => setAthleteForm(f => ({ ...f, firstName: e.target.value }))} />
+                          <Input placeholder="Last name" value={athleteForm.lastName}
+                            onChange={e => setAthleteForm(f => ({ ...f, lastName: e.target.value }))} />
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground w-10 shrink-0">Bats</span>
+                          <div className="flex gap-1.5 flex-1">
+                            {BATS_OPTIONS.map(v => (
+                              <button key={v} type="button"
+                                onClick={() => setAthleteForm(f => ({ ...f, bats: f.bats === v ? "" : v }))}
+                                className={`flex-1 py-1.5 rounded-md text-xs font-semibold border transition-colors ${athleteForm.bats === v ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:text-foreground"}`}
+                              >{v === "R" ? "Right" : v === "L" ? "Left" : "Switch"}</button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground w-10 shrink-0">Throws</span>
+                          <div className="flex gap-1.5 flex-1">
+                            {THROWS_OPTIONS.map(v => (
+                              <button key={v} type="button"
+                                onClick={() => setAthleteForm(f => ({ ...f, throws: f.throws === v ? "" : v }))}
+                                className={`flex-1 py-1.5 rounded-md text-xs font-semibold border transition-colors ${athleteForm.throws === v ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:text-foreground"}`}
+                              >{v === "R" ? "Right" : "Left"}</button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-1.5">
+                          {PLAYER_SKILL_OPTIONS.map(s => (
+                            <button key={s.value} type="button"
+                              onClick={() => setAthleteForm(f => ({ ...f, skillLevel: f.skillLevel === s.value ? "" : s.value }))}
+                              className={`py-1.5 px-2 rounded-md text-xs font-semibold border transition-colors text-left ${athleteForm.skillLevel === s.value ? "bg-primary/10 border-primary/50 text-primary" : "border-border text-muted-foreground hover:text-foreground"}`}
+                            >{s.label}</button>
+                          ))}
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <Input placeholder="Age" type="number" min={5} max={25}
+                            value={athleteForm.age} onChange={e => setAthleteForm(f => ({ ...f, age: e.target.value }))} />
+                          <Input placeholder="City"
+                            value={athleteForm.city} onChange={e => setAthleteForm(f => ({ ...f, city: e.target.value }))} />
+                        </div>
+
+                        <select value={athleteForm.state} onChange={e => setAthleteForm(f => ({ ...f, state: e.target.value }))}
+                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
+                        >
+                          <option value="">State</option>
+                          {US_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+
+                        <div className="flex gap-2">
+                          <Button type="submit" className="flex-1" size="sm"
+                            disabled={createAthleteMutation.isPending || updateAthleteMutation.isPending || !athleteForm.firstName.trim()}
+                          >
+                            {createAthleteMutation.isPending || updateAthleteMutation.isPending ? "Saving..." : editingAthleteId ? "Save" : "Add Athlete"}
+                          </Button>
+                          <Button type="button" variant="ghost" size="sm"
+                            onClick={() => { setAddingAthlete(false); setEditingAthleteId(null); }}
+                          >Cancel</Button>
+                        </div>
+                      </form>
+                    )}
+                  </div>
                 )}
 
                 {/* My Coaches — player accounts only */}
