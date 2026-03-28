@@ -14,6 +14,38 @@ const KEYBOARD_ROWS = [
   ["ENTER", "Z", "X", "C", "V", "B", "N", "M", "⌫"],
 ];
 
+// ── Team logos ────────────────────────────────────────────────────────────────
+
+const TEAM_IDS: Record<string, number> = {
+  ARI: 109, ATL: 144, BAL: 110, BOS: 111, CHC: 112, CWS: 145, CIN: 113,
+  CLE: 114, COL: 115, DET: 116, HOU: 117, KC: 118, LAA: 108, LAD: 119,
+  MIA: 146, FLA: 146, MIL: 158, MIN: 142, NYM: 121, NYY: 147, OAK: 133,
+  PHI: 143, PIT: 134, SD: 135, SF: 137, SEA: 136, STL: 138, TB: 139,
+  TEX: 140, TOR: 141, WSH: 120, MON: 120,
+};
+
+function TeamBadge({ abbr }: { abbr: string }) {
+  const teamId = TEAM_IDS[abbr.toUpperCase()];
+  const [imgOk, setImgOk] = useState(!!teamId);
+  if (imgOk && teamId) {
+    return (
+      <span title={abbr} className="inline-flex items-center justify-center w-7 h-7 rounded bg-secondary border border-border overflow-hidden shrink-0">
+        <img
+          src={`https://www.mlbstatic.com/team-logos/${teamId}.svg`}
+          alt={abbr}
+          className="w-5 h-5 object-contain"
+          onError={() => setImgOk(false)}
+        />
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-secondary border border-border text-[10px] font-bold text-foreground shrink-0">
+      {abbr}
+    </span>
+  );
+}
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type LetterResult = "correct" | "present" | "absent";
@@ -170,6 +202,9 @@ function PlayerPhoto({ mlbId, revealed, name }: { mlbId: string; revealed: boole
 // ── Clue card ─────────────────────────────────────────────────────────────────
 
 function ClueCard({ clue, index, visible }: { clue: Clue; index: number; visible: boolean }) {
+  const isTeams = clue.label === "Teams";
+  const teamList = isTeams ? clue.value.split(", ").filter(Boolean) : [];
+
   return visible ? (
     <motion.div
       initial={{ opacity: 0, y: 6 }}
@@ -178,7 +213,13 @@ function ClueCard({ clue, index, visible }: { clue: Clue; index: number; visible
       className="flex items-start justify-between gap-3 py-2.5 border-b border-border last:border-0"
     >
       <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground w-28 shrink-0 pt-0.5">{clue.label}</span>
-      <span className="text-foreground font-medium text-right text-sm">{clue.value}</span>
+      {isTeams && teamList.length > 0 ? (
+        <div className="flex flex-wrap gap-1 justify-end">
+          {teamList.map(abbr => <TeamBadge key={abbr} abbr={abbr} />)}
+        </div>
+      ) : (
+        <span className="text-foreground font-medium text-right text-sm">{clue.value}</span>
+      )}
     </motion.div>
   ) : (
     <div className="flex items-center justify-between py-2.5 border-b border-border last:border-0 opacity-25">
