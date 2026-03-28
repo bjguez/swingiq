@@ -1,0 +1,18 @@
+{
+  "name": "Swing Studio",
+  "short_name": "Swing Studio",
+  "description": "Analyze your swing. Compare with the pros. Develop your game.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0d0d0d",
+  "theme_color": "#22c55e",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
