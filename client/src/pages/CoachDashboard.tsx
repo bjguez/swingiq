@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
@@ -43,6 +43,92 @@ function statusBadge(status: string) {
   if (status === "active")
     return <span className="flex items-center gap-1 text-xs text-green-500 font-semibold"><CheckCircle size={12} /> Connected</span>;
   return <span className="flex items-center gap-1 text-xs text-muted-foreground font-semibold"><Clock size={12} /> Pending</span>;
+}
+
+function VideoScrubThumbnail({ videoId, thumbnailUrl, duration }: {
+  videoId: string;
+  thumbnailUrl?: string | null;
+  duration?: string | null;
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [src, setSrc] = useState<string | null>(null);
+  const [scrubbing, setScrubbing] = useState(false);
+  const [scrubPct, setScrubPct] = useState(0);
+
+  async function handleMouseEnter() {
+    setScrubbing(true);
+    if (!src) {
+      const res = await fetch(`/api/videos/${videoId}/presigned-url`);
+      const { url } = await res.json();
+      setSrc(url);
+    }
+  }
+
+  function handleMouseLeave() {
+    setScrubbing(false);
+    setScrubPct(0);
+    if (videoRef.current) videoRef.current.currentTime = 0;
+  }
+
+  function handleMouseMove(e: React.MouseEvent<HTMLDivElement>) {
+    const video = videoRef.current;
+    if (!video || !video.duration) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    video.currentTime = pct * video.duration;
+    setScrubPct(pct * 100);
+  }
+
+  return (
+    <div
+      className="relative aspect-video w-full bg-black overflow-hidden"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      onMouseMove={handleMouseMove}
+    >
+      {/* Static thumbnail or placeholder */}
+      {!scrubbing && (
+        thumbnailUrl
+          ? <img src={thumbnailUrl} alt="" className="w-full h-full object-cover" />
+          : <div className="w-full h-full flex items-center justify-center">
+              <Video size={24} className="text-muted-foreground opacity-40" />
+            </div>
+      )}
+
+      {/* Loading spinner while URL is fetching */}
+      {scrubbing && !src && (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        </div>
+      )}
+
+      {/* Video element — shown once src is ready */}
+      {src && (
+        <video
+          ref={videoRef}
+          src={src}
+          preload="metadata"
+          muted
+          playsInline
+          className={`absolute inset-0 w-full h-full object-cover ${scrubbing ? "opacity-100" : "opacity-0"}`}
+        />
+      )}
+
+      {/* Duration badge */}
+      {duration && (
+        <span className="absolute bottom-1 right-1 text-[10px] bg-black/70 text-white px-1 py-0.5 rounded z-10">
+          {duration}
+        </span>
+      )}
+
+      {/* Scrub progress bar */}
+      {scrubbing && src && (
+        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white/20 z-10">
+          <div className="h-full bg-primary transition-none" style={{ width: `${scrubPct}%` }} />
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function CoachDashboard() {
@@ -224,25 +310,16 @@ export default function CoachDashboard() {
                     <button
                       key={v.id}
                       onClick={() => navigate(`/coach/session?playerId=${selectedPlayer.playerId}&videoId=${v.id}`)}
-                      className="group flex flex-col rounded-lg overflow-hidden border border-border bg-secondary hover:border-primary/50 transition-colors text-left"
+                      className="group relative flex flex-col rounded-lg overflow-hidden border border-border bg-secondary hover:border-primary/50 transition-colors text-left"
                     >
-                      {/* Thumbnail */}
-                      <div className="relative aspect-video w-full bg-black">
-                        {v.thumbnailUrl ? (
-                          <img src={v.thumbnailUrl} alt={v.title} className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <Video size={24} className="text-muted-foreground opacity-40" />
-                          </div>
-                        )}
-                        {v.duration && (
-                          <span className="absolute bottom-1 right-1 text-[10px] bg-black/70 text-white px-1 py-0.5 rounded">
-                            {v.duration}
-                          </span>
-                        )}
-                        <div className="absolute inset-0 bg-primary/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                          <span className="text-xs font-bold text-white bg-primary px-2 py-1 rounded">Start Session</span>
-                        </div>
+                      {/* Thumbnail / scrub preview */}
+                      <VideoScrubThumbnail
+                        videoId={v.id}
+                        thumbnailUrl={v.thumbnailUrl}
+                        duration={v.duration}
+                      />
+                      <div className="absolute inset-0 bg-primary/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                        <span className="text-xs font-bold text-white bg-primary px-2 py-1 rounded">Start Session</span>
                       </div>
                       {/* Metadata */}
                       <div className="px-2 py-2 flex flex-col gap-0.5">
