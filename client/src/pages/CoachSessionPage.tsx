@@ -547,7 +547,6 @@ export default function CoachSessionPage() {
                   color={activeColor}
                   annotations={leftAnnotations}
                   onAnnotationsChange={setLeftAnnotations}
-                  recordingSize={proVideoSrc ? { width: 639, height: 360 } : { width: 640, height: 360 }}
                 />
                 <div className="absolute top-2 left-2 text-[10px] font-bold text-white/60 bg-black/40 px-1.5 py-0.5 rounded pointer-events-none">Player</div>
                 <div className="absolute top-2 right-2 flex items-center gap-1 pointer-events-auto z-30" onPointerDown={e => e.stopPropagation()}>
@@ -616,7 +615,6 @@ export default function CoachSessionPage() {
                       color={activeColor}
                       annotations={rightAnnotations}
                       onAnnotationsChange={setRightAnnotations}
-                      recordingSize={{ width: 639, height: 360 }}
                     />
                     <div className="absolute top-2 left-2 text-[10px] font-bold text-white/60 bg-black/40 px-1.5 py-0.5 rounded pointer-events-none">Pro</div>
                     <div className="absolute top-2 right-2 flex items-center gap-1 pointer-events-auto z-30" onPointerDown={e => e.stopPropagation()}>

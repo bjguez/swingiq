@@ -17,11 +17,10 @@ interface DrawingCanvasProps {
   annotations: DrawAction[];
   onAnnotationsChange: (annotations: DrawAction[]) => void;
   onTimerClick?: () => void;
-  recordingSize?: { width: number; height: number };
 }
 
 const DrawingCanvas = forwardRef<HTMLCanvasElement, DrawingCanvasProps>(function DrawingCanvas(
-  { tool, color, annotations, onAnnotationsChange, onTimerClick, recordingSize },
+  { tool, color, annotations, onAnnotationsChange, onTimerClick },
   ref,
 ) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -292,8 +291,8 @@ const DrawingCanvas = forwardRef<HTMLCanvasElement, DrawingCanvasProps>(function
     <div ref={containerRef} className="absolute inset-0 z-20" style={{ pointerEvents: isInteractive ? "auto" : "none" }}>
       <canvas
         ref={canvasRef}
-        width={recordingSize?.width ?? canvasSize.width}
-        height={recordingSize?.height ?? canvasSize.height}
+        width={canvasSize.width}
+        height={canvasSize.height}
         className="w-full h-full"
         style={{ cursor: isInteractive ? "crosshair" : "default", touchAction: isInteractive ? "none" : "auto" }}
         onPointerDown={handleMouseDown}
