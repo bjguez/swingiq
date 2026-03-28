@@ -46,14 +46,15 @@ function buildClues(player: any) {
     ? `${stats.wins ?? "?"}W  ${stats.era ?? "?"}ERA  ${stats.so ?? "?"}K`
     : `${stats.hr ?? "?"}HR  ${stats.rbi ?? "?"}RBI  .${String(Math.round((stats.avg ?? 0) * 1000)).padStart(3, "0")} AVG`;
 
+  // Better clues first: teams, stats, birthplace — then narrowing clues
   return [
+    { label: "Teams", value: Array.isArray(player.teams) && player.teams.length ? player.teams.join(", ") : "N/A" },
+    { label: isPitcher ? "Career pitching" : "Career hitting", value: keyStats },
+    { label: "Born in", value: player.birthCountry ?? "Unknown" },
     { label: "Position", value: player.position },
     { label: "Bats / Throws", value: `${player.bats ?? "?"}/${player.throwsHand ?? "?"}` },
     { label: "Career", value: careerSpan },
-    { label: "Birth country", value: player.birthCountry ?? "Unknown" },
     { label: "Career WAR", value: player.careerWar != null ? player.careerWar.toFixed(1) : "N/A" },
-    { label: "Teams", value: Array.isArray(player.teams) && player.teams.length ? player.teams.join(", ") : "N/A" },
-    { label: isPitcher ? "Career pitching" : "Career hitting", value: keyStats },
   ];
 }
 
@@ -65,7 +66,7 @@ export function setupStatdleRoutes(app: Express) {
       const date = todayStr();
       const player = await getDailyPlayer(date);
       if (!player) return res.status(503).json({ error: "No players in pool yet" });
-      res.json({ date, clues: buildClues(player), totalClues: 7, maxGuesses: MAX_GUESSES });
+      res.json({ date, clues: buildClues(player), totalClues: 7, maxGuesses: MAX_GUESSES, mlbId: player.mlbId, nameLength: player.name });
     } catch {
       res.status(500).json({ error: "Server error" });
     }
@@ -78,7 +79,7 @@ export function setupStatdleRoutes(app: Express) {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: "Invalid date" });
       const player = await getDailyPlayer(date);
       if (!player) return res.status(503).json({ error: "No players in pool yet" });
-      res.json({ date, clues: buildClues(player), totalClues: 7, maxGuesses: MAX_GUESSES });
+      res.json({ date, clues: buildClues(player), totalClues: 7, maxGuesses: MAX_GUESSES, mlbId: player.mlbId, nameLength: player.name });
     } catch {
       res.status(500).json({ error: "Server error" });
     }

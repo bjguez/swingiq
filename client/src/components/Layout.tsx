@@ -73,8 +73,6 @@ export default function Layout({ children, showScoreTicker = false }: { children
     { section: "Company", links: [
       { href: "/about", label: "About" },
       { href: "/pricing", label: "Pricing" },
-    ]},
-    { section: "Games", links: [
       { href: "/statdle", label: "StudioStatdle" },
     ]},
   ];

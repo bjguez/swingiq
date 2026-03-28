@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Trophy, X, ChevronRight, Lock, RotateCcw } from "lucide-react";
 
 const MAX_GUESSES = 6;
-const CLUES_INITIALLY_VISIBLE = 2;
+const CLUES_INITIALLY_VISIBLE = 3;
 const API_BASE = "/api/statdle";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -41,6 +41,65 @@ function loadState(date: string): GameState {
 
 function saveState(date: string, state: GameState) {
   localStorage.setItem(storageKey(date), JSON.stringify(state));
+}
+
+function mlbHeadshotUrl(mlbId: string) {
+  return `https://img.mlb.com/headshots/current/180x180/${mlbId}.png`;
+}
+
+// ── Name blanks ───────────────────────────────────────────────────────────────
+
+function NameBlanks({ name, revealed }: { name: string; revealed: boolean }) {
+  if (revealed) {
+    return <p className="text-2xl font-bold text-center tracking-wide">{name}</p>;
+  }
+
+  const words = name.split(" ");
+  return (
+    <div className="flex flex-wrap gap-3 justify-center">
+      {words.map((word, wi) => (
+        <div key={wi} className="flex gap-1">
+          {word.split("").map((_, li) => (
+            <div
+              key={li}
+              className="w-5 h-0.5 bg-foreground/50 rounded-full mt-6"
+            />
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Player photo ──────────────────────────────────────────────────────────────
+
+function PlayerPhoto({ mlbId, revealed, name }: { mlbId: string; revealed: boolean; name: string }) {
+  const [imgError, setImgError] = useState(false);
+
+  return (
+    <div className="flex flex-col items-center gap-3 mb-2">
+      <div className="relative w-28 h-28 rounded-full overflow-hidden border-2 border-border bg-card flex items-center justify-center">
+        {!imgError ? (
+          <img
+            src={mlbHeadshotUrl(mlbId)}
+            alt={revealed ? name : "Mystery player"}
+            className={`w-full h-full object-cover transition-all duration-500 ${revealed ? "" : "blur-md scale-110"}`}
+            onError={() => setImgError(true)}
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-secondary text-4xl">
+            ⚾
+          </div>
+        )}
+        {!revealed && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Lock size={20} className="text-white drop-shadow" />
+          </div>
+        )}
+      </div>
+      <NameBlanks name={name} revealed={revealed} />
+    </div>
+  );
 }
 
 // ── Clue card ─────────────────────────────────────────────────────────────────
@@ -144,6 +203,8 @@ function PlayerSearch({ onSelect, disabled }: { onSelect: (name: string) => void
 
 function GamePanel({ date, isArchive = false }: { date: string; isArchive?: boolean }) {
   const [clues, setClues] = useState<Clue[]>([]);
+  const [mlbId, setMlbId] = useState<string>("");
+  const [playerName, setPlayerName] = useState<string>("");
   const [gameState, setGameState] = useState<GameState>({ guesses: [], won: false, lost: false });
   const [answer, setAnswer] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -159,22 +220,22 @@ function GamePanel({ date, isArchive = false }: { date: string; isArchive?: bool
       .then((data) => {
         if (data.error) throw new Error(data.error);
         setClues(data.clues ?? []);
+        setMlbId(data.mlbId ?? "");
+        setPlayerName(data.nameLength ?? "");
         const saved = loadState(date);
         setGameState(saved);
-        // If game already over, reveal answer
-        if (saved.won || saved.lost) fetchAnswer(date, saved.won);
+        if (saved.won || saved.lost) fetchAnswer(date);
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, [date, isArchive]);
 
-  async function fetchAnswer(d: string, won: boolean) {
-    const lastGuess = won ? (loadState(d).guesses.find((g) => g.correct)?.name ?? "") : "__reveal__";
+  async function fetchAnswer(d: string) {
     try {
       const res = await fetch(`${API_BASE}/guess`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date: d, guessName: lastGuess, reveal: true }),
+        body: JSON.stringify({ date: d, guessName: "__reveal__", reveal: true }),
       });
       const data = await res.json();
       if (data.answer?.name) setAnswer(data.answer.name);
@@ -233,9 +294,15 @@ function GamePanel({ date, isArchive = false }: { date: string; isArchive?: bool
   const cluesVisible = Math.min(CLUES_INITIALLY_VISIBLE + wrongGuesses, clues.length);
   const guessesLeft = MAX_GUESSES - gameState.guesses.length;
   const gameOver = gameState.won || gameState.lost;
+  const revealed = gameOver;
 
   return (
     <div className="space-y-6">
+      {/* Player photo + name blanks */}
+      {mlbId && playerName && (
+        <PlayerPhoto mlbId={mlbId} revealed={revealed} name={answer ?? playerName} />
+      )}
+
       {/* Clue board */}
       <div className="rounded-xl border border-border bg-card p-5">
         <p className="text-xs font-semibold uppercase tracking-widest text-primary mb-4">Clues</p>
