@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
-import { Trophy, X, ChevronRight, Lock, RotateCcw, Delete } from "lucide-react";
+import { Trophy, X, Lock, Delete, RefreshCw } from "lucide-react";
 
 const MAX_GUESSES = 6;
 const CLUES_INITIALLY_VISIBLE = 3;
@@ -20,15 +20,13 @@ type LetterResult = "correct" | "present" | "absent";
 type SubmittedRow = { letters: string; results: LetterResult[] };
 type StoredGame = { rows: SubmittedRow[]; won: boolean; lost: boolean };
 type Clue = { label: string; value: string };
-type ArchiveEntry = { date: string };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function todayStr() {
-  return new Date().toISOString().split("T")[0];
-}
+function todayStr() { return new Date().toISOString().split("T")[0]; }
 
 function formatDate(dateStr: string) {
+  if (dateStr.startsWith("random-")) return "Random game";
   return new Date(dateStr + "T00:00:00").toLocaleDateString(undefined, {
     month: "long", day: "numeric", year: "numeric",
   });
@@ -37,22 +35,16 @@ function formatDate(dateStr: string) {
 function storageKey(date: string) { return `statdle2_${date}`; }
 
 function loadGame(date: string): StoredGame {
-  try {
-    const raw = localStorage.getItem(storageKey(date));
-    if (raw) return JSON.parse(raw);
-  } catch {}
+  try { const r = localStorage.getItem(storageKey(date)); if (r) return JSON.parse(r); } catch {}
   return { rows: [], won: false, lost: false };
 }
 
-function saveGame(date: string, state: StoredGame) {
-  localStorage.setItem(storageKey(date), JSON.stringify(state));
+function saveGame(date: string, s: StoredGame) {
+  localStorage.setItem(storageKey(date), JSON.stringify(s));
 }
 
-function totalLetters(nameStructure: number[]) {
-  return nameStructure.reduce((a, b) => a + b, 0);
-}
+function totalLetters(ns: number[]) { return ns.reduce((a, b) => a + b, 0); }
 
-// Convert flat letters + nameStructure into display items (letters + space markers)
 function toDisplayItems(letters: string, nameStructure: number[]) {
   const items: { char: string; isSpace: boolean; letterIdx: number }[] = [];
   let idx = 0;
@@ -66,55 +58,37 @@ function toDisplayItems(letters: string, nameStructure: number[]) {
   return items;
 }
 
-function mlbHeadshotUrl(mlbId: string) {
-  return `https://img.mlb.com/headshots/current/180x180/${mlbId}.png`;
-}
+// ── Letter square ─────────────────────────────────────────────────────────────
 
-// ── Square ────────────────────────────────────────────────────────────────────
-
-const squareColors: Record<string, string> = {
+const squareClass: Record<string, string> = {
   correct: "bg-green-600 border-green-600 text-white",
   present: "bg-yellow-500 border-yellow-500 text-white",
-  absent: "bg-zinc-600 border-zinc-600 text-white",
-  active: "bg-transparent border-primary text-foreground",
-  empty: "bg-transparent border-border text-foreground",
+  absent:  "bg-zinc-600 border-zinc-600 text-white",
+  active:  "bg-transparent border-primary text-foreground",
+  empty:   "bg-transparent border-border text-foreground",
 };
 
 function LetterSquare({ char, result, isCurrent }: { char: string; result?: LetterResult; isCurrent?: boolean }) {
   const state = result ?? (isCurrent && char ? "active" : "empty");
   return (
     <motion.div
-      initial={result ? { rotateX: 0 } : {}}
       animate={result ? { rotateX: [0, -90, 0] } : {}}
-      transition={{ duration: 0.4 }}
-      className={`w-9 h-9 border-2 rounded flex items-center justify-center font-bold text-sm uppercase ${squareColors[state]}`}
+      transition={{ duration: 0.35 }}
+      className={`w-9 h-9 border-2 rounded flex items-center justify-center font-bold text-sm uppercase ${squareClass[state]}`}
     >
       {char}
     </motion.div>
   );
 }
 
-// ── Guess row ─────────────────────────────────────────────────────────────────
-
 function GuessRow({ letters, nameStructure, results, isCurrent }: {
-  letters: string;
-  nameStructure: number[];
-  results?: LetterResult[];
-  isCurrent?: boolean;
+  letters: string; nameStructure: number[]; results?: LetterResult[]; isCurrent?: boolean;
 }) {
-  const items = toDisplayItems(letters, nameStructure);
   return (
     <div className="flex items-center gap-1 justify-center">
-      {items.map((item, i) =>
-        item.isSpace ? (
-          <div key={i} className="w-2" />
-        ) : (
-          <LetterSquare
-            key={i}
-            char={item.char}
-            result={results?.[item.letterIdx]}
-            isCurrent={isCurrent}
-          />
+      {toDisplayItems(letters, nameStructure).map((item, i) =>
+        item.isSpace ? <div key={i} className="w-2" /> : (
+          <LetterSquare key={i} char={item.char} result={results?.[item.letterIdx]} isCurrent={isCurrent} />
         )
       )}
     </div>
@@ -123,31 +97,27 @@ function GuessRow({ letters, nameStructure, results, isCurrent }: {
 
 // ── Keyboard ──────────────────────────────────────────────────────────────────
 
-function OnscreenKeyboard({ onKey, letterStatuses }: {
-  onKey: (key: string) => void;
-  letterStatuses: Record<string, LetterResult>;
-}) {
-  function keyColor(k: string) {
-    const s = letterStatuses[k];
+function OnscreenKeyboard({ onKey, statuses }: { onKey: (k: string) => void; statuses: Record<string, LetterResult> }) {
+  function keyClass(k: string) {
+    const s = statuses[k];
     if (s === "correct") return "bg-green-600 text-white";
     if (s === "present") return "bg-yellow-500 text-white";
-    if (s === "absent") return "bg-zinc-600 text-muted-foreground";
+    if (s === "absent")  return "bg-zinc-600 text-muted-foreground";
     return "bg-secondary text-foreground hover:bg-secondary/70";
   }
-
   return (
-    <div className="flex flex-col items-center gap-1.5 mt-4">
+    <div className="flex flex-col items-center gap-1.5">
       {KEYBOARD_ROWS.map((row, ri) => (
         <div key={ri} className="flex gap-1">
-          {row.map((k) => (
+          {row.map(k => (
             <button
               key={k}
               onClick={() => onKey(k)}
-              className={`h-14 rounded font-semibold text-sm transition-colors ${
-                k === "ENTER" || k === "⌫" ? "px-2 min-w-[52px] text-xs" : "w-9"
-              } ${keyColor(k)}`}
+              className={`h-12 rounded font-semibold text-sm transition-colors ${
+                k === "ENTER" || k === "⌫" ? "px-2 min-w-12 text-xs" : "w-8"
+              } ${keyClass(k)}`}
             >
-              {k === "⌫" ? <Delete size={16} className="mx-auto" /> : k}
+              {k === "⌫" ? <Delete size={14} className="mx-auto" /> : k}
             </button>
           ))}
         </div>
@@ -159,16 +129,29 @@ function OnscreenKeyboard({ onKey, letterStatuses }: {
 // ── Player photo ──────────────────────────────────────────────────────────────
 
 function PlayerPhoto({ mlbId, revealed, name }: { mlbId: string; revealed: boolean; name: string }) {
-  const [imgError, setImgError] = useState(false);
+  const urls = [
+    `https://img.mlb.com/headshots/current/180x180/${mlbId}.png`,
+    `https://securea.mlb.com/mlb/images/players/head_shot/${mlbId}.jpg`,
+  ];
+  const [urlIdx, setUrlIdx] = useState(0);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => { setUrlIdx(0); setFailed(false); }, [mlbId]);
+
+  function handleError() {
+    if (urlIdx + 1 < urls.length) setUrlIdx(i => i + 1);
+    else setFailed(true);
+  }
+
   return (
-    <div className="flex flex-col items-center gap-2 mb-2">
+    <div className="flex flex-col items-center gap-2">
       <div className="relative w-24 h-24 rounded-full overflow-hidden border-2 border-border bg-card">
-        {!imgError ? (
+        {!failed ? (
           <img
-            src={mlbHeadshotUrl(mlbId)}
+            src={urls[urlIdx]}
             alt={revealed ? name : "Mystery player"}
             className={`w-full h-full object-cover transition-all duration-500 ${revealed ? "" : "blur-md scale-110"}`}
-            onError={() => setImgError(true)}
+            onError={handleError}
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-secondary text-4xl">⚾</div>
@@ -179,7 +162,7 @@ function PlayerPhoto({ mlbId, revealed, name }: { mlbId: string; revealed: boole
           </div>
         )}
       </div>
-      {revealed && <p className="font-bold text-xl text-center">{name}</p>}
+      {revealed && name && <p className="font-bold text-lg text-center">{name}</p>}
     </div>
   );
 }
@@ -189,26 +172,25 @@ function PlayerPhoto({ mlbId, revealed, name }: { mlbId: string; revealed: boole
 function ClueCard({ clue, index, visible }: { clue: Clue; index: number; visible: boolean }) {
   return visible ? (
     <motion.div
-      key="visible"
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay: index * 0.04 }}
-      className="flex items-start justify-between gap-4 py-3 border-b border-border last:border-0"
+      className="flex items-start justify-between gap-3 py-2.5 border-b border-border last:border-0"
     >
-      <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground w-32 shrink-0 pt-0.5">{clue.label}</span>
-      <span className="text-foreground font-medium text-right">{clue.value}</span>
+      <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground w-28 shrink-0 pt-0.5">{clue.label}</span>
+      <span className="text-foreground font-medium text-right text-sm">{clue.value}</span>
     </motion.div>
   ) : (
-    <div className="flex items-center justify-between py-3 border-b border-border last:border-0 opacity-30">
-      <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground w-32 shrink-0">{clue.label}</span>
-      <Lock size={14} className="text-muted-foreground" />
+    <div className="flex items-center justify-between py-2.5 border-b border-border last:border-0 opacity-25">
+      <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground w-28 shrink-0">{clue.label}</span>
+      <Lock size={13} className="text-muted-foreground" />
     </div>
   );
 }
 
 // ── Game panel ────────────────────────────────────────────────────────────────
 
-function GamePanel({ date, isArchive = false }: { date: string; isArchive?: boolean }) {
+function GamePanel({ date, onPlayAgain }: { date: string; onPlayAgain: () => void }) {
   const [nameStructure, setNameStructure] = useState<number[]>([]);
   const [mlbId, setMlbId] = useState("");
   const [clues, setClues] = useState<Clue[]>([]);
@@ -225,12 +207,19 @@ function GamePanel({ date, isArchive = false }: { date: string; isArchive?: bool
 
   const total = totalLetters(nameStructure);
   const gameOver = won || lost;
-  const wrongCount = rows.filter(r => r.results[0] !== "correct" || !r.results.every(x => x === "correct")).length;
+  const wrongCount = rows.filter(r => !r.results.every(x => x === "correct")).length;
   const cluesVisible = Math.min(CLUES_INITIALLY_VISIBLE + wrongCount, clues.length);
 
   useEffect(() => {
     setLoading(true);
-    const url = isArchive ? `${API_BASE}/game/${date}` : `${API_BASE}/daily`;
+    setError(null);
+    setRows([]); setCurrentLetters(""); setWon(false); setLost(false);
+    setAnswer(null); setLetterStatuses({});
+
+    const url = date.startsWith("random-")
+      ? `${API_BASE}/random?seed=${date.replace("random-", "")}`
+      : date === todayStr() ? `${API_BASE}/daily` : `${API_BASE}/game/${date}`;
+
     fetch(url)
       .then(r => r.json())
       .then(data => {
@@ -245,26 +234,22 @@ function GamePanel({ date, isArchive = false }: { date: string; isArchive?: bool
         setLost(saved.lost);
         if (saved.won || saved.lost) revealAnswer(date);
 
-        // Rebuild letter statuses from saved rows
         const statuses: Record<string, LetterResult> = {};
         for (const row of saved.rows) {
-          const letters = row.letters.toUpperCase().split("");
-          row.results.forEach((result, i) => {
-            const k = letters[i];
-            if (!statuses[k] || result === "correct") statuses[k] = result;
+          row.letters.toUpperCase().split("").forEach((k, i) => {
+            if (!statuses[k] || row.results[i] === "correct") statuses[k] = row.results[i];
           });
         }
         setLetterStatuses(statuses);
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
-  }, [date, isArchive]);
+  }, [date]);
 
   async function revealAnswer(d: string) {
     try {
       const res = await fetch(`${API_BASE}/guess`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ date: d, reveal: true }),
       });
       const data = await res.json();
@@ -276,21 +261,19 @@ function GamePanel({ date, isArchive = false }: { date: string; isArchive?: bool
     if (gameOver || submitting) return;
 
     if (key === "⌫" || key === "BACKSPACE") {
-      setCurrentLetters(prev => prev.slice(0, -1));
+      setCurrentLetters(p => p.slice(0, -1));
       return;
     }
 
     if (key === "ENTER") {
       if (currentLetters.length < total) {
-        setShake(true);
-        setTimeout(() => setShake(false), 500);
+        setShake(true); setTimeout(() => setShake(false), 400);
         return;
       }
       setSubmitting(true);
       try {
         const res = await fetch(`${API_BASE}/guess`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
+          method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ date, guessLetters: currentLetters }),
         });
         const data = await res.json();
@@ -301,25 +284,16 @@ function GamePanel({ date, isArchive = false }: { date: string; isArchive?: bool
 
         setRows(newRows);
         setCurrentLetters("");
-
-        // Update letter statuses
         setLetterStatuses(prev => {
           const next = { ...prev };
-          const letters = currentLetters.toUpperCase().split("");
-          data.letterResults.forEach((result: LetterResult, i: number) => {
-            const k = letters[i];
-            if (!next[k] || result === "correct") next[k] = result;
+          currentLetters.toUpperCase().split("").forEach((k, i) => {
+            if (!next[k] || data.letterResults[i] === "correct") next[k] = data.letterResults[i];
           });
           return next;
         });
 
-        if (newWon) {
-          setWon(true);
-          setAnswer(data.answer?.name ?? null);
-        } else if (newLost) {
-          setLost(true);
-          await revealAnswer(date);
-        }
+        if (newWon) { setWon(true); setAnswer(data.answer?.name ?? null); }
+        else if (newLost) { setLost(true); await revealAnswer(date); }
 
         saveGame(date, { rows: newRows, won: newWon, lost: newLost });
       } catch {}
@@ -328,11 +302,10 @@ function GamePanel({ date, isArchive = false }: { date: string; isArchive?: bool
     }
 
     if (/^[A-Z]$/.test(key) && currentLetters.length < total) {
-      setCurrentLetters(prev => prev + key.toLowerCase());
+      setCurrentLetters(p => p + key.toLowerCase());
     }
   }, [gameOver, submitting, currentLetters, total, rows, date]);
 
-  // Physical keyboard support
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
@@ -345,167 +318,114 @@ function GamePanel({ date, isArchive = false }: { date: string; isArchive?: bool
   }, [handleKey]);
 
   if (loading) return <div className="text-center text-muted-foreground py-16">Loading...</div>;
-  if (error) return (
-    <div className="text-center text-muted-foreground py-16">
-      {error === "No players in pool yet" ? "The player pool isn't seeded yet." : `Error: ${error}`}
-    </div>
-  );
+  if (error) return <div className="text-center text-muted-foreground py-12">{error}</div>;
 
   const emptyRowCount = Math.max(0, MAX_GUESSES - rows.length - (gameOver ? 0 : 1));
 
   return (
-    <div className="space-y-5">
-      {/* Photo */}
-      {mlbId && <PlayerPhoto mlbId={mlbId} revealed={gameOver} name={answer ?? ""} />}
+    <div className="lg:grid lg:grid-cols-2 lg:gap-8 lg:items-start">
 
-      {/* Clue board */}
-      <div className="rounded-xl border border-border bg-card p-4">
-        <p className="text-xs font-semibold uppercase tracking-widest text-primary mb-3">Clues</p>
-        {clues.map((clue, i) => (
-          <ClueCard key={clue.label} clue={clue} index={i} visible={i < cluesVisible} />
-        ))}
-      </div>
+      {/* ── Left: photo + clues ──────────────────────────────── */}
+      <div className="space-y-4">
+        {mlbId && <PlayerPhoto mlbId={mlbId} revealed={gameOver} name={answer ?? ""} />}
 
-      {/* Guess grid */}
-      {nameStructure.length > 0 && (
-        <div className="space-y-1.5">
-          {rows.map((row, i) => (
-            <GuessRow key={i} letters={row.letters} nameStructure={nameStructure} results={row.results} />
-          ))}
-          {!gameOver && (
-            <motion.div animate={shake ? { x: [-6, 6, -6, 6, 0] } : {}} transition={{ duration: 0.3 }}>
-              <GuessRow letters={currentLetters} nameStructure={nameStructure} isCurrent />
-            </motion.div>
-          )}
-          {Array.from({ length: emptyRowCount }).map((_, i) => (
-            <GuessRow key={`empty-${i}`} letters="" nameStructure={nameStructure} />
+        <div className="rounded-xl border border-border bg-card p-4">
+          <p className="text-xs font-semibold uppercase tracking-widest text-primary mb-2">Clues</p>
+          {clues.map((clue, i) => (
+            <ClueCard key={clue.label} clue={clue} index={i} visible={i < cluesVisible} />
           ))}
         </div>
-      )}
+      </div>
 
-      {/* Win / Lose */}
-      {gameOver && (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.97 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className={`rounded-xl border p-4 text-center ${won ? "border-green-500/30 bg-green-500/10" : "border-destructive/30 bg-destructive/10"}`}
-        >
-          {won ? (
-            <>
-              <Trophy className="mx-auto mb-1 text-green-400" size={24} />
-              <p className="font-bold text-green-400">Got it!</p>
-              <p className="text-muted-foreground text-sm">{rows.length === 1 ? "1 guess" : `${rows.length} guesses`}</p>
-            </>
-          ) : (
-            <>
-              <X className="mx-auto mb-1 text-destructive" size={24} />
-              <p className="font-bold text-destructive">Better luck tomorrow</p>
-            </>
-          )}
-        </motion.div>
-      )}
+      {/* ── Right: grid + keyboard ───────────────────────────── */}
+      <div className="space-y-3 mt-4 lg:mt-0">
 
-      {/* Keyboard */}
-      {!gameOver && nameStructure.length > 0 && (
-        <>
-          <OnscreenKeyboard onKey={handleKey} letterStatuses={letterStatuses} />
-          <button
-            onClick={() => revealAnswer(date).then(() => {
-              const next = { rows, won: false, lost: true };
-              setLost(true);
-              saveGame(date, next);
-            })}
-            className="w-full text-xs text-muted-foreground hover:text-foreground transition-colors py-1 mt-1"
-          >
-            Give up and show the answer
-          </button>
-        </>
-      )}
-    </div>
-  );
-}
-
-// ── Archive tab ────────────────────────────────────────────────────────────────
-
-function ArchiveTab({ onPlay }: { onPlay: (date: string) => void }) {
-  const [entries, setEntries] = useState<ArchiveEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetch(`${API_BASE}/archive`)
-      .then(r => r.json())
-      .then(setEntries)
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
-
-  if (loading) return <div className="text-center text-muted-foreground py-12">Loading...</div>;
-  if (!entries.length) return <div className="text-center text-muted-foreground py-12">No archive yet.</div>;
-
-  return (
-    <div className="space-y-2">
-      {entries.map(e => {
-        const saved = loadGame(e.date);
-        const played = saved.rows.length > 0;
-        return (
-          <div key={e.date} className="flex items-center justify-between px-4 py-3 rounded-lg border border-border bg-card">
-            <p className="text-sm font-medium">{formatDate(e.date)}</p>
-            <Button size="sm" variant={played ? "ghost" : "outline"} onClick={() => onPlay(e.date)}>
-              {played ? <><RotateCcw size={13} className="mr-1.5" />Replay</> : <><ChevronRight size={14} className="mr-1" />Play</>}
-            </Button>
+        {/* Guess grid */}
+        {nameStructure.length > 0 && (
+          <div className="space-y-1.5">
+            {rows.map((row, i) => (
+              <GuessRow key={i} letters={row.letters} nameStructure={nameStructure} results={row.results} />
+            ))}
+            {!gameOver && (
+              <motion.div animate={shake ? { x: [-5, 5, -5, 5, 0] } : {}} transition={{ duration: 0.3 }}>
+                <GuessRow letters={currentLetters} nameStructure={nameStructure} isCurrent />
+              </motion.div>
+            )}
+            {Array.from({ length: emptyRowCount }).map((_, i) => (
+              <GuessRow key={`e-${i}`} letters="" nameStructure={nameStructure} />
+            ))}
           </div>
-        );
-      })}
+        )}
+
+        {/* Win / Lose */}
+        {gameOver && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }}
+            className={`rounded-xl border p-4 text-center ${won
+              ? "border-green-500/30 bg-green-500/10"
+              : "border-destructive/30 bg-destructive/10"}`}
+          >
+            {won ? (
+              <>
+                <Trophy className="mx-auto mb-1 text-green-400" size={22} />
+                <p className="font-bold text-green-400">Got it!</p>
+                <p className="text-muted-foreground text-sm">{rows.length === 1 ? "1 guess" : `${rows.length} guesses`}</p>
+              </>
+            ) : (
+              <>
+                <X className="mx-auto mb-1 text-destructive" size={22} />
+                <p className="font-bold text-destructive">Better luck next time</p>
+              </>
+            )}
+            <Button size="sm" className="mt-3" onClick={onPlayAgain}>
+              <RefreshCw size={14} className="mr-2" /> Play Again
+            </Button>
+          </motion.div>
+        )}
+
+        {/* Keyboard */}
+        {!gameOver && nameStructure.length > 0 && (
+          <>
+            <OnscreenKeyboard onKey={handleKey} statuses={letterStatuses} />
+            <button
+              onClick={async () => {
+                await revealAnswer(date);
+                const next = { rows, won: false, lost: true };
+                setLost(true);
+                saveGame(date, next);
+              }}
+              className="w-full text-xs text-muted-foreground hover:text-foreground transition-colors py-1"
+            >
+              Give up and show the answer
+            </button>
+          </>
+        )}
+      </div>
     </div>
   );
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
-type Tab = "today" | "archive";
-
 export default function StudioStatdle() {
-  const [tab, setTab] = useState<Tab>("today");
-  const [archiveDate, setArchiveDate] = useState<string | null>(null);
-  const today = todayStr();
+  const [gameDate, setGameDate] = useState(todayStr());
+
+  function playAgain() {
+    const seed = Math.floor(Math.random() * 999999);
+    setGameDate(`random-${seed}`);
+  }
 
   return (
     <Layout>
-      <div className="max-w-xl mx-auto px-4 py-10">
-        <div className="mb-8">
+      <div className="max-w-4xl mx-auto px-4 py-10">
+        <div className="mb-6">
           <p className="text-primary text-xs font-semibold uppercase tracking-widest mb-2">Daily Game</p>
           <h1 className="font-display font-bold text-4xl tracking-tight">StudioStatdle</h1>
-          <p className="text-muted-foreground text-sm mt-2">Guess the MLB player. A new player every day.</p>
+          <p className="text-muted-foreground text-sm mt-1">
+            {formatDate(gameDate)} · Guess the MLB player.
+          </p>
         </div>
-
-        <div className="flex gap-1 mb-6 border-b border-border">
-          {(["today", "archive"] as Tab[]).map(t => (
-            <button
-              key={t}
-              onClick={() => { setTab(t); if (t === "today") setArchiveDate(null); }}
-              className={`px-4 py-2 text-sm font-medium capitalize border-b-2 -mb-px transition-colors ${tab === t ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
-            >
-              {t}
-            </button>
-          ))}
-        </div>
-
-        {tab === "today" && (
-          <>
-            <p className="text-xs text-muted-foreground mb-4">{formatDate(today)}</p>
-            <GamePanel date={today} />
-          </>
-        )}
-        {tab === "archive" && !archiveDate && <ArchiveTab onPlay={d => { setArchiveDate(d); }} />}
-        {tab === "archive" && archiveDate && (
-          <>
-            <div className="flex items-center gap-3 mb-4">
-              <Button variant="ghost" size="sm" onClick={() => setArchiveDate(null)}>← Back</Button>
-              <p className="text-xs text-muted-foreground">{formatDate(archiveDate)}</p>
-            </div>
-            <GamePanel date={archiveDate} isArchive />
-          </>
-        )}
+        <GamePanel key={gameDate} date={gameDate} onPlayAgain={playAgain} />
       </div>
     </Layout>
   );

@@ -116,6 +116,20 @@ function buildGameResponse(player: any, date: string) {
 
 export function setupStatdleRoutes(app: Express) {
 
+  // GET /api/statdle/random?seed=
+  app.get("/api/statdle/random", async (req, res) => {
+    try {
+      const players = await getActivePlayers();
+      if (!players.length) return res.status(503).json({ error: "No players in pool yet" });
+      const seed = parseInt(req.query.seed as string) || Math.floor(Math.random() * 999999);
+      const player = players[((seed % players.length) + players.length) % players.length];
+      res.json({ ...buildGameResponse(player, `random-${seed}`), seed });
+    } catch {
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+
   // GET /api/statdle/daily
   app.get("/api/statdle/daily", async (_req, res) => {
     try {
@@ -174,7 +188,15 @@ export function setupStatdleRoutes(app: Express) {
 
       if (!date) return res.status(400).json({ error: "Missing date" });
 
-      const player = await getDailyPlayer(date);
+      let player;
+      const randomMatch = date.match(/^random-(\d+)$/);
+      if (randomMatch) {
+        const players = await getActivePlayers();
+        const seed = parseInt(randomMatch[1]);
+        player = players[((seed % players.length) + players.length) % players.length];
+      } else {
+        player = await getDailyPlayer(date);
+      }
       if (!player) return res.status(503).json({ error: "No player found" });
 
       if (reveal) {
