@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Trophy, X, Lock, Delete, RefreshCw } from "lucide-react";
 
 const MAX_GUESSES = 6;
-const CLUES_INITIALLY_VISIBLE = 3;
+const CLUES_INITIALLY_VISIBLE = 7;
 const API_BASE = "/api/statdle";
 
 const KEYBOARD_ROWS = [

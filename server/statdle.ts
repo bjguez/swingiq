@@ -53,7 +53,7 @@ function compareLetters(guessLetters: string, answerName: string): ("correct" | 
 }
 
 async function getActivePlayers() {
-  return db
+  const players = await db
     .select()
     .from(statlePlayers)
     .where(and(
@@ -62,6 +62,11 @@ async function getActivePlayers() {
       gte(statlePlayers.careerStart, 2000),
     ))
     .orderBy(asc(statlePlayers.mlbId));
+
+  // Only players with careers of 10+ years
+  return players.filter(p =>
+    p.careerStart != null && p.careerEnd != null && (p.careerEnd - p.careerStart) >= 10
+  );
 }
 
 async function getDailyPlayer(dateStr: string) {
