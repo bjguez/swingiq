@@ -6,7 +6,7 @@ import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { UserPlus, Trash2, Clock, CheckCircle, Mail, ChevronRight, Video, ArrowLeft, MessageSquare, FileVideo, Mic, Users, Plus, X } from "lucide-react";
+import { UserPlus, Trash2, Clock, CheckCircle, Mail, ChevronRight, Video, ArrowLeft, MessageSquare, FileVideo, Users, Plus, X } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import type { Video as VideoType } from "@shared/schema";
 
@@ -295,7 +295,7 @@ export default function CoachDashboard() {
                           </p>
                           {s.voiceoverUrl && (
                             <span className="flex items-center gap-1 text-xs text-primary bg-primary/10 px-1.5 py-0.5 rounded">
-                              <Mic size={10} /> Voiceover
+                              <Video size={10} /> Recording
                             </span>
                           )}
                           {s.playerVideoId && <span className="text-xs text-muted-foreground bg-secondary px-1.5 py-0.5 rounded">Player video</span>}

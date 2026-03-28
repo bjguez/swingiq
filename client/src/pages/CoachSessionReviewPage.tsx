@@ -2,7 +2,7 @@ import { useSearch, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Mic, FileVideo, MessageSquare } from "lucide-react";
+import { ArrowLeft, Video, FileVideo, MessageSquare } from "lucide-react";
 
 export default function CoachSessionReviewPage() {
   const [, navigate] = useLocation();
@@ -59,43 +59,53 @@ export default function CoachSessionReviewPage() {
           </div>
         </div>
 
-        {/* Videos */}
-        <div className={`grid gap-4 ${session.playerVideoUrl && session.proVideoUrl ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1"}`}>
-          {session.playerVideoUrl && (
-            <div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                <FileVideo size={12} /> Player Video
-              </p>
-              <video
-                src={session.playerVideoUrl}
-                controls
-                playsInline
-                className="w-full aspect-video rounded-lg bg-black border border-border object-contain"
-              />
-            </div>
-          )}
-          {session.proVideoUrl && (
-            <div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                <FileVideo size={12} /> Pro Comparison
-              </p>
-              <video
-                src={session.proVideoUrl}
-                controls
-                playsInline
-                className="w-full aspect-video rounded-lg bg-black border border-border object-contain"
-              />
-            </div>
-          )}
-        </div>
-
-        {/* Voiceover */}
+        {/* Session Recording — shown first, full width */}
         {session.voiceoverUrl && (
           <div>
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
-              <Mic size={12} /> Voiceover
+              <Video size={12} /> Session Recording
             </p>
-            <audio src={session.voiceoverUrl} controls className="w-full" />
+            <video
+              src={session.voiceoverUrl}
+              controls
+              playsInline
+              className="w-full aspect-video rounded-lg bg-black border border-border object-contain"
+            />
+          </div>
+        )}
+
+        {/* Reference Videos */}
+        {(session.playerVideoUrl || session.proVideoUrl) && (
+          <div>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Reference Videos</p>
+            <div className={`grid gap-4 ${session.playerVideoUrl && session.proVideoUrl ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1"}`}>
+              {session.playerVideoUrl && (
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1.5 flex items-center gap-1.5">
+                    <FileVideo size={12} /> Player Video
+                  </p>
+                  <video
+                    src={session.playerVideoUrl}
+                    controls
+                    playsInline
+                    className="w-full aspect-video rounded-lg bg-black border border-border object-contain"
+                  />
+                </div>
+              )}
+              {session.proVideoUrl && (
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1.5 flex items-center gap-1.5">
+                    <FileVideo size={12} /> Pro Comparison
+                  </p>
+                  <video
+                    src={session.proVideoUrl}
+                    controls
+                    playsInline
+                    className="w-full aspect-video rounded-lg bg-black border border-border object-contain"
+                  />
+                </div>
+              )}
+            </div>
           </div>
         )}
 
