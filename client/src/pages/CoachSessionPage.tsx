@@ -256,15 +256,18 @@ export default function CoachSessionPage() {
         ctx.fillText("Player Swing", 8, headerH + 15);
         ctx.fillText("Pro Comparison", W / 2 + 9, headerH + 15);
       } else if (playerVid && playerVideoSrc) {
-        drawVid(playerVid, 0, headerH, W, videoH, leftFlipH, leftZoom, leftPanX, leftPanY, leftRotation);
+        // Center single video at 16:9 (same aspect as browser panel) to avoid X/Y distortion
+        const panelW = W / 2;
+        const panelX = W / 4;
+        drawVid(playerVid, panelX, headerH, panelW, videoH, leftFlipH, leftZoom, leftPanX, leftPanY, leftRotation);
         if (leftAnnotationRef.current) {
-          ctx.drawImage(leftAnnotationRef.current, 0, headerH, W, videoH);
+          ctx.drawImage(leftAnnotationRef.current, panelX, headerH, panelW, videoH);
         }
         ctx.fillStyle = "rgba(0,0,0,0.65)";
-        ctx.fillRect(0, headerH, 140, 22);
+        ctx.fillRect(panelX, headerH, 140, 22);
         ctx.fillStyle = "#fff";
         ctx.font = "12px Arial, sans-serif";
-        ctx.fillText("Player Swing", 8, headerH + 15);
+        ctx.fillText("Player Swing", panelX + 8, headerH + 15);
       }
 
       // Footer
@@ -544,7 +547,7 @@ export default function CoachSessionPage() {
                   color={activeColor}
                   annotations={leftAnnotations}
                   onAnnotationsChange={setLeftAnnotations}
-                  recordingSize={proVideoSrc ? { width: 639, height: 360 } : { width: 1280, height: 360 }}
+                  recordingSize={proVideoSrc ? { width: 639, height: 360 } : { width: 640, height: 360 }}
                 />
                 <div className="absolute top-2 left-2 text-[10px] font-bold text-white/60 bg-black/40 px-1.5 py-0.5 rounded pointer-events-none">Player</div>
                 <div className="absolute top-2 right-2 flex items-center gap-1 pointer-events-auto z-30" onPointerDown={e => e.stopPropagation()}>
