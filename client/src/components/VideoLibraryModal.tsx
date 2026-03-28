@@ -197,6 +197,7 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected }: Vi
 
   const handleSelectProVideo = (video: Video) => {
     if (!user) { setPendingProVideo(video); setAuthGateOpen(true); }
+    else if (!isPaid) { setIsOpen(false); navigate("/pricing"); }
     else doImportProVideo(video);
   };
 
@@ -338,6 +339,15 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected }: Vi
                   ))}
                 </div>
               </div>
+              {user && !isPaid && (
+                <div className="flex items-center gap-3 px-3 py-2.5 rounded-md bg-yellow-500/10 border border-yellow-500/30 text-sm mb-2">
+                  <Lock className="w-4 h-4 text-yellow-500 shrink-0" />
+                  <span className="text-yellow-200 flex-1">Pro comparisons require a <strong>Player</strong> plan.</span>
+                  <button onClick={() => { setIsOpen(false); navigate("/pricing"); }} className="text-xs font-bold text-yellow-400 hover:text-yellow-300 underline shrink-0">
+                    Upgrade
+                  </button>
+                </div>
+              )}
               <div className="border border-border rounded-md overflow-hidden">
                 <div className="bg-secondary/50 p-2 text-xs font-semibold text-muted-foreground grid grid-cols-12 gap-2 uppercase tracking-wider">
                   <div className="col-span-7">Video</div>
@@ -367,10 +377,11 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected }: Vi
                       <div className="col-span-3 text-right">
                         <Button
                           size="sm" variant="outline"
-                          className="border-primary/50 text-primary hover:bg-primary/20 hover:text-primary h-8"
+                          className={user && !isPaid ? "border-border text-muted-foreground h-8 gap-1.5" : "border-primary/50 text-primary hover:bg-primary/20 hover:text-primary h-8"}
                           onClick={() => handleSelectProVideo(video)}
                           data-testid={`button-import-${video.id}`}
                         >
+                          {user && !isPaid && <Lock className="w-3 h-3" />}
                           Import
                         </Button>
                       </div>
