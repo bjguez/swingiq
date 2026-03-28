@@ -93,12 +93,12 @@ function buildClues(player: any) {
   }
 
   return [
-    { label: "Teams", value: Array.isArray(player.teams) && player.teams.length ? player.teams.join(", ") : "N/A" },
-    { label: isPitcher ? "Career pitching" : "Career hitting", value: keyStats },
-    { label: "Born in", value: player.birthCountry ?? "Unknown" },
     { label: "Position", value: player.position },
-    { label: "Bats / Throws", value: `${player.bats ?? "?"}/${player.throwsHand ?? "?"}` },
+    { label: "Born in", value: player.birthCountry ?? "Unknown" },
+    { label: isPitcher ? "Career pitching" : "Career hitting", value: keyStats },
     { label: "Career", value: careerSpan },
+    { label: "Teams", value: Array.isArray(player.teams) && player.teams.length ? player.teams.join(", ") : "N/A" },
+    { label: "Bats / Throws", value: `${player.bats ?? "?"}/${player.throwsHand ?? "?"}` },
     { label: "Career WAR", value: player.careerWar != null ? player.careerWar.toFixed(1) : "N/A" },
   ];
 }

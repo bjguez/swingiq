@@ -323,7 +323,7 @@ function GamePanel({ date, onPlayAgain }: { date: string; onPlayAgain: () => voi
   const emptyRowCount = Math.max(0, MAX_GUESSES - rows.length - (gameOver ? 0 : 1));
 
   return (
-    <div className="lg:grid lg:grid-cols-2 lg:gap-8 lg:items-start">
+    <div className="lg:grid lg:grid-cols-2 lg:gap-8 lg:items-end">
 
       {/* ── Left: photo + clues ──────────────────────────────── */}
       <div className="space-y-4">
@@ -338,7 +338,7 @@ function GamePanel({ date, onPlayAgain }: { date: string; onPlayAgain: () => voi
       </div>
 
       {/* ── Right: grid + keyboard ───────────────────────────── */}
-      <div className="space-y-3 mt-4 lg:mt-0">
+      <div className="flex flex-col gap-3 mt-4 lg:mt-0">
 
         {/* Guess grid */}
         {nameStructure.length > 0 && (
