@@ -544,26 +544,59 @@ export default function Development() {
 // ── Content card ─────────────────────────────────────────────────────────────
 function ContentCard({ item }: { item: BlueprintItem }) {
   const [playing, setPlaying] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const [scrubPct, setScrubPct] = useState(0);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const typeColor = TYPE_COLORS[item.contentType] ?? "bg-secondary text-muted-foreground";
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const vid = videoRef.current;
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!vid || !rect || !vid.duration) return;
+    const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    vid.currentTime = pct * vid.duration;
+    setScrubPct(pct * 100);
+  };
 
   return (
     <div className="bg-card border border-border rounded-lg overflow-hidden group">
-      {item.videoUrl && playing ? (
+      {playing ? (
         <video
-          src={item.videoUrl}
+          src={item.videoUrl!}
           controls
           autoPlay
           className="w-full aspect-video object-contain bg-black"
         />
       ) : item.videoUrl ? (
-        <button
+        <div
+          ref={containerRef}
+          className="relative w-full aspect-video bg-black cursor-pointer"
+          onMouseEnter={() => setHovered(true)}
+          onMouseLeave={() => { setHovered(false); if (videoRef.current) videoRef.current.currentTime = 0; setScrubPct(0); }}
+          onMouseMove={handleMouseMove}
           onClick={() => setPlaying(true)}
-          className="w-full aspect-video bg-black/60 flex items-center justify-center hover:bg-black/40 transition-colors"
         >
-          <div className="w-8 h-8 rounded-full bg-primary/80 flex items-center justify-center group-hover:scale-105 transition-transform">
-            <PlayCircle className="w-4 h-4 text-white" />
-          </div>
-        </button>
+          <video
+            ref={videoRef}
+            src={item.videoUrl}
+            className="w-full h-full object-contain"
+            preload="metadata"
+            muted
+          />
+          {!hovered && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-8 h-8 rounded-full bg-primary/80 flex items-center justify-center group-hover:scale-105 transition-transform">
+                <PlayCircle className="w-4 h-4 text-white" />
+              </div>
+            </div>
+          )}
+          {hovered && (
+            <div className="absolute bottom-0 inset-x-0 h-0.5 bg-border/50">
+              <div className="h-full bg-primary transition-none" style={{ width: `${scrubPct}%` }} />
+            </div>
+          )}
+        </div>
       ) : (
         <div className="w-full aspect-video bg-secondary/40 flex items-center justify-center">
           <PlayCircle className="w-5 h-5 text-muted-foreground opacity-30" />
