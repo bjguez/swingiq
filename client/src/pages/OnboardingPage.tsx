@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Video, User, GraduationCap, Users } from "lucide-react";
+import { User, GraduationCap, Users } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 
 const BATS_OPTIONS = ["R", "L", "S"] as const;
@@ -170,11 +170,9 @@ export default function OnboardingPage() {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-md space-y-6">
-        <div className="flex items-center justify-center gap-2 text-primary font-bold text-3xl tracking-tighter">
-          <div className="w-10 h-10 rounded-md bg-primary flex items-center justify-center text-primary-foreground">
-            <Video size={22} />
-          </div>
-          Swing Studio
+        <div className="flex items-center justify-center gap-2">
+          <img src="/logo-option-b-square.svg" alt="Swing Studio" className="w-10 h-10" />
+          <span className="font-display font-bold text-3xl tracking-tighter text-primary">Swing Studio</span>
         </div>
 
         {/* Step 1: Choose account type */}

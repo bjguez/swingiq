@@ -93,7 +93,7 @@ export default function Layout({ children, showScoreTicker = false }: { children
             <Link href="/">
               <div className="flex items-center gap-2 cursor-pointer">
                 <img src="/logo-option-b-square.svg" alt="Swing Studio" className="w-9 h-9 shrink-0" />
-                <span className="hidden lg:block font-display font-bold text-2xl tracking-tighter text-foreground">Swing Studio</span>
+                <span className="hidden lg:block font-display font-bold text-2xl tracking-tighter text-primary">Swing Studio</span>
               </div>
             </Link>
 
@@ -241,11 +241,9 @@ export default function Layout({ children, showScoreTicker = false }: { children
           <div className="grid grid-cols-2 md:grid-cols-5 gap-8">
             {/* Brand */}
             <div className="col-span-2 md:col-span-1">
-              <div className="flex items-center gap-2 text-primary font-display font-bold text-xl tracking-tighter mb-3">
-                <div className="w-7 h-7 rounded-md bg-primary flex items-center justify-center text-primary-foreground shrink-0">
-                  <Video size={15} />
-                </div>
-                Swing Studio
+              <div className="flex items-center gap-2 mb-3">
+                <img src="/logo-option-b-square.svg" alt="Swing Studio" className="w-7 h-7 shrink-0" />
+                <span className="font-display font-bold text-xl tracking-tighter text-primary">Swing Studio</span>
               </div>
               <p className="text-sm text-muted-foreground leading-relaxed">
                 Analyze your swing. Compare with the pros. Develop your game.
