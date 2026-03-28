@@ -5,11 +5,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchVideos, fetchPlayers } from "@/lib/api";
 import { useState, useRef, useEffect } from "react";
+import { Link } from "wouter";
 import type { Video, MlbPlayer } from "@shared/schema";
 import {
   Upload, Trash2, Pencil, Save, X, Plus, PlayCircle,
   Film, Loader2, CheckCircle2, AlertCircle, Search,
-  Users, UserPlus, Scissors, BookOpen,
+  Users, UserPlus, Scissors, BookOpen, Mic,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -1012,6 +1013,16 @@ function BlueprintAdminTab() {
 
   return (
     <div className="space-y-6">
+      {/* Quick action */}
+      <div className="flex items-center gap-3">
+        <Link href="/coach/session?mode=blueprint">
+          <Button size="sm" className="gap-2">
+            <Mic size={14} /> Record Pro Voiceover
+          </Button>
+        </Link>
+        <p className="text-xs text-muted-foreground">Pick a pro video and record your coaching analysis directly over it.</p>
+      </div>
+
       {/* Add content form */}
       <div className="bg-card border border-border rounded-xl p-5 space-y-4">
         <h3 className="font-bold text-base">Add Blueprint Content</h3>
