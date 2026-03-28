@@ -23,6 +23,7 @@ import AcceptInvitePage from "@/pages/AcceptInvitePage";
 import AboutPage from "@/pages/AboutPage";
 import StudioStatdle from "@/pages/StudioStatdle";
 import { useAuth } from "@/hooks/use-auth";
+import { AthleteProvider } from "@/hooks/use-athletes";
 
 function AdminRoute() {
   const { user, isLoading } = useAuth();
@@ -68,8 +69,10 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <Toaster />
-        <Router />
+        <AthleteProvider>
+          <Toaster />
+          <Router />
+        </AthleteProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );

@@ -84,6 +84,7 @@ export const videos = pgTable("videos", {
   fps: integer("fps"),
   thumbnailUrl: text("thumbnail_url"),
   userId: varchar("user_id").references(() => users.id, { onDelete: "set null" }),
+  athleteProfileId: varchar("athlete_profile_id").references(() => athleteProfiles.id, { onDelete: "set null" }),
   isProVideo: boolean("is_pro_video").default(false),
   season: integer("season"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -200,6 +201,20 @@ export const playerPhaseFocus = pgTable("player_phase_focus", {
   startedAt: timestamp("started_at").defaultNow(),
 });
 
+export const athleteProfiles = pgTable("athlete_profiles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  parentUserId: varchar("parent_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name").notNull(),
+  age: integer("age"),
+  bats: text("bats"),
+  throws: text("throws"),
+  skillLevel: text("skill_level"),
+  city: text("city"),
+  state: text("state"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const statlePlayers = pgTable("statdle_players", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   mlbId: text("mlb_id").unique().notNull(),
@@ -252,3 +267,5 @@ export type UserPlayerComp = typeof userPlayerComps.$inferSelect;
 export type BlueprintContent = typeof blueprintContent.$inferSelect;
 export type InsertBlueprintContent = typeof blueprintContent.$inferInsert;
 export type PlayerPhaseFocus = typeof playerPhaseFocus.$inferSelect;
+export type AthleteProfile = typeof athleteProfiles.$inferSelect;
+export type InsertAthleteProfile = typeof athleteProfiles.$inferInsert;

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { VideoLibraryModal } from "@/components/VideoLibraryModal";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
+import { useAthletes } from "@/hooks/use-athletes";
 import { ProfileSheet } from "@/components/ProfileSheet";
 import ScoreTicker from "@/components/ScoreTicker";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -42,8 +43,11 @@ export default function Layout({ children, showScoreTicker = false }: { children
   });
 
   const isCoach = user?.accountType === "coach";
+  const isParent = user?.accountType === "parent";
   const isPaid = user && ["player", "pro", "coach"].includes(user.subscriptionTier ?? "");
   const isAdmin = user?.isAdmin;
+
+  const { athletes, activeAthlete, setActiveAthleteId } = useAthletes();
 
   const navLinks = isCoach ? [
     { href: "/", icon: <Video className="w-4 h-4 mr-2" />, label: "Analysis" },
@@ -109,7 +113,18 @@ export default function Layout({ children, showScoreTicker = false }: { children
           </div>
 
           <div className="flex items-center gap-3">
-            {!isCoach && (
+            {isParent && athletes.length > 0 && (
+              <select
+                value={activeAthlete?.id ?? ""}
+                onChange={(e) => setActiveAthleteId(e.target.value)}
+                className="h-8 rounded-md border border-input bg-background px-2 text-sm font-medium text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring hidden sm:block"
+              >
+                {athletes.map(a => (
+                  <option key={a.id} value={a.id}>{a.firstName} {a.lastName}</option>
+                ))}
+              </select>
+            )}
+            {!isCoach && !isParent && (
               <VideoLibraryModal
                 mode="user"
                 trigger={

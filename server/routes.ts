@@ -14,6 +14,7 @@ import { setupCoachingRoutes } from "./coaching";
 import { setupBiometricsRoutes } from "./biometrics";
 import { setupBlueprintRoutes } from "./blueprint";
 import { setupStatdleRoutes } from "./statdle";
+import { setupAthleteRoutes } from "./athletes";
 
 const uploadDir = path.resolve("uploads");
 if (!fs.existsSync(uploadDir)) {
@@ -1028,6 +1029,7 @@ export async function registerRoutes(
   setupBiometricsRoutes(app);
   setupBlueprintRoutes(app);
   setupStatdleRoutes(app);
+  setupAthleteRoutes(app);
 
   // ── Coach recording upload ─────────────────────────────────────────────────
   // Accept webm blobs from the canvas recorder, store in R2 under recordings/

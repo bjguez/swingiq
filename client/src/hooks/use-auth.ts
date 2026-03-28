@@ -18,7 +18,7 @@ export type AuthUser = {
   lastName?: string | null;
   profileComplete?: boolean;
   subscriptionTier?: string;
-  accountType?: "player" | "coach";
+  accountType?: "player" | "coach" | "parent";
   organization?: string | null;
   coachingLevel?: string | null;
 };
@@ -85,6 +85,9 @@ export function useAuth() {
 
   const updateProfileMutation = useMutation({
     mutationFn: async (profile: {
+      accountType?: "player" | "coach" | "parent";
+      firstName?: string;
+      lastName?: string;
       age?: number;
       city?: string;
       state?: string;
@@ -95,6 +98,7 @@ export function useAuth() {
       weightLbs?: number;
       organization?: string;
       coachingLevel?: string;
+      profileComplete?: boolean;
     }) => {
       const res = await fetch("/api/auth/profile", {
         method: "PUT",

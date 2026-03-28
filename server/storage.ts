@@ -1,12 +1,13 @@
 import { eq, and, ilike, or, sql } from "drizzle-orm";
 import { db } from "./db";
 import {
-  users, mlbPlayers, videos, drills, sessions,
+  users, mlbPlayers, videos, drills, sessions, athleteProfiles,
   type InsertUser, type User,
   type InsertMlbPlayer, type MlbPlayer,
   type InsertVideo, type Video,
   type InsertDrill, type Drill,
   type InsertSession, type Session,
+  type AthleteProfile, type InsertAthleteProfile,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -43,6 +44,12 @@ export interface IStorage {
   getSessionsByUser(userId: string): Promise<Session[]>;
   createSession(session: InsertSession): Promise<Session>;
   updateSession(id: string, data: Partial<InsertSession>): Promise<Session | undefined>;
+
+  getAthletesByParent(parentUserId: string): Promise<AthleteProfile[]>;
+  getAthlete(id: string): Promise<AthleteProfile | undefined>;
+  createAthlete(athlete: InsertAthleteProfile): Promise<AthleteProfile>;
+  updateAthlete(id: string, data: Partial<Omit<AthleteProfile, "id" | "parentUserId">>): Promise<AthleteProfile | undefined>;
+  deleteAthlete(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -192,6 +199,30 @@ export class DatabaseStorage implements IStorage {
   async updateSession(id: string, data: Partial<InsertSession>): Promise<Session | undefined> {
     const [updated] = await db.update(sessions).set(data).where(eq(sessions.id, id)).returning();
     return updated;
+  }
+
+  async getAthletesByParent(parentUserId: string): Promise<AthleteProfile[]> {
+    return db.select().from(athleteProfiles).where(eq(athleteProfiles.parentUserId, parentUserId));
+  }
+
+  async getAthlete(id: string): Promise<AthleteProfile | undefined> {
+    const [athlete] = await db.select().from(athleteProfiles).where(eq(athleteProfiles.id, id));
+    return athlete;
+  }
+
+  async createAthlete(athlete: InsertAthleteProfile): Promise<AthleteProfile> {
+    const [created] = await db.insert(athleteProfiles).values(athlete).returning();
+    return created;
+  }
+
+  async updateAthlete(id: string, data: Partial<Omit<AthleteProfile, "id" | "parentUserId">>): Promise<AthleteProfile | undefined> {
+    const [updated] = await db.update(athleteProfiles).set(data).where(eq(athleteProfiles.id, id)).returning();
+    return updated;
+  }
+
+  async deleteAthlete(id: string): Promise<boolean> {
+    const result = await db.delete(athleteProfiles).where(eq(athleteProfiles.id, id)).returning();
+    return result.length > 0;
   }
 }
 
