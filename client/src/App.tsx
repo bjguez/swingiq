@@ -1,8 +1,10 @@
-import { Switch, Route, Redirect } from "wouter";
+import { Switch, Route, Redirect, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { useEffect } from "react";
+import posthog from "posthog-js";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/Home";
 import Development from "@/pages/Development";
@@ -25,6 +27,14 @@ import TermsPage from "@/pages/TermsPage";
 import StudioStatdle from "@/pages/StudioStatdle";
 import { useAuth } from "@/hooks/use-auth";
 import { AthleteProvider } from "@/hooks/use-athletes";
+
+function PageviewTracker() {
+  const [location] = useLocation();
+  useEffect(() => {
+    posthog.capture("$pageview", { $current_url: window.location.href });
+  }, [location]);
+  return null;
+}
 
 function AdminRoute() {
   const { user, isLoading } = useAuth();
@@ -100,6 +110,7 @@ function App() {
       <TooltipProvider>
         <AthleteProvider>
           <Toaster />
+          <PageviewTracker />
           <Router />
         </AthleteProvider>
       </TooltipProvider>
