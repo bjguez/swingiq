@@ -52,6 +52,8 @@ function compareLetters(guessLetters: string, answerName: string): ("correct" | 
   return result;
 }
 
+const ALL_STAR_CUTOFF_YEAR = new Date().getFullYear() - 20; // past 20 years
+
 async function getActivePlayers() {
   const players = await db
     .select()
@@ -63,11 +65,16 @@ async function getActivePlayers() {
     .orderBy(asc(statlePlayers.mlbId));
 
   // Only established players: 300+ games for hitters, 100+ appearances for pitchers
+  // AND must have debuted within the past 20 years OR have career WAR >= 25 (notable veterans)
   return players.filter(p => {
     const stats = (p.careerStats ?? {}) as Record<string, any>;
     const games = stats.games ?? 0;
-    if (stats.type === "pitcher") return games >= 100;
-    return games >= 300;
+    const meetsGames = stats.type === "pitcher" ? games >= 100 : games >= 300;
+    if (!meetsGames) return false;
+
+    const debutYear = p.careerStart ?? 9999;
+    const war = p.careerWar ?? 0;
+    return debutYear >= ALL_STAR_CUTOFF_YEAR || war >= 25;
   });
 }
 
