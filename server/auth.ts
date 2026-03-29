@@ -3,6 +3,7 @@ import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
+import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { storage } from "./storage";
@@ -99,6 +100,7 @@ export function setupAuth(app: Express) {
           ? await storage.getUserByEmail(usernameOrEmail.toLowerCase())
           : await storage.getUserByUsername(usernameOrEmail);
         if (!user) return done(null, false, { message: "Invalid email or password" });
+        if (!user.password) return done(null, false, { message: "This account uses Google sign-in. Please use the Google button to log in." });
         const valid = await comparePasswords(password, user.password);
         if (!valid) return done(null, false, { message: "Invalid email or password" });
         if (!user.email) return done(null, false, { message: "EMAIL_REQUIRED" });
@@ -110,6 +112,58 @@ export function setupAuth(app: Express) {
     })
   );
 
+  // Google OAuth strategy
+  if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+    passport.use(new GoogleStrategy(
+      {
+        clientID: process.env.GOOGLE_CLIENT_ID,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+        callbackURL: `${process.env.APP_URL || ""}/api/auth/google/callback`,
+      },
+      async (_accessToken, _refreshToken, profile, done) => {
+        try {
+          // Try to find existing user by Google ID
+          let user = await storage.getUserByGoogleId(profile.id);
+          if (user) return done(null, user);
+
+          // Try to match by email (links Google to an existing password account)
+          const email = profile.emails?.[0]?.value?.toLowerCase();
+          if (email) {
+            user = await storage.getUserByEmail(email);
+            if (user) {
+              // Link Google ID to existing account
+              user = await storage.updateUser(user.id, { googleId: profile.id, emailVerified: true }) ?? user;
+              return done(null, user);
+            }
+          }
+
+          // New user — derive a unique username from their Google display name
+          const baseName = (profile.displayName || email?.split("@")[0] || "user")
+            .toLowerCase().replace(/[^a-z0-9]/g, "");
+          let username = baseName || "user";
+          let suffix = 1;
+          while (await storage.getUserByUsername(username)) {
+            username = `${baseName}${suffix++}`;
+          }
+
+          const created = await storage.createUser({
+            username,
+            password: "" as any,
+            email: email ?? null,
+          });
+          user = await storage.updateUser(created.id, {
+            googleId: profile.id,
+            emailVerified: !!email,
+            password: null,
+          }) ?? created;
+          return done(null, user);
+        } catch (err) {
+          return done(err as Error);
+        }
+      }
+    ));
+  }
+
   passport.serializeUser((user, done) => done(null, user.id));
   passport.deserializeUser(async (id: string, done) => {
     try {
@@ -118,6 +172,40 @@ export function setupAuth(app: Express) {
     } catch (err) {
       done(err);
     }
+  });
+
+  // Google OAuth routes
+  app.get("/api/auth/google", (req, res, next) => {
+    const state = (req.query.invite as string) ?? "";
+    passport.authenticate("google", {
+      scope: ["profile", "email"],
+      state,
+    })(req, res, next);
+  });
+
+  app.get("/api/auth/google/callback", (req, res, next) => {
+    passport.authenticate("google", { failureRedirect: "/auth?error=google" }, (err, user) => {
+      if (err || !user) return res.redirect("/auth?error=google");
+      req.login(user, (loginErr) => {
+        if (loginErr) return next(loginErr);
+        // If a pending invite token was passed via state, store it for the client to pick up
+        const state = req.query.state as string;
+        if (state) res.cookie("pendingInviteToken", state, { httpOnly: false, maxAge: 5 * 60 * 1000 });
+        // New users (no profile) go to onboarding; returning users go home
+        const destination = user.profileComplete ? "/" : "/onboarding?google=1";
+        res.redirect(destination);
+      });
+    })(req, res, next);
+  });
+
+  // Check if a username is available (used by onboarding username step)
+  app.get("/api/auth/check-username", async (req, res) => {
+    const { username } = req.query;
+    if (!username || typeof username !== "string") return res.status(400).json({ available: false });
+    const clean = username.toLowerCase().replace(/[^a-z0-9_]/g, "");
+    if (clean.length < 3) return res.json({ available: false, reason: "Too short" });
+    const existing = await storage.getUserByUsername(clean);
+    res.json({ available: !existing, username: clean });
   });
 
   // Register
@@ -129,6 +217,7 @@ export function setupAuth(app: Express) {
       const { password, email } = parsed.data;
 
       if (!email) return res.status(400).json({ message: "Email is required" });
+      if (!password) return res.status(400).json({ message: "Password is required" });
 
       const existingEmail = await storage.getUserByEmail(email.toLowerCase());
       if (existingEmail) return res.status(400).json({ message: "An account with this email already exists" });
@@ -229,7 +318,7 @@ export function setupAuth(app: Express) {
       }
 
       const user = await storage.getUserByUsername(username);
-      if (!user) return res.status(401).json({ message: "Invalid username or password" });
+      if (!user || !user.password) return res.status(401).json({ message: "Invalid username or password" });
 
       const valid = await comparePasswords(password, user.password);
       if (!valid) return res.status(401).json({ message: "Invalid username or password" });
@@ -293,22 +382,34 @@ export function setupAuth(app: Express) {
   app.put("/api/auth/profile", async (req, res, next) => {
     if (!req.user) return res.status(401).json({ message: "Not authenticated" });
     try {
-      const { firstName, lastName, age, city, state, skillLevel, bats, throws: throwHand, heightInches, weightLbs, accountType, organization, coachingLevel } = req.body;
+      const { username, firstName, lastName, age, city, state, skillLevel, bats, throws: throwHand, heightInches, weightLbs, accountType, organization, coachingLevel, profileComplete } = req.body;
+
+      // Validate and claim username if provided
+      if (username !== undefined) {
+        const clean = username.toLowerCase().replace(/[^a-z0-9_]/g, "");
+        if (clean.length < 3) return res.status(400).json({ message: "Username must be at least 3 characters" });
+        const existing = await storage.getUserByUsername(clean);
+        if (existing && existing.id !== (req.user as User).id) {
+          return res.status(400).json({ message: "Username is already taken" });
+        }
+      }
+
       const updated = await storage.updateUser((req.user as User).id, {
+        ...(username !== undefined && { username: username.toLowerCase().replace(/[^a-z0-9_]/g, "") }),
         ...(firstName !== undefined && { firstName: firstName || null }),
         ...(lastName !== undefined && { lastName: lastName || null }),
-        age: age ? Number(age) : null,
-        city: city || null,
-        state: state || null,
-        skillLevel: skillLevel || null,
-        bats: bats || null,
-        throws: throwHand || null,
-        heightInches: heightInches ? Number(heightInches) : null,
-        weightLbs: weightLbs ? Number(weightLbs) : null,
+        ...(age !== undefined && { age: age ? Number(age) : null }),
+        ...(city !== undefined && { city: city || null }),
+        ...(state !== undefined && { state: state || null }),
+        ...(skillLevel !== undefined && { skillLevel: skillLevel || null }),
+        ...(bats !== undefined && { bats: bats || null }),
+        ...(throwHand !== undefined && { throws: throwHand || null }),
+        ...(heightInches !== undefined && { heightInches: heightInches ? Number(heightInches) : null }),
+        ...(weightLbs !== undefined && { weightLbs: weightLbs ? Number(weightLbs) : null }),
         ...(accountType && { accountType }),
         ...(organization !== undefined && { organization: organization || null }),
         ...(coachingLevel !== undefined && { coachingLevel: coachingLevel || null }),
-        profileComplete: true,
+        ...(profileComplete !== undefined && { profileComplete }),
       });
       if (!updated) return res.status(404).json({ message: "User not found" });
       res.json(serializeUser(updated));

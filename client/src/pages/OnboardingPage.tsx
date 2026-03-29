@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useLocation } from "wouter";
+import { useState, useEffect } from "react";
+import { useLocation, useSearch } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,12 +32,14 @@ const US_STATES = [
   "SD","TN","TX","UT","VT","VA","WA","WV","WI","WY","DC",
 ];
 
-type Step = "account_type" | "player_profile" | "coach_profile" | "parent_profile" | "add_athlete";
+type Step = "username" | "account_type" | "player_profile" | "coach_profile" | "parent_profile" | "add_athlete";
 
 export default function OnboardingPage() {
   const [, navigate] = useLocation();
-  const { updateProfile, isUpdatingProfile } = useAuth();
-  const [step, setStep] = useState<Step>("account_type");
+  const search = useSearch();
+  const isGoogleFlow = new URLSearchParams(search).get("google") === "1";
+  const { user, updateProfile, isUpdatingProfile } = useAuth();
+  const [step, setStep] = useState<Step>(isGoogleFlow ? "username" : "account_type");
   const [playerErrors, setPlayerErrors] = useState<Record<string, string>>({});
   const [coachErrors, setCoachErrors] = useState<Record<string, string>>({});
   const [parentErrors, setParentErrors] = useState<Record<string, string>>({});
@@ -56,6 +58,40 @@ export default function OnboardingPage() {
   const [athleteForm, setAthleteForm] = useState({
     firstName: "", lastName: "", bats: "", throws: "", skillLevel: "", age: "", city: "", state: "",
   });
+
+  // Username step (Google flow)
+  const [usernameInput, setUsernameInput] = useState(user?.username ?? "");
+  const [usernameChecking, setUsernameChecking] = useState(false);
+  const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
+  const [usernameError, setUsernameError] = useState("");
+  const [usernameSaving, setUsernameSaving] = useState(false);
+
+  useEffect(() => {
+    if (!usernameInput || usernameInput.length < 3) { setUsernameAvailable(null); return; }
+    setUsernameChecking(true);
+    const timer = setTimeout(async () => {
+      const res = await fetch(`/api/auth/check-username?username=${encodeURIComponent(usernameInput)}`);
+      const data = await res.json();
+      // It's fine if the username matches their current one (no change)
+      setUsernameAvailable(data.available || usernameInput.toLowerCase() === user?.username?.toLowerCase());
+      setUsernameChecking(false);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [usernameInput]);
+
+  async function handleUsernameSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const clean = usernameInput.toLowerCase().replace(/[^a-z0-9_]/g, "");
+    if (clean.length < 3) { setUsernameError("Username must be at least 3 characters"); return; }
+    if (!usernameAvailable) { setUsernameError("Username is not available"); return; }
+    setUsernameSaving(true);
+    try {
+      await updateProfile({ username: clean } as any);
+    } finally {
+      setUsernameSaving(false);
+    }
+    setStep("account_type");
+  }
 
   const createAthleteMutation = useMutation({
     mutationFn: async (data: object) => {
@@ -174,6 +210,46 @@ export default function OnboardingPage() {
           <img src="/logo-option-b-square.svg" alt="Swing Studio" className="w-10 h-10" />
           <span className="font-display font-bold text-3xl tracking-tighter text-primary">Swing Studio</span>
         </div>
+
+        {/* Step 0: Choose username (Google flow only) */}
+        {step === "username" && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Choose your username</CardTitle>
+              <CardDescription>This is how other users will see you on Swing Studio</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleUsernameSubmit} className="space-y-4">
+                <div className="space-y-1">
+                  <Label htmlFor="username-input">Username</Label>
+                  <div className="relative">
+                    <Input
+                      id="username-input"
+                      placeholder="e.g. slugger42"
+                      value={usernameInput}
+                      onChange={(e) => { setUsernameInput(e.target.value); setUsernameError(""); }}
+                      autoFocus
+                      autoComplete="off"
+                    />
+                    {usernameInput.length >= 3 && (
+                      <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold ${
+                        usernameChecking ? "text-muted-foreground" :
+                        usernameAvailable ? "text-green-500" : "text-destructive"
+                      }`}>
+                        {usernameChecking ? "…" : usernameAvailable ? "✓ Available" : "✗ Taken"}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Letters, numbers, and underscores only. Min 3 characters.</p>
+                  {usernameError && <p className="text-xs text-destructive">{usernameError}</p>}
+                </div>
+                <Button type="submit" className="w-full" disabled={usernameSaving || !usernameAvailable || usernameInput.length < 3}>
+                  {usernameSaving ? "Saving..." : "Continue →"}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Step 1: Choose account type */}
         {step === "account_type" && (

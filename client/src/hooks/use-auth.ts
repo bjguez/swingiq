@@ -85,6 +85,7 @@ export function useAuth() {
 
   const updateProfileMutation = useMutation({
     mutationFn: async (profile: {
+      username?: string;
       accountType?: "player" | "coach" | "parent";
       firstName?: string;
       lastName?: string;
