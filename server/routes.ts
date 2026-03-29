@@ -51,12 +51,12 @@ export async function registerRoutes(
   app.use("/ingest/static", createProxyMiddleware({
     target: "https://us-assets.i.posthog.com",
     changeOrigin: true,
-    pathRewrite: { "^/ingest/static": "/static" },
+    pathRewrite: { "^/": "/static/" },
   }));
   app.use("/ingest", createProxyMiddleware({
     target: "https://us.i.posthog.com",
     changeOrigin: true,
-    pathRewrite: { "^/ingest": "" },
+    pathRewrite: { "^/": "/" },
   }));
 
 

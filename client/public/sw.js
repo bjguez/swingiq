@@ -1,4 +1,4 @@
-const CACHE = "swingstudio-v2";
+const CACHE = "swingstudio-v3";
 
 // App shell — always available offline
 const PRECACHE = ["/", "/manifest.json", "/favicon.svg"];
@@ -21,8 +21,14 @@ self.addEventListener("fetch", (e) => {
   const { request } = e;
   const url = new URL(request.url);
 
-  // Never intercept API calls, WebSocket upgrades, or cross-origin requests
-  if (url.pathname.startsWith("/api/") || request.mode === "websocket" || url.origin !== self.location.origin) {
+  // Never intercept API calls, analytics, WebSocket upgrades, non-GET, or cross-origin requests
+  if (
+    url.pathname.startsWith("/api/") ||
+    url.pathname.startsWith("/ingest/") ||
+    request.method !== "GET" ||
+    request.mode === "websocket" ||
+    url.origin !== self.location.origin
+  ) {
     return;
   }
 
@@ -38,7 +44,7 @@ self.addEventListener("fetch", (e) => {
   e.respondWith(
     caches.match(request).then((cached) => {
       const network = fetch(request).then((res) => {
-        if (res.ok) {
+        if (res.ok && res.status !== 206) {
           const clone = res.clone();
           caches.open(CACHE).then((c) => c.put(request, clone));
         }
