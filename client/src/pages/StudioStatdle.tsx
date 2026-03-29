@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
-import { Trophy, X, Lock, Delete, RefreshCw, Lightbulb } from "lucide-react";
+import { Trophy, X, Lock, Delete, RefreshCw, Lightbulb, Share2, Check } from "lucide-react";
 
 const MAX_GUESSES = 6;
 const CLUES_INITIALLY_VISIBLE = 7;
@@ -247,6 +247,7 @@ function GamePanel({ date, onPlayAgain }: { date: string; onPlayAgain: () => voi
   const [shake, setShake] = useState(false);
   const [hintsUsed, setHintsUsed] = useState(0);
   const [hintedSlots, setHintedSlots] = useState<Record<number, string>>({});
+  const [copied, setCopied] = useState(false);
 
   const total = totalLetters(nameStructure);
   const gameOver = won || lost;
@@ -299,6 +300,30 @@ function GamePanel({ date, onPlayAgain }: { date: string; onPlayAgain: () => voi
       const data = await res.json();
       if (data.answer?.name) setAnswer(data.answer.name);
     } catch {}
+  }
+
+  function buildShareText() {
+    const emoji = { correct: "🟩", present: "🟨", absent: "⬛" };
+    const dateLabel = date.startsWith("random-") ? "Random" : formatDate(date);
+    const guessLine = won ? `${rows.length}/${MAX_GUESSES}` : `X/${MAX_GUESSES}`;
+    const hintsLine = hintsUsed > 0 ? ` (${hintsUsed} hint${hintsUsed > 1 ? "s" : ""})` : "";
+    const grid = rows.map(row =>
+      row.results.map(r => emoji[r]).join("")
+    ).join("\n");
+    return `StudioStatdle ${dateLabel}\n${guessLine}${hintsLine}\n\n${grid}\n\nswingstudio.ai/statdle`;
+  }
+
+  async function handleShare() {
+    const text = buildShareText();
+    if (navigator.share) {
+      try {
+        await navigator.share({ text });
+        return;
+      } catch {}
+    }
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   }
 
   // Build the merged current row: hinted letters at fixed positions, typed letters fill the rest
@@ -456,9 +481,15 @@ function GamePanel({ date, onPlayAgain }: { date: string; onPlayAgain: () => voi
                 <p className="font-bold text-destructive">Better luck next time</p>
               </>
             )}
-            <Button size="sm" className="mt-3" onClick={onPlayAgain}>
-              <RefreshCw size={14} className="mr-2" /> Play Again
-            </Button>
+            <div className="flex items-center justify-center gap-2 mt-3">
+              <Button size="sm" variant="outline" onClick={handleShare}>
+                {copied ? <Check size={14} className="mr-2 text-green-500" /> : <Share2 size={14} className="mr-2" />}
+                {copied ? "Copied!" : "Share"}
+              </Button>
+              <Button size="sm" onClick={onPlayAgain}>
+                <RefreshCw size={14} className="mr-2" /> Play Again
+              </Button>
+            </div>
           </motion.div>
         )}
 
