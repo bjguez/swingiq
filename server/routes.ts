@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { createProxyMiddleware } from "http-proxy-middleware";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertMlbPlayerSchema, insertVideoSchema, insertDrillSchema, insertSessionSchema } from "@shared/schema";
@@ -44,6 +45,18 @@ export async function registerRoutes(
   app.use("/uploads", express.static(uploadDir, {
     acceptRanges: true,
     maxAge: "1d",
+  }));
+
+  // PostHog reverse proxy — bypasses ad blockers
+  app.use("/ingest/static", createProxyMiddleware({
+    target: "https://us-assets.i.posthog.com",
+    changeOrigin: true,
+    pathRewrite: { "^/ingest/static": "/static" },
+  }));
+  app.use("/ingest", createProxyMiddleware({
+    target: "https://us.i.posthog.com",
+    changeOrigin: true,
+    pathRewrite: { "^/ingest": "" },
   }));
 
 
