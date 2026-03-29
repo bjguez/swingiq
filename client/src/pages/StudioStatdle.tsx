@@ -246,7 +246,7 @@ function GamePanel({ date, onPlayAgain }: { date: string; onPlayAgain: () => voi
   const [submitting, setSubmitting] = useState(false);
   const [shake, setShake] = useState(false);
   const [hintsUsed, setHintsUsed] = useState(0);
-  const [hintMessages, setHintMessages] = useState<string[]>([]);
+  const [hintedSlots, setHintedSlots] = useState<Record<number, string>>({});
 
   const total = totalLetters(nameStructure);
   const gameOver = won || lost;
@@ -258,7 +258,7 @@ function GamePanel({ date, onPlayAgain }: { date: string; onPlayAgain: () => voi
     setError(null);
     setRows([]); setCurrentLetters(""); setWon(false); setLost(false);
     setAnswer(null); setLetterStatuses({});
-    setHintsUsed(0); setHintMessages([]);
+    setHintsUsed(0); setHintedSlots({});
 
     const url = date.startsWith("random-")
       ? `${API_BASE}/random?seed=${date.replace("random-", "")}`
@@ -301,6 +301,20 @@ function GamePanel({ date, onPlayAgain }: { date: string; onPlayAgain: () => voi
     } catch {}
   }
 
+  // Build the merged current row: hinted letters at fixed positions, typed letters fill the rest
+  function getMergedRow(typed: string, slots: Record<number, string>): string {
+    const arr = new Array(total).fill("");
+    for (const [pos, letter] of Object.entries(slots)) arr[parseInt(pos)] = letter;
+    let t = 0;
+    for (let i = 0; i < total; i++) {
+      if (!arr[i] && t < typed.length) arr[i] = typed[t++];
+    }
+    return arr.join("");
+  }
+
+  const hintedCount = Object.keys(hintedSlots).length;
+  const filledCount = currentLetters.length + hintedCount;
+
   async function handleHint() {
     if (hintsUsed >= 2 || gameOver) return;
     const nextHint = hintsUsed + 1;
@@ -308,14 +322,14 @@ function GamePanel({ date, onPlayAgain }: { date: string; onPlayAgain: () => voi
       const res = await fetch(`${API_BASE}/hint?date=${encodeURIComponent(date)}&hint=${nextHint}`);
       const data = await res.json();
       if (data.reveals) {
-        const msgs: string[] = [];
+        const newSlots = { ...hintedSlots };
         const newStatuses = { ...letterStatuses };
         for (const r of data.reveals as { letter: string; position: number; label: string }[]) {
-          msgs.push(`${r.label}: ${r.letter}`);
+          newSlots[r.position] = r.letter.toLowerCase();
           newStatuses[r.letter] = "correct";
         }
+        setHintedSlots(newSlots);
         setLetterStatuses(newStatuses);
-        setHintMessages(prev => [...prev, msgs.join("  ·  ")]);
         setHintsUsed(nextHint);
       }
     } catch {}
@@ -330,15 +344,16 @@ function GamePanel({ date, onPlayAgain }: { date: string; onPlayAgain: () => voi
     }
 
     if (key === "ENTER") {
-      if (currentLetters.length < total) {
+      if (filledCount < total) {
         setShake(true); setTimeout(() => setShake(false), 400);
         return;
       }
+      const mergedGuess = getMergedRow(currentLetters, hintedSlots);
       setSubmitting(true);
       try {
         const res = await fetch(`${API_BASE}/guess`, {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ date, guessLetters: currentLetters }),
+          body: JSON.stringify({ date, guessLetters: mergedGuess }),
         });
         const data = await res.json();
         const newRow: SubmittedRow = { letters: currentLetters, results: data.letterResults };
@@ -365,10 +380,10 @@ function GamePanel({ date, onPlayAgain }: { date: string; onPlayAgain: () => voi
       return;
     }
 
-    if (/^[A-Z]$/.test(key) && currentLetters.length < total) {
+    if (/^[A-Z]$/.test(key) && filledCount < total) {
       setCurrentLetters(p => p + key.toLowerCase());
     }
-  }, [gameOver, submitting, currentLetters, total, rows, date]);
+  }, [gameOver, submitting, currentLetters, total, rows, date, hintedSlots, filledCount]);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -412,7 +427,7 @@ function GamePanel({ date, onPlayAgain }: { date: string; onPlayAgain: () => voi
             ))}
             {!gameOver && (
               <motion.div animate={shake ? { x: [-5, 5, -5, 5, 0] } : {}} transition={{ duration: 0.3 }}>
-                <GuessRow letters={currentLetters} nameStructure={nameStructure} isCurrent />
+                <GuessRow letters={getMergedRow(currentLetters, hintedSlots)} nameStructure={nameStructure} isCurrent />
               </motion.div>
             )}
             {Array.from({ length: emptyRowCount }).map((_, i) => (
@@ -450,16 +465,6 @@ function GamePanel({ date, onPlayAgain }: { date: string; onPlayAgain: () => voi
         {/* Keyboard */}
         {!gameOver && nameStructure.length > 0 && (
           <>
-            {hintMessages.length > 0 && (
-              <div className="space-y-1.5">
-                {hintMessages.map((msg, i) => (
-                  <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/10 border border-primary/20 text-sm">
-                    <Lightbulb size={13} className="text-primary shrink-0" />
-                    <span className="text-primary font-medium">{msg}</span>
-                  </div>
-                ))}
-              </div>
-            )}
             <OnscreenKeyboard onKey={handleKey} statuses={letterStatuses} />
             <div className="flex items-center justify-between gap-2">
               <button
