@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
-import { Trophy, X, Lock, Delete, RefreshCw } from "lucide-react";
+import { Trophy, X, Lock, Delete, RefreshCw, Lightbulb } from "lucide-react";
 
 const MAX_GUESSES = 6;
 const CLUES_INITIALLY_VISIBLE = 7;
@@ -245,6 +245,8 @@ function GamePanel({ date, onPlayAgain }: { date: string; onPlayAgain: () => voi
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [shake, setShake] = useState(false);
+  const [hintsUsed, setHintsUsed] = useState(0);
+  const [hintMessages, setHintMessages] = useState<string[]>([]);
 
   const total = totalLetters(nameStructure);
   const gameOver = won || lost;
@@ -256,6 +258,7 @@ function GamePanel({ date, onPlayAgain }: { date: string; onPlayAgain: () => voi
     setError(null);
     setRows([]); setCurrentLetters(""); setWon(false); setLost(false);
     setAnswer(null); setLetterStatuses({});
+    setHintsUsed(0); setHintMessages([]);
 
     const url = date.startsWith("random-")
       ? `${API_BASE}/random?seed=${date.replace("random-", "")}`
@@ -295,6 +298,26 @@ function GamePanel({ date, onPlayAgain }: { date: string; onPlayAgain: () => voi
       });
       const data = await res.json();
       if (data.answer?.name) setAnswer(data.answer.name);
+    } catch {}
+  }
+
+  async function handleHint() {
+    if (hintsUsed >= 2 || gameOver) return;
+    const nextHint = hintsUsed + 1;
+    try {
+      const res = await fetch(`${API_BASE}/hint?date=${encodeURIComponent(date)}&hint=${nextHint}`);
+      const data = await res.json();
+      if (data.reveals) {
+        const msgs: string[] = [];
+        const newStatuses = { ...letterStatuses };
+        for (const r of data.reveals as { letter: string; position: number; label: string }[]) {
+          msgs.push(`${r.label}: ${r.letter}`);
+          newStatuses[r.letter] = "correct";
+        }
+        setLetterStatuses(newStatuses);
+        setHintMessages(prev => [...prev, msgs.join("  ·  ")]);
+        setHintsUsed(nextHint);
+      }
     } catch {}
   }
 
@@ -427,18 +450,38 @@ function GamePanel({ date, onPlayAgain }: { date: string; onPlayAgain: () => voi
         {/* Keyboard */}
         {!gameOver && nameStructure.length > 0 && (
           <>
+            {hintMessages.length > 0 && (
+              <div className="space-y-1.5">
+                {hintMessages.map((msg, i) => (
+                  <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/10 border border-primary/20 text-sm">
+                    <Lightbulb size={13} className="text-primary shrink-0" />
+                    <span className="text-primary font-medium">{msg}</span>
+                  </div>
+                ))}
+              </div>
+            )}
             <OnscreenKeyboard onKey={handleKey} statuses={letterStatuses} />
-            <button
-              onClick={async () => {
-                await revealAnswer(date);
-                const next = { rows, won: false, lost: true };
-                setLost(true);
-                saveGame(date, next);
-              }}
-              className="w-full text-xs text-muted-foreground hover:text-foreground transition-colors py-1"
-            >
-              Give up and show the answer
-            </button>
+            <div className="flex items-center justify-between gap-2">
+              <button
+                onClick={handleHint}
+                disabled={hintsUsed >= 2}
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors py-1 disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                <Lightbulb size={13} />
+                {hintsUsed >= 2 ? "No hints left" : `Hint (${2 - hintsUsed} left)`}
+              </button>
+              <button
+                onClick={async () => {
+                  await revealAnswer(date);
+                  const next = { rows, won: false, lost: true };
+                  setLost(true);
+                  saveGame(date, next);
+                }}
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors py-1"
+              >
+                Give up
+              </button>
+            </div>
           </>
         )}
       </div>

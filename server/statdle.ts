@@ -188,6 +188,54 @@ export function setupStatdleRoutes(app: Express) {
     }
   });
 
+  // GET /api/statdle/hint?date=&hint=1|2|3
+  app.get("/api/statdle/hint", async (req, res) => {
+    try {
+      const { date, hint } = req.query;
+      const hintNum = parseInt(hint as string);
+      if (!date || ![1, 2].includes(hintNum)) {
+        return res.status(400).json({ error: "Invalid request" });
+      }
+
+      let player: any;
+      const randomMatch = (date as string).match(/^random-(\d+)$/);
+      if (randomMatch) {
+        const players = await getActivePlayers();
+        const seed = parseInt(randomMatch[1]);
+        player = players[((seed % players.length) + players.length) % players.length];
+      } else {
+        player = await getDailyPlayer(date as string);
+      }
+      if (!player) return res.status(503).json({ error: "No player found" });
+
+      const letters = normalizeLetters(player.name);
+      const structure = getNameStructure(player.name);
+
+      // lastNameStart = index of first letter of last word
+      const lastNameStart = structure.slice(0, -1).reduce((a, b) => a + b, 0);
+
+      let reveals: { letter: string; position: number; label: string }[];
+      if (hintNum === 1) {
+        reveals = [
+          { letter: letters[0].toUpperCase(), position: 0, label: "First name starts with" },
+          { letter: letters[lastNameStart].toUpperCase(), position: lastNameStart, label: "Last name starts with" },
+        ];
+      } else {
+        // Second letters (fallback to first if name is only 1 char)
+        const firstPos = Math.min(1, structure[0] - 1);
+        const lastPos = Math.min(lastNameStart + 1, letters.length - 1);
+        reveals = [
+          { letter: letters[firstPos].toUpperCase(), position: firstPos, label: "First name 2nd letter" },
+          { letter: letters[lastPos].toUpperCase(), position: lastPos, label: "Last name 2nd letter" },
+        ];
+      }
+
+      res.json({ reveals });
+    } catch {
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
   // POST /api/statdle/guess
   app.post("/api/statdle/guess", async (req, res) => {
     try {
