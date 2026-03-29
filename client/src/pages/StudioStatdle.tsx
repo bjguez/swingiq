@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Trophy, X, Lock, Delete, RefreshCw, Lightbulb, Share2, Check } from "lucide-react";
 
 const MAX_GUESSES = 6;
-const CLUES_INITIALLY_VISIBLE = 7;
+const CLUES_INITIALLY_VISIBLE = 3;
 const API_BASE = "/api/statdle";
 
 const KEYBOARD_ROWS = [
@@ -253,7 +253,7 @@ function GamePanel({ date, onPlayAgain }: { date: string; onPlayAgain: () => voi
   const total = totalLetters(nameStructure);
   const gameOver = won || lost;
   const wrongCount = rows.filter(r => !r.results.every(x => x === "correct")).length;
-  const cluesVisible = Math.min(CLUES_INITIALLY_VISIBLE + wrongCount, clues.length);
+  const cluesVisible = gameOver ? clues.length : Math.min(CLUES_INITIALLY_VISIBLE + wrongCount, clues.length);
 
   useEffect(() => {
     setLoading(true);
