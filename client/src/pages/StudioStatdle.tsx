@@ -101,14 +101,15 @@ const squareClass: Record<string, string> = {
 };
 
 function LetterSquare({ char, result, isCurrent }: { char: string; result?: LetterResult; isCurrent?: boolean }) {
-  const state = result ?? (isCurrent && char ? "active" : "empty");
+  const displayChar = char === " " ? "" : char;
+  const state = result ?? (isCurrent && displayChar ? "active" : "empty");
   return (
     <motion.div
       animate={result ? { rotateX: [0, -90, 0] } : {}}
       transition={{ duration: 0.35 }}
       className={`w-9 h-9 border-2 rounded flex items-center justify-center font-bold text-sm uppercase ${squareClass[state]}`}
     >
-      {char}
+      {displayChar}
     </motion.div>
   );
 }
@@ -326,13 +327,15 @@ function GamePanel({ date, onPlayAgain }: { date: string; onPlayAgain: () => voi
     setTimeout(() => setCopied(false), 2000);
   }
 
-  // Build the merged current row: hinted letters at fixed positions, typed letters fill the rest
+  // Build the merged current row: hinted letters at fixed positions, typed letters fill the rest.
+  // Uses " " as a placeholder for unfilled slots so the string stays total-length and
+  // toDisplayItems can correctly index into first vs last name positions.
   function getMergedRow(typed: string, slots: Record<number, string>): string {
-    const arr = new Array(total).fill("");
+    const arr = new Array(total).fill(" ");
     for (const [pos, letter] of Object.entries(slots)) arr[parseInt(pos)] = letter;
     let t = 0;
     for (let i = 0; i < total; i++) {
-      if (!arr[i] && t < typed.length) arr[i] = typed[t++];
+      if (arr[i] === " " && t < typed.length) arr[i] = typed[t++];
     }
     return arr.join("");
   }
