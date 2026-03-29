@@ -5,7 +5,7 @@ import DataDashboard from "@/components/DataDashboard";
 import { VideoLibraryModal } from "@/components/VideoLibraryModal";
 import { useQuery } from "@tanstack/react-query";
 import { fetchPlayers, fetchVideos } from "@/lib/api";
-import { useState, useCallback, useRef, useMemo } from "react";
+import { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import { useSearch } from "wouter";
 import { Upload, Users, X, Target } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,10 +13,12 @@ import type { MlbPlayer } from "@shared/schema";
 
 export default function Home() {
   const search = useSearch();
-  const proVideoId = useMemo(() => new URLSearchParams(search).get("proVideoId"), [search]);
+  const params = useMemo(() => new URLSearchParams(search), [search]);
+  const proVideoId = useMemo(() => params.get("proVideoId"), [params]);
+  const incomingVideoId = useMemo(() => params.get("videoId"), [params]);
 
   const { data: players = [] } = useQuery({ queryKey: ["/api/players"], queryFn: fetchPlayers });
-  const { data: allVideos = [] } = useQuery({ queryKey: ["/api/videos"], queryFn: () => fetchVideos(), enabled: !!proVideoId });
+  const { data: allVideos = [] } = useQuery({ queryKey: ["/api/videos"], queryFn: () => fetchVideos(), enabled: !!(proVideoId || incomingVideoId) });
 
   const proVideo = useMemo(() => proVideoId ? allVideos.find((v: any) => v.id === proVideoId) ?? null : null, [proVideoId, allVideos]);
 
@@ -32,6 +34,16 @@ export default function Home() {
       ? (players as MlbPlayer[]).find(p => p.name.toLowerCase() === selectedPlayerName.toLowerCase()) ?? null
       : null
   );
+
+  // Auto-load user video when navigated from My Swings
+  useEffect(() => {
+    if (!incomingVideoId || allVideos.length === 0) return;
+    const v = (allVideos as any[]).find(v => v.id === incomingVideoId);
+    if (v?.sourceUrl) {
+      setExternalVideo({ src: v.sourceUrl, label: v.title ?? "My Swing" });
+      setTimeout(() => comparisonRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+    }
+  }, [incomingVideoId, allVideos]);
 
   const handleSelectUserVideo = useCallback((videoUrl: string, label?: string) => {
     setExternalVideo({ src: videoUrl, label: label ?? "My Swing" });

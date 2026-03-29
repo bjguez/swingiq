@@ -2,6 +2,7 @@ import { useState } from "react";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { fetchVideos, deleteVideo } from "@/lib/api";
 import { VideoLibraryModal } from "@/components/VideoLibraryModal";
 import { UserVideoCard } from "@/components/UserVideoCard";
@@ -11,6 +12,7 @@ import { ALL_USER_CATEGORIES } from "@/lib/categories";
 
 export default function MySwings() {
   const queryClient = useQueryClient();
+  const [, navigate] = useLocation();
   const { data: allVideos = [], isLoading } = useQuery({
     queryKey: ["/api/videos"],
     queryFn: () => fetchVideos(),
@@ -172,8 +174,10 @@ export default function MySwings() {
               bulkMode={bulkMode}
               selected={selected.has(video.id)}
               onToggleSelect={toggleSelect}
+              onSelect={(v) => navigate(`/?videoId=${v.id}`)}
               showDelete={true}
               showTrim={true}
+              playLabel="Analyze"
             />
           ))}
         </div>
