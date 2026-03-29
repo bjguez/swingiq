@@ -46,31 +46,6 @@ export async function registerRoutes(
     maxAge: "1d",
   }));
 
-  // PostHog reverse proxy — bypasses ad blockers
-  app.all("/ingest/static/*", async (req, res) => {
-    try {
-      const url = `https://us-assets.i.posthog.com/static/${req.params[0]}`;
-      const response = await fetch(url);
-      const body = await response.arrayBuffer();
-      response.headers.forEach((v, k) => res.setHeader(k, v));
-      res.status(response.status).send(Buffer.from(body));
-    } catch (_e) { res.status(500).end(); }
-  });
-
-  app.all("/ingest/*", async (req, res) => {
-    try {
-      const qs = req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : "";
-      const url = `https://us.i.posthog.com/${req.params[0]}${qs}`;
-      const response = await fetch(url, {
-        method: req.method,
-        headers: { "content-type": req.headers["content-type"] || "application/json" },
-        body: ["GET", "HEAD"].includes(req.method) ? undefined : JSON.stringify(req.body),
-      });
-      const body = await response.arrayBuffer();
-      response.headers.forEach((v, k) => res.setHeader(k, v));
-      res.status(response.status).send(Buffer.from(body));
-    } catch (_e) { res.status(500).end(); }
-  });
 
   app.post("/api/upload", upload.single("video"), async (req, res) => {
     try {
