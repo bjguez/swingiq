@@ -501,15 +501,15 @@ export default function Admin() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <StatCard label="Total Users" value={adminUsers.length} />
             <StatCard label="Paid" value={adminUsers.filter((u: any) => u.subscriptionTier === "player" || u.subscriptionTier === "pro").length} />
-            <StatCard label="With Uploads" value={adminUsers.filter((u: any) => u.uploadCount > 0).length} />
-            <StatCard label="Total Uploads" value={adminUsers.reduce((sum: number, u: any) => sum + u.uploadCount, 0)} />
+            <StatCard label="Unverified Email" value={adminUsers.filter((u: any) => !u.emailVerified).length} />
+            <StatCard label="Incomplete Profile" value={adminUsers.filter((u: any) => !u.profileComplete).length} />
           </div>
           <div className="border border-border rounded-xl overflow-hidden overflow-x-auto">
             <div className="min-w-[900px]">
             <div className="bg-secondary/50 p-3 text-xs font-semibold text-muted-foreground grid grid-cols-12 gap-2 uppercase tracking-wider">
               <div className="col-span-2">Username</div>
               <div className="col-span-1">Tier</div>
-              <div className="col-span-2">Skill Level</div>
+              <div className="col-span-2">Status</div>
               <div className="col-span-1">Bats</div>
               <div className="col-span-1">Throws</div>
               <div className="col-span-1">Age</div>
@@ -535,8 +535,13 @@ export default function Admin() {
                         {u.subscriptionTier === "pro" ? "Pro" : u.subscriptionTier === "player" ? "Player" : "Rookie"}
                       </span>
                     </div>
-                    <div className="col-span-2 text-xs text-muted-foreground truncate capitalize">
-                      {u.skillLevel?.replace(/_/g, " ") || "—"}
+                    <div className="col-span-2 flex flex-col gap-0.5">
+                      <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded w-fit ${u.emailVerified ? "bg-green-500/10 text-green-500" : "bg-yellow-500/10 text-yellow-500"}`}>
+                        {u.emailVerified ? "✓ Email" : "✗ Email"}
+                      </span>
+                      <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded w-fit ${u.profileComplete ? "bg-green-500/10 text-green-500" : "bg-orange-500/10 text-orange-500"}`}>
+                        {u.profileComplete ? "✓ Profile" : "✗ Profile"}
+                      </span>
                     </div>
                     <div className="col-span-1 text-xs text-muted-foreground">{u.bats || "—"}</div>
                     <div className="col-span-1 text-xs text-muted-foreground">{u.throws || "—"}</div>

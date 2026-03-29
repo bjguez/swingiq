@@ -294,6 +294,8 @@ export async function registerRoutes(
       const result = await Promise.all(allUsers.map(async u => ({
         id: u.id,
         username: u.username,
+        email: u.email,
+        emailVerified: u.emailVerified,
         subscriptionTier: u.subscriptionTier,
         skillLevel: u.skillLevel,
         bats: u.bats,
