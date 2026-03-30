@@ -384,7 +384,7 @@ function GamePanel({ date, onPlayAgain }: { date: string; onPlayAgain: () => voi
           body: JSON.stringify({ date, guessLetters: mergedGuess }),
         });
         const data = await res.json();
-        const newRow: SubmittedRow = { letters: currentLetters, results: data.letterResults };
+        const newRow: SubmittedRow = { letters: mergedGuess, results: data.letterResults };
         const newRows = [...rows, newRow];
         const newWon = data.correct;
         const newLost = !data.correct && newRows.length >= MAX_GUESSES;
@@ -393,7 +393,7 @@ function GamePanel({ date, onPlayAgain }: { date: string; onPlayAgain: () => voi
         setCurrentLetters("");
         setLetterStatuses(prev => {
           const next = { ...prev };
-          currentLetters.toUpperCase().split("").forEach((k, i) => {
+          mergedGuess.toUpperCase().split("").forEach((k, i) => {
             if (!next[k] || data.letterResults[i] === "correct") next[k] = data.letterResults[i];
           });
           return next;
