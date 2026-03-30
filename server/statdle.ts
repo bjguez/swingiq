@@ -68,8 +68,13 @@ async function getActivePlayers() {
   // AND must have debuted within the past 20 years OR have career WAR >= 25 (notable veterans)
   return players.filter(p => {
     const stats = (p.careerStats ?? {}) as Record<string, any>;
+    const isPitcher = ["P", "SP", "RP", "CL"].includes(p.position);
     const games = stats.games ?? 0;
-    const meetsGames = stats.type === "pitcher" ? games >= 100 : games >= 300;
+
+    // Exclude pitchers whose stored stats are hitting stats (seeded incorrectly)
+    if (isPitcher && stats.wins == null && stats.era == null) return false;
+
+    const meetsGames = isPitcher ? games >= 100 : games >= 300;
     if (!meetsGames) return false;
 
     const debutYear = p.careerStart ?? 9999;

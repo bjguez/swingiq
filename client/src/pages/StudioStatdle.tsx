@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Trophy, X, Lock, Delete, RefreshCw, Lightbulb, Share2, Check } from "lucide-react";
 
 const MAX_GUESSES = 6;
-const CLUES_INITIALLY_VISIBLE = 3;
+const CLUES_INITIALLY_VISIBLE = 6;
 const API_BASE = "/api/statdle";
 
 const KEYBOARD_ROWS = [
@@ -216,7 +216,7 @@ function ClueCard({ clue, index, visible }: { clue: Clue; index: number; visible
       <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground w-28 shrink-0 pt-0.5">{clue.label}</span>
       {isTeams && teamList.length > 0 ? (
         <div className="flex flex-wrap gap-1 justify-end">
-          {teamList.map(abbr => <TeamBadge key={abbr} abbr={abbr} />)}
+          {teamList.map((abbr, i) => <TeamBadge key={i} abbr={abbr} />)}
         </div>
       ) : (
         <span className="text-foreground font-medium text-right text-sm">{clue.value}</span>
