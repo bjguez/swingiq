@@ -193,12 +193,13 @@ export function setupStatdleRoutes(app: Express) {
     }
   });
 
-  // GET /api/statdle/hint?date=&hint=1|2|3
+  // GET /api/statdle/hint?date=&position=N
+  // Returns the letter at the requested position (0-indexed, spaces excluded)
   app.get("/api/statdle/hint", async (req, res) => {
     try {
-      const { date, hint } = req.query;
-      const hintNum = parseInt(hint as string);
-      if (!date || ![1, 2].includes(hintNum)) {
+      const { date, position } = req.query;
+      const pos = parseInt(position as string);
+      if (!date || isNaN(pos) || pos < 0) {
         return res.status(400).json({ error: "Invalid request" });
       }
 
@@ -214,28 +215,9 @@ export function setupStatdleRoutes(app: Express) {
       if (!player) return res.status(503).json({ error: "No player found" });
 
       const letters = normalizeLetters(player.name);
-      const structure = getNameStructure(player.name);
+      if (pos >= letters.length) return res.status(400).json({ error: "Position out of range" });
 
-      // lastNameStart = index of first letter of last word
-      const lastNameStart = structure.slice(0, -1).reduce((a, b) => a + b, 0);
-
-      let reveals: { letter: string; position: number; label: string }[];
-      if (hintNum === 1) {
-        reveals = [
-          { letter: letters[0].toUpperCase(), position: 0, label: "First name starts with" },
-          { letter: letters[lastNameStart].toUpperCase(), position: lastNameStart, label: "Last name starts with" },
-        ];
-      } else {
-        // Second letters (fallback to first if name is only 1 char)
-        const firstPos = Math.min(1, structure[0] - 1);
-        const lastPos = Math.min(lastNameStart + 1, letters.length - 1);
-        reveals = [
-          { letter: letters[firstPos].toUpperCase(), position: firstPos, label: "First name 2nd letter" },
-          { letter: letters[lastPos].toUpperCase(), position: lastPos, label: "Last name 2nd letter" },
-        ];
-      }
-
-      res.json({ reveals });
+      res.json({ letter: letters[pos].toUpperCase(), position: pos });
     } catch {
       res.status(500).json({ error: "Server error" });
     }

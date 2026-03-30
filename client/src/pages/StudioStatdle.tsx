@@ -55,7 +55,10 @@ type Clue = { label: string; value: string };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function todayStr() { return new Date().toISOString().split("T")[0]; }
+function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 
 function formatDate(dateStr: string) {
   if (dateStr.startsWith("random-")) return "Random game";
@@ -343,22 +346,34 @@ function GamePanel({ date, onPlayAgain }: { date: string; onPlayAgain: () => voi
   const hintedCount = Object.keys(hintedSlots).length;
   const filledCount = currentLetters.length + hintedCount;
 
+  // Positions already solved: either correctly guessed in a submitted row or already hinted
+  function getKnownPositions(): Set<number> {
+    const known = new Set<number>(Object.keys(hintedSlots).map(Number));
+    for (const row of rows) {
+      row.results.forEach((r, i) => { if (r === "correct") known.add(i); });
+    }
+    return known;
+  }
+
+  function nextUnknownPosition(): number {
+    const known = getKnownPositions();
+    for (let i = 0; i < total; i++) {
+      if (!known.has(i)) return i;
+    }
+    return -1;
+  }
+
   async function handleHint() {
-    if (hintsUsed >= 2 || gameOver) return;
-    const nextHint = hintsUsed + 1;
+    if (gameOver) return;
+    const pos = nextUnknownPosition();
+    if (pos === -1) return;
     try {
-      const res = await fetch(`${API_BASE}/hint?date=${encodeURIComponent(date)}&hint=${nextHint}`);
+      const res = await fetch(`${API_BASE}/hint?date=${encodeURIComponent(date)}&position=${pos}`);
       const data = await res.json();
-      if (data.reveals) {
-        const newSlots = { ...hintedSlots };
-        const newStatuses = { ...letterStatuses };
-        for (const r of data.reveals as { letter: string; position: number; label: string }[]) {
-          newSlots[r.position] = r.letter.toLowerCase();
-          newStatuses[r.letter] = "correct";
-        }
-        setHintedSlots(newSlots);
-        setLetterStatuses(newStatuses);
-        setHintsUsed(nextHint);
+      if (data.letter) {
+        setHintedSlots(prev => ({ ...prev, [pos]: data.letter.toLowerCase() }));
+        setLetterStatuses(prev => ({ ...prev, [data.letter]: "correct" as LetterResult }));
+        setHintsUsed(h => h + 1);
       }
     } catch {}
   }
@@ -503,11 +518,11 @@ function GamePanel({ date, onPlayAgain }: { date: string; onPlayAgain: () => voi
             <div className="flex items-center justify-between gap-2">
               <button
                 onClick={handleHint}
-                disabled={hintsUsed >= 2}
+                disabled={nextUnknownPosition() === -1}
                 className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors py-1 disabled:opacity-30 disabled:cursor-not-allowed"
               >
                 <Lightbulb size={13} />
-                {hintsUsed >= 2 ? "No hints left" : `Hint (${2 - hintsUsed} left)`}
+                {nextUnknownPosition() === -1 ? "No hints left" : hintsUsed === 0 ? "Hint" : `Hint (${hintsUsed} used)`}
               </button>
               <button
                 onClick={async () => {
