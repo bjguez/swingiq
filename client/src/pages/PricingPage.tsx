@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
-import { Check, Zap } from "lucide-react";
+import { Check, Zap, X } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import Layout from "@/components/Layout";
 
@@ -22,11 +22,13 @@ const TIERS = [
       "Side-by-side swing comparison",
       "MLB player video library",
       "Basic swing categories",
+      "StudioStatdle — daily MLB guessing game",
     ],
     limitations: [
       "Cannot delete or manage videos",
       "No Biometrics matching",
       "No Development Blueprint",
+      "No Cognition training",
     ],
     cta: "Get Started Free",
     highlight: false,
@@ -39,14 +41,16 @@ const TIERS = [
     description: "Unlimited video + pro player comparisons",
     priceKey: { monthly: "player_monthly", annual: "player_annual" },
     features: [
+      "Everything in Rookie",
       "Unlimited video uploads",
       "Full video library management",
-      "Side-by-side swing comparison",
-      "MLB player video library",
       "Biometrics — match your body to MLB comps",
       "Exit velocity & barrel rate analysis",
     ],
-    limitations: ["No Development Blueprint"],
+    limitations: [
+      "No Development Blueprint",
+      "No Cognition training",
+    ],
     cta: "Start Player",
     highlight: true,
   },
@@ -55,13 +59,14 @@ const TIERS = [
     name: "Pro",
     monthlyPrice: 39,
     annualPrice: 390,
-    description: "Everything in Player + structured development",
+    description: "Everything in Player + structured development & vision training",
     priceKey: { monthly: "pro_monthly", annual: "pro_annual" },
     features: [
       "Everything in Player",
       "Development Blueprint",
       "Phase-by-phase drill programs",
       "Pro model swing breakdowns",
+      "Cognition — 3D vision & attention training",
       "Priority support",
     ],
     limitations: [],
@@ -225,6 +230,12 @@ export default function PricingPage() {
                     <li key={f} className="flex items-start gap-2 text-sm">
                       <Check size={15} className="text-green-500 shrink-0 mt-0.5" />
                       <span>{f}</span>
+                    </li>
+                  ))}
+                  {tier.limitations.map((l) => (
+                    <li key={l} className="flex items-start gap-2 text-sm">
+                      <X size={15} className="text-muted-foreground/50 shrink-0 mt-0.5" />
+                      <span className="text-muted-foreground/60">{l}</span>
                     </li>
                   ))}
                 </ul>

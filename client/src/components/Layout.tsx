@@ -70,20 +70,20 @@ export default function Layout({ children, showScoreTicker = false }: { children
       { href: "/biometrics", label: "Biometrics" },
       { href: "/development", label: "Development" },
     ]},
-    { section: "Account", links: [
-      { href: "/onboarding", label: "Edit Profile" },
-      { href: "/pricing", label: "Upgrade Plan" },
+    { section: "Enhancements", links: [
+      { href: "/vision", label: "Cognition" },
+    ]},
+    { section: "Games", links: [
+      { href: "/statdle", label: "StudioStatdle" },
     ]},
     { section: "Company", links: [
       { href: "/about", label: "About" },
       { href: "/pricing", label: "Pricing" },
       { href: "/terms", label: "Terms of Service" },
     ]},
-    { section: "Games", links: [
-      { href: "/statdle", label: "StudioStatdle" },
-    ]},
-    { section: "Enhancements", links: [
-      { href: "/vision", label: "Cognition" },
+    { section: "Account", links: [
+      { href: "/onboarding", label: "Edit Profile" },
+      { href: "/pricing", label: "Upgrade Plan" },
     ]},
   ];
 

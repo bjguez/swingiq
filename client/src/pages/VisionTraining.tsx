@@ -4,8 +4,10 @@ import { PerspectiveCamera } from "@react-three/drei";
 import * as THREE from "three";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
-import { Eye, Trophy, RotateCcw, Play } from "lucide-react";
+import { Eye, Trophy, RotateCcw, Play, Lock } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useAuth } from "@/hooks/use-auth";
+import { useLocation } from "wouter";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -153,6 +155,10 @@ function Scene({
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function VisionTraining() {
+  const { user } = useAuth();
+  const [, navigate] = useLocation();
+  const isPro = user?.isAdmin || ["pro", "coach"].includes(user?.subscriptionTier ?? "");
+
   const [phase, setPhase] = useState<Phase>("intro");
   const [round, setRound] = useState(0);
   const [speed, setSpeed] = useState(INITIAL_SPEED);
@@ -275,6 +281,35 @@ export default function VisionTraining() {
   const threshold = speedHistory.length > 0
     ? (speedHistory.reduce((a, b) => a + b, 0) / speedHistory.length).toFixed(2)
     : null;
+
+  if (!isPro) {
+    return (
+      <Layout>
+        <div className="max-w-lg mx-auto px-4 py-16 text-center space-y-6">
+          <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
+            <Lock size={28} className="text-primary" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold mb-2">Cognition is a Pro feature</h1>
+            <p className="text-muted-foreground">
+              3D Multiple Object Tracking is available on the Pro and Coach plans.
+              Train your visual attention and processing speed the way professional athletes do.
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <Button onClick={() => navigate("/pricing")} size="lg">
+              Upgrade to Pro
+            </Button>
+            {!user && (
+              <Button variant="outline" size="lg" onClick={() => navigate("/auth")}>
+                Sign In
+              </Button>
+            )}
+          </div>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
@@ -470,8 +505,8 @@ export default function VisionTraining() {
         {(phase === "intro" || phase === "complete") && (
           <div className="rounded-xl border border-border bg-card p-4 space-y-2 text-sm text-muted-foreground">
             <p className="font-semibold text-foreground text-xs uppercase tracking-widest">How it works</p>
-            <p>Based on NeuroTracker's 3D-MOT protocol, used by professional athletes to improve visual attention, working memory, and processing speed.</p>
-            <p>The adaptive difficulty automatically adjusts speed: faster when you're correct, slower when you miss. Your <span className="text-foreground font-medium">threshold speed</span> is the average across all rounds — a measurable benchmark you can track over time.</p>
+            <p>Multi-object tracking (MOT) is a core visual-cognitive skill, representing your brain's ability to simultaneously tag and follow multiple moving targets in 3D space. Research shows it directly underlies the kind of attention, working memory, and processing speed that separate elite hitters from average ones.</p>
+            <p>The adaptive difficulty automatically adjusts speed: faster when you're correct, slower when you miss. Your <span className="text-foreground font-medium">threshold speed</span> is the average across all rounds, a measurable benchmark you can track over time.</p>
           </div>
         )}
 
