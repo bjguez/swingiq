@@ -14,8 +14,10 @@ import { useLocation } from "wouter";
 const NUM_SPHERES = 8;
 const NUM_TARGETS = 4;
 const SPHERE_RADIUS = 0.25;
-const BOX_HALF = 2.8;
-const SAFE = BOX_HALF - SPHERE_RADIUS;
+const BOX_HALF_XY = 2.8;   // width / height
+const BOX_HALF_Z  = 1.2;   // depth — shallower so balls stay visible
+const SAFE_XY = BOX_HALF_XY - SPHERE_RADIUS;
+const SAFE_Z  = BOX_HALF_Z  - SPHERE_RADIUS;
 const HIGHLIGHT_SECS = 3;
 const TRACKING_SECS = 5;
 const TOTAL_ROUNDS = 10;
@@ -42,9 +44,9 @@ function initRound(speed: number) {
     let tries = 0;
     do {
       pos = new THREE.Vector3(
-        (Math.random() - 0.5) * SAFE * 1.4,
-        (Math.random() - 0.5) * SAFE * 1.4,
-        (Math.random() - 0.5) * SAFE * 1.4,
+        (Math.random() - 0.5) * SAFE_XY * 1.4,
+        (Math.random() - 0.5) * SAFE_XY * 1.4,
+        (Math.random() - 0.5) * SAFE_Z  * 1.4,
       );
       tries++;
     } while (tries < 50 && positions.some(p => p.distanceTo(pos) < SPHERE_RADIUS * 5));
@@ -85,12 +87,12 @@ function Scene({
       // Wall bounces
       for (let i = 0; i < NUM_SPHERES; i++) {
         const p = pos[i]; const v = vel[i];
-        if (p.x >  SAFE) { p.x =  SAFE; v.x = -Math.abs(v.x); }
-        if (p.x < -SAFE) { p.x = -SAFE; v.x =  Math.abs(v.x); }
-        if (p.y >  SAFE) { p.y =  SAFE; v.y = -Math.abs(v.y); }
-        if (p.y < -SAFE) { p.y = -SAFE; v.y =  Math.abs(v.y); }
-        if (p.z >  SAFE) { p.z =  SAFE; v.z = -Math.abs(v.z); }
-        if (p.z < -SAFE) { p.z = -SAFE; v.z =  Math.abs(v.z); }
+        if (p.x >  SAFE_XY) { p.x =  SAFE_XY; v.x = -Math.abs(v.x); }
+        if (p.x < -SAFE_XY) { p.x = -SAFE_XY; v.x =  Math.abs(v.x); }
+        if (p.y >  SAFE_XY) { p.y =  SAFE_XY; v.y = -Math.abs(v.y); }
+        if (p.y < -SAFE_XY) { p.y = -SAFE_XY; v.y =  Math.abs(v.y); }
+        if (p.z >  SAFE_Z)  { p.z =  SAFE_Z;  v.z = -Math.abs(v.z); }
+        if (p.z < -SAFE_Z)  { p.z = -SAFE_Z;  v.z =  Math.abs(v.z); }
       }
 
       // Sphere–sphere elastic collision
@@ -128,7 +130,7 @@ function Scene({
 
       {/* Bounding box wireframe */}
       <lineSegments>
-        <edgesGeometry args={[new THREE.BoxGeometry(BOX_HALF * 2, BOX_HALF * 2, BOX_HALF * 2)]} />
+        <edgesGeometry args={[new THREE.BoxGeometry(BOX_HALF_XY * 2, BOX_HALF_XY * 2, BOX_HALF_Z * 2)]} />
         <lineBasicMaterial color="#334155" transparent opacity={0.5} />
       </lineSegments>
 
