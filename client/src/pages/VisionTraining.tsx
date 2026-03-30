@@ -285,7 +285,7 @@ export default function VisionTraining() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold flex items-center gap-2">
-              <Eye size={20} className="text-primary" /> Vision Training
+              <Eye size={20} className="text-primary" /> Cognition
             </h1>
             <p className="text-xs text-muted-foreground">3D Multiple Object Tracking</p>
           </div>

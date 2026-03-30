@@ -82,6 +82,9 @@ export default function Layout({ children, showScoreTicker = false }: { children
     { section: "Games", links: [
       { href: "/statdle", label: "StudioStatdle" },
     ]},
+    { section: "Enhancements", links: [
+      { href: "/vision", label: "Cognition" },
+    ]},
   ];
 
   return (
