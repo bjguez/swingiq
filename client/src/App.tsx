@@ -25,6 +25,7 @@ import AcceptInvitePage from "@/pages/AcceptInvitePage";
 import AboutPage from "@/pages/AboutPage";
 import TermsPage from "@/pages/TermsPage";
 import StudioStatdle from "@/pages/StudioStatdle";
+import VisionTraining from "@/pages/VisionTraining";
 import { useAuth } from "@/hooks/use-auth";
 import { AthleteProvider } from "@/hooks/use-athletes";
 
@@ -69,6 +70,7 @@ function Router() {
       <Route path="/about" component={AboutPage} />
       <Route path="/terms" component={TermsPage} />
       <Route path="/statdle" component={StudioStatdle} />
+      <Route path="/vision" component={VisionTraining} />
       <Route path="/invite/accept" component={AcceptInvitePage} />
       <Route path="/pricing" component={PricingPage} />
       <Route path="/">
