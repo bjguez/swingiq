@@ -21,6 +21,8 @@ export type AuthUser = {
   accountType?: "player" | "coach" | "parent";
   organization?: string | null;
   coachingLevel?: string | null;
+  coachTrialStartedAt?: string | null;
+  coachTrialDaysRemaining?: number | null;
 };
 
 async function fetchCurrentUser(): Promise<AuthUser | null> {

@@ -6,7 +6,7 @@ import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { UserPlus, Trash2, Clock, CheckCircle, Mail, ChevronRight, Video, ArrowLeft, MessageSquare, FileVideo, Users, Plus, X } from "lucide-react";
+import { UserPlus, Trash2, Clock, CheckCircle, Mail, ChevronRight, Video, ArrowLeft, MessageSquare, FileVideo, Users, Plus, X, Lock, AlertTriangle } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import type { Video as VideoType } from "@shared/schema";
 
@@ -400,9 +400,44 @@ export default function CoachDashboard() {
   // ── Main list view ──
   const isLoading = teamsLoading || playersLoading;
 
+  const daysRemaining = (user as any)?.coachTrialDaysRemaining ?? 0;
+  const isOnTrial = user?.subscriptionTier !== "coach" && (user as any)?.coachTrialStartedAt;
+  const trialExpired = isOnTrial && daysRemaining === 0;
+
+  if (trialExpired) {
+    return (
+      <Layout>
+        <div className="max-w-lg mx-auto px-4 py-16 text-center space-y-6">
+          <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mx-auto">
+            <Lock size={28} className="text-destructive" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold mb-2">Your free trial has ended</h1>
+            <p className="text-muted-foreground">Upgrade to the Coach plan to continue managing your players and sessions.</p>
+          </div>
+          <Button size="lg" onClick={() => navigate("/pricing")}>Upgrade to Coach</Button>
+        </div>
+      </Layout>
+    );
+  }
+
   return (
     <Layout>
       <div className="max-w-3xl mx-auto w-full py-8 space-y-8">
+
+        {/* Trial banner */}
+        {isOnTrial && daysRemaining > 0 && (
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-4 py-3">
+            <div className="flex items-center gap-2 text-sm text-yellow-400">
+              <AlertTriangle size={15} className="shrink-0" />
+              <span><span className="font-semibold">{daysRemaining} day{daysRemaining !== 1 ? "s" : ""} left</span> in your free trial</span>
+            </div>
+            <Button size="sm" variant="outline" className="border-yellow-500/40 text-yellow-400 hover:bg-yellow-500/10 shrink-0" onClick={() => navigate("/pricing")}>
+              Upgrade
+            </Button>
+          </div>
+        )}
+
         <div>
           <h1 className="font-display text-3xl uppercase tracking-wider">My Teams</h1>
           <p className="text-muted-foreground mt-1">{activeCount} connected · {pendingCount} pending</p>

@@ -28,6 +28,8 @@ export const users = pgTable("users", {
   // Coach-specific profile fields
   organization: text("organization"),
   coachingLevel: text("coaching_level"), // "youth" | "high_school" | "college" | "pro"
+  // Coach trial
+  coachTrialStartedAt: timestamp("coach_trial_started_at"),
   // Subscription — tiers: "free" | "player" | "pro" | "coach"
   subscriptionTier: text("subscription_tier").default("free").notNull(),
   stripeCustomerId: text("stripe_customer_id"),

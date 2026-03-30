@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { hasCoachAccess } from "./coachAccess";
 import { createProxyMiddleware } from "http-proxy-middleware";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
@@ -1060,7 +1061,7 @@ export async function registerRoutes(
       if (!user) return res.status(401).json({ message: "Not authenticated" });
       const adminUsername = process.env.ADMIN_USERNAME;
       const isAdmin = adminUsername && user.username === adminUsername;
-      if (user.accountType !== "coach" && !isAdmin) return res.status(403).json({ message: "Coach account required" });
+      if ((user.accountType !== "coach" || !hasCoachAccess(user)) && !isAdmin) return res.status(403).json({ message: "Coach subscription required" });
       if (!req.file) return res.status(400).json({ message: "No file provided" });
       if (!r2Configured()) return res.status(503).json({ message: "Storage not configured" });
 

@@ -12,6 +12,7 @@ import { insertUserSchema, emailVerifications } from "@shared/schema";
 import type { User } from "@shared/schema";
 import { sendVerificationEmail } from "./email";
 import { eq, and, gt } from "drizzle-orm";
+import { coachTrialDaysRemaining } from "./coachAccess";
 
 const scryptAsync = promisify(scrypt);
 
@@ -66,6 +67,8 @@ function serializeUser(user: User) {
     accountType: user.accountType ?? "player",
     organization: user.organization,
     coachingLevel: user.coachingLevel,
+    coachTrialStartedAt: user.coachTrialStartedAt ?? null,
+    coachTrialDaysRemaining: user.accountType === "coach" ? coachTrialDaysRemaining(user) : null,
   };
 }
 
@@ -394,7 +397,14 @@ export function setupAuth(app: Express) {
         }
       }
 
-      const updated = await storage.updateUser((req.user as User).id, {
+      const currentUser = req.user as User;
+      const startingCoachTrial =
+        accountType === "coach" &&
+        currentUser.accountType !== "coach" &&
+        currentUser.subscriptionTier !== "coach" &&
+        !currentUser.coachTrialStartedAt;
+
+      const updated = await storage.updateUser(currentUser.id, {
         ...(username !== undefined && { username: username.toLowerCase().replace(/[^a-z0-9_]/g, "") }),
         ...(firstName !== undefined && { firstName: firstName || null }),
         ...(lastName !== undefined && { lastName: lastName || null }),
@@ -410,6 +420,7 @@ export function setupAuth(app: Express) {
         ...(organization !== undefined && { organization: organization || null }),
         ...(coachingLevel !== undefined && { coachingLevel: coachingLevel || null }),
         ...(profileComplete !== undefined && { profileComplete }),
+        ...(startingCoachTrial && { coachTrialStartedAt: new Date() }),
       });
       if (!updated) return res.status(404).json({ message: "User not found" });
       res.json(serializeUser(updated));

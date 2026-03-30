@@ -3,6 +3,7 @@ import { db } from "./db";
 import { coachSessions, notifications, messages, coachPlayers, videos, users } from "../shared/schema";
 import { eq, and, desc, or } from "drizzle-orm";
 import { User } from "../shared/schema";
+import { hasCoachAccess } from "./coachAccess";
 import { Resend } from "resend";
 import { getVideoUrl, isR2Key } from "./r2";
 
@@ -31,7 +32,7 @@ export function setupCoachingRoutes(app: Express) {
     try {
       const coach = req.user as User | undefined;
       if (!coach) return res.status(401).json({ message: "Not authenticated" });
-      if (coach.accountType !== "coach") return res.status(403).json({ message: "Coach account required" });
+      if (coach.accountType !== "coach" || !hasCoachAccess(coach)) return res.status(403).json({ message: "Coach subscription required" });
 
       // Verify relationship exists
       const [rel] = await db.select().from(coachPlayers).where(
@@ -59,7 +60,7 @@ export function setupCoachingRoutes(app: Express) {
     try {
       const coach = req.user as User | undefined;
       if (!coach) return res.status(401).json({ message: "Not authenticated" });
-      if (coach.accountType !== "coach") return res.status(403).json({ message: "Coach account required" });
+      if (coach.accountType !== "coach" || !hasCoachAccess(coach)) return res.status(403).json({ message: "Coach subscription required" });
 
       const { playerId, playerVideoId, proVideoId, notes, highlightStart, highlightEnd, voiceoverUrl } = req.body;
       if (!playerId) return res.status(400).json({ message: "playerId is required" });
