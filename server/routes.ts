@@ -306,6 +306,7 @@ export async function registerRoutes(
         city: u.city,
         state: u.state,
         profileComplete: u.profileComplete,
+        accountType: u.accountType ?? "player",
         uploadCount: userVideoMap.get(u.id)?.length ?? 0,
         videos: await Promise.all((userVideoMap.get(u.id) ?? []).map(async v => ({
           id: v.id,

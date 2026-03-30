@@ -510,8 +510,8 @@ export default function Admin() {
               <div className="col-span-2">Username</div>
               <div className="col-span-1">Tier</div>
               <div className="col-span-2">Status</div>
+              <div className="col-span-1">Type</div>
               <div className="col-span-1">Bats</div>
-              <div className="col-span-1">Throws</div>
               <div className="col-span-1">Age</div>
               <div className="col-span-1">City</div>
               <div className="col-span-1">State</div>
@@ -543,8 +543,16 @@ export default function Admin() {
                         {u.profileComplete ? "✓ Profile" : "✗ Profile"}
                       </span>
                     </div>
+                    <div className="col-span-1">
+                      <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded w-fit ${
+                        u.accountType === "coach" ? "bg-purple-500/10 text-purple-400" :
+                        u.accountType === "parent" ? "bg-yellow-500/10 text-yellow-400" :
+                        "bg-blue-500/10 text-blue-400"
+                      }`}>
+                        {u.accountType === "coach" ? "Coach" : u.accountType === "parent" ? "Parent" : "Player"}
+                      </span>
+                    </div>
                     <div className="col-span-1 text-xs text-muted-foreground">{u.bats || "—"}</div>
-                    <div className="col-span-1 text-xs text-muted-foreground">{u.throws || "—"}</div>
                     <div className="col-span-1 text-xs text-muted-foreground">{u.age || "—"}</div>
                     <div className="col-span-1 text-xs text-muted-foreground truncate">{u.city || "—"}</div>
                     <div className="col-span-1 text-xs text-muted-foreground">{u.state || "—"}</div>
