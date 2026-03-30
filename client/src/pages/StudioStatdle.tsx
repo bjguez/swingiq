@@ -118,7 +118,7 @@ function LetterSquare({ char, result, isCurrent }: { char: string; result?: Lett
 }
 
 function GuessRow({ letters, nameStructure, results, isCurrent }: {
-  letters: string; nameStructure: number[]; results?: LetterResult[]; isCurrent?: boolean;
+  letters: string; nameStructure: number[]; results?: (LetterResult | undefined)[]; isCurrent?: boolean;
 }) {
   return (
     <div className="flex items-center gap-1 justify-center">
@@ -250,7 +250,7 @@ function GamePanel({ date, onPlayAgain }: { date: string; onPlayAgain: () => voi
   const [submitting, setSubmitting] = useState(false);
   const [shake, setShake] = useState(false);
   const [hintsUsed, setHintsUsed] = useState(0);
-  const [hintedSlots, setHintedSlots] = useState<Record<number, string>>({});
+  const [hintReveals, setHintReveals] = useState<{ position: number; letter: string }[]>([]);
   const [copied, setCopied] = useState(false);
 
   const total = totalLetters(nameStructure);
@@ -263,7 +263,7 @@ function GamePanel({ date, onPlayAgain }: { date: string; onPlayAgain: () => voi
     setError(null);
     setRows([]); setCurrentLetters(""); setWon(false); setLost(false);
     setAnswer(null); setLetterStatuses({});
-    setHintsUsed(0); setHintedSlots({});
+    setHintsUsed(0); setHintReveals([]);
 
     const url = date.startsWith("random-")
       ? `${API_BASE}/random?seed=${date.replace("random-", "")}`
@@ -330,33 +330,12 @@ function GamePanel({ date, onPlayAgain }: { date: string; onPlayAgain: () => voi
     setTimeout(() => setCopied(false), 2000);
   }
 
-  // Build the merged current row: hinted letters at fixed positions, typed letters fill the rest.
-  // Uses " " as a placeholder for unfilled slots so the string stays total-length and
-  // toDisplayItems can correctly index into first vs last name positions.
-  function getMergedRow(typed: string, slots: Record<number, string>): string {
-    const arr = new Array(total).fill(" ");
-    for (const [pos, letter] of Object.entries(slots)) arr[parseInt(pos)] = letter;
-    let t = 0;
-    for (let i = 0; i < total; i++) {
-      if (arr[i] === " " && t < typed.length) arr[i] = typed[t++];
-    }
-    return arr.join("");
-  }
-
-  const hintedCount = Object.keys(hintedSlots).length;
-  const filledCount = currentLetters.length + hintedCount;
-
-  // Positions already solved: either correctly guessed in a submitted row or already hinted
-  function getKnownPositions(): Set<number> {
-    const known = new Set<number>(Object.keys(hintedSlots).map(Number));
+  // Positions already solved: correctly guessed in a submitted row or revealed by a hint
+  function nextUnknownPosition(): number {
+    const known = new Set<number>(hintReveals.map(h => h.position));
     for (const row of rows) {
       row.results.forEach((r, i) => { if (r === "correct") known.add(i); });
     }
-    return known;
-  }
-
-  function nextUnknownPosition(): number {
-    const known = getKnownPositions();
     for (let i = 0; i < total; i++) {
       if (!known.has(i)) return i;
     }
@@ -371,7 +350,7 @@ function GamePanel({ date, onPlayAgain }: { date: string; onPlayAgain: () => voi
       const res = await fetch(`${API_BASE}/hint?date=${encodeURIComponent(date)}&position=${pos}`);
       const data = await res.json();
       if (data.letter) {
-        setHintedSlots(prev => ({ ...prev, [pos]: data.letter.toLowerCase() }));
+        setHintReveals(prev => [...prev, { position: pos, letter: data.letter.toLowerCase() }]);
         setLetterStatuses(prev => ({ ...prev, [data.letter]: "correct" as LetterResult }));
         setHintsUsed(h => h + 1);
       }
@@ -387,19 +366,18 @@ function GamePanel({ date, onPlayAgain }: { date: string; onPlayAgain: () => voi
     }
 
     if (key === "ENTER") {
-      if (filledCount < total) {
+      if (currentLetters.length < total) {
         setShake(true); setTimeout(() => setShake(false), 400);
         return;
       }
-      const mergedGuess = getMergedRow(currentLetters, hintedSlots);
       setSubmitting(true);
       try {
         const res = await fetch(`${API_BASE}/guess`, {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ date, guessLetters: mergedGuess }),
+          body: JSON.stringify({ date, guessLetters: currentLetters }),
         });
         const data = await res.json();
-        const newRow: SubmittedRow = { letters: mergedGuess, results: data.letterResults };
+        const newRow: SubmittedRow = { letters: currentLetters, results: data.letterResults };
         const newRows = [...rows, newRow];
         const newWon = data.correct;
         const newLost = !data.correct && newRows.length >= MAX_GUESSES;
@@ -408,7 +386,7 @@ function GamePanel({ date, onPlayAgain }: { date: string; onPlayAgain: () => voi
         setCurrentLetters("");
         setLetterStatuses(prev => {
           const next = { ...prev };
-          mergedGuess.toUpperCase().split("").forEach((k, i) => {
+          currentLetters.toUpperCase().split("").forEach((k, i) => {
             if (!next[k] || data.letterResults[i] === "correct") next[k] = data.letterResults[i];
           });
           return next;
@@ -423,10 +401,10 @@ function GamePanel({ date, onPlayAgain }: { date: string; onPlayAgain: () => voi
       return;
     }
 
-    if (/^[A-Z]$/.test(key) && filledCount < total) {
+    if (/^[A-Z]$/.test(key) && currentLetters.length < total) {
       setCurrentLetters(p => p + key.toLowerCase());
     }
-  }, [gameOver, submitting, currentLetters, total, rows, date, hintedSlots, filledCount]);
+  }, [gameOver, submitting, currentLetters, total, rows, date]);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -462,6 +440,18 @@ function GamePanel({ date, onPlayAgain }: { date: string; onPlayAgain: () => voi
       {/* ── Right: grid + keyboard ───────────────────────────── */}
       <div className="flex flex-col gap-3 mt-4 lg:mt-0">
 
+        {/* Hint display row */}
+        {hintReveals.length > 0 && nameStructure.length > 0 && (
+          <div className="space-y-1">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-primary text-center">Hints</p>
+            <GuessRow
+              letters={Array.from({ length: total }, (_, i) => hintReveals.find(h => h.position === i)?.letter ?? " ").join("")}
+              nameStructure={nameStructure}
+              results={Array.from({ length: total }, (_, i) => hintReveals.some(h => h.position === i) ? "correct" as LetterResult : undefined)}
+            />
+          </div>
+        )}
+
         {/* Guess grid */}
         {nameStructure.length > 0 && (
           <div className="space-y-1.5">
@@ -470,7 +460,7 @@ function GamePanel({ date, onPlayAgain }: { date: string; onPlayAgain: () => voi
             ))}
             {!gameOver && (
               <motion.div animate={shake ? { x: [-5, 5, -5, 5, 0] } : {}} transition={{ duration: 0.3 }}>
-                <GuessRow letters={getMergedRow(currentLetters, hintedSlots)} nameStructure={nameStructure} isCurrent />
+                <GuessRow letters={currentLetters} nameStructure={nameStructure} isCurrent />
               </motion.div>
             )}
             {Array.from({ length: emptyRowCount }).map((_, i) => (
@@ -516,14 +506,19 @@ function GamePanel({ date, onPlayAgain }: { date: string; onPlayAgain: () => voi
           <>
             <OnscreenKeyboard onKey={handleKey} statuses={letterStatuses} />
             <div className="flex items-center justify-between gap-2">
-              <button
-                onClick={handleHint}
-                disabled={nextUnknownPosition() === -1}
-                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors py-1 disabled:opacity-30 disabled:cursor-not-allowed"
-              >
-                <Lightbulb size={13} />
-                {nextUnknownPosition() === -1 ? "No hints left" : hintsUsed === 0 ? "Hint" : `Hint (${hintsUsed} used)`}
-              </button>
+              {(() => {
+                const noMore = nextUnknownPosition() === -1;
+                return (
+                  <button
+                    onClick={handleHint}
+                    disabled={noMore}
+                    className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors py-1 disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    <Lightbulb size={13} />
+                    {noMore ? "No hints left" : hintsUsed === 0 ? "Hint" : `Hint (${hintsUsed} used)`}
+                  </button>
+                );
+              })()}
               <button
                 onClick={async () => {
                   await revealAnswer(date);
