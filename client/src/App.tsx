@@ -70,7 +70,7 @@ function Router() {
       <Route path="/about" component={AboutPage} />
       <Route path="/terms" component={TermsPage} />
       <Route path="/statdle" component={StudioStatdle} />
-      <Route path="/vision" component={VisionTraining} />
+      <Route path="/cognition" component={VisionTraining} />
       <Route path="/invite/accept" component={AcceptInvitePage} />
       <Route path="/pricing" component={PricingPage} />
       <Route path="/">
