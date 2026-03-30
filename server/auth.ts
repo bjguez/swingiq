@@ -12,7 +12,7 @@ import { insertUserSchema, emailVerifications } from "@shared/schema";
 import type { User } from "@shared/schema";
 import { sendVerificationEmail } from "./email";
 import { eq, and, gt } from "drizzle-orm";
-import { coachTrialDaysRemaining } from "./coachAccess";
+import { coachTrialDaysRemaining, ensureCoachTrialStarted } from "./coachAccess";
 
 const scryptAsync = promisify(scrypt);
 
@@ -170,7 +170,8 @@ export function setupAuth(app: Express) {
   passport.serializeUser((user, done) => done(null, user.id));
   passport.deserializeUser(async (id: string, done) => {
     try {
-      const user = await storage.getUser(id);
+      let user = await storage.getUser(id);
+      if (user) user = await ensureCoachTrialStarted(user);
       done(null, user ?? false);
     } catch (err) {
       done(err);
