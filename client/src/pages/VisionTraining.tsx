@@ -163,7 +163,7 @@ export default function VisionTraining() {
   const [correctCount, setCorrectCount] = useState(0);
   const [lastCorrect, setLastCorrect] = useState<boolean | null>(null);
 
-  const posRef = useRef<THREE.Vector3[]>([]);
+  const posRef = useRef<THREE.Vector3[]>(initRound(INITIAL_SPEED).positions);
   const velRef = useRef<THREE.Vector3[]>([]);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -237,6 +237,7 @@ export default function VisionTraining() {
   function handleRestart() {
     clearTimer();
     posRef.current = [];
+    posRef.current = initRound(INITIAL_SPEED).positions;
     velRef.current = [];
     setPhase("intro");
     setRound(0);
@@ -275,8 +276,6 @@ export default function VisionTraining() {
     ? (speedHistory.reduce((a, b) => a + b, 0) / speedHistory.length).toFixed(2)
     : null;
 
-  const showCanvas = phase !== "intro";
-
   return (
     <Layout>
       <div className="max-w-3xl mx-auto px-4 py-6 space-y-4">
@@ -298,18 +297,16 @@ export default function VisionTraining() {
 
         {/* Canvas */}
         <div className="relative rounded-xl overflow-hidden border border-border bg-[#0a0f1a]" style={{ height: 520 }}>
-          {showCanvas && (
-            <Canvas>
-              <PerspectiveCamera makeDefault position={[0, 1, 11]} fov={42} />
-              <Scene
-                phase={phase}
-                colors={colors}
-                posRef={posRef}
-                velRef={velRef}
-                onSphereClick={handleSphereClick}
-              />
-            </Canvas>
-          )}
+          <Canvas>
+            <PerspectiveCamera makeDefault position={[0, 1, 11]} fov={42} />
+            <Scene
+              phase={phase}
+              colors={colors}
+              posRef={posRef}
+              velRef={velRef}
+              onSphereClick={handleSphereClick}
+            />
+          </Canvas>
 
           {/* Phase overlays */}
           <AnimatePresence>
