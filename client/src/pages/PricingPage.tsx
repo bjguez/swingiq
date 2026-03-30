@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { usePageMeta } from "@/hooks/use-page-meta";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
@@ -95,6 +96,7 @@ const TIERS = [
 ];
 
 export default function PricingPage() {
+  usePageMeta({ title: "Pricing", description: "Start free and upgrade when you're ready. Unlock unlimited video, Biometrics, Development Blueprint, and Cognition training.", path: "/pricing" });
   const [interval, setInterval] = useState<Interval>("monthly");
   const [loading, setLoading] = useState<string | null>(null);
   const { user } = useAuth();

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { usePageMeta } from "@/hooks/use-page-meta";
 import { motion } from "framer-motion";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -541,6 +542,7 @@ function GamePanel({ date, onPlayAgain }: { date: string; onPlayAgain: () => voi
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function StudioStatdle() {
+  usePageMeta({ title: "StudioStatdle", description: "Guess today's mystery MLB player from career stats and clues. A new player every day — how many guesses does it take?", path: "/statdle" });
   const [gameDate, setGameDate] = useState(todayStr());
 
   function playAgain() {

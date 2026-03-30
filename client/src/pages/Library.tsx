@@ -1,4 +1,5 @@
 import Layout from "@/components/Layout";
+import { usePageMeta } from "@/hooks/use-page-meta";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { motion } from "framer-motion";
@@ -28,6 +29,7 @@ function LibraryThumb({ src }: { src: string }) {
 const categories = ["All", "Full Swing", "Game Swing"];
 
 export default function Library() {
+  usePageMeta({ title: "Pro Library", description: "Study the swings of elite MLB hitters. Frame-by-frame video breakdowns of the game's best.", path: "/library" });
   const [activeCategory, setActiveCategory] = useState("All");
   const [activeYear, setActiveYear] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");

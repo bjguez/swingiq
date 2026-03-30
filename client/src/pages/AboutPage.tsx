@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { usePageMeta } from "@/hooks/use-page-meta";
 import Layout from "@/components/Layout";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,7 @@ function Section({ eyebrow, headline, body }: { eyebrow: string; headline: strin
 }
 
 export default function AboutPage() {
+  usePageMeta({ title: "About", description: "Swing Studio is built for serious hitters who want to train smarter. Learn about our mission to bring pro-level swing analysis to every player.", path: "/about" });
   return (
     <Layout>
 

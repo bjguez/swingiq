@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { usePageMeta } from "@/hooks/use-page-meta";
 import { useLocation } from "wouter";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -176,6 +177,7 @@ function ProfileGate({ missing, onOpenProfile }: { missing: string[]; onOpenProf
 }
 
 export default function Biometrics() {
+  usePageMeta({ title: "Biometrics", description: "Match your body measurements to MLB player comps. Find the pros built like you and model your swing after theirs.", path: "/biometrics" });
   const { user } = useAuth();
   const qc = useQueryClient();
   const isPaid = user?.isAdmin || user?.subscriptionTier === "player" || user?.subscriptionTier === "pro" || user?.subscriptionTier === "coach";

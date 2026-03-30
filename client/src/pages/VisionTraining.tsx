@@ -8,6 +8,7 @@ import { Eye, Trophy, RotateCcw, Play, Lock } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
+import { usePageMeta } from "@/hooks/use-page-meta";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -157,6 +158,7 @@ function Scene({
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function VisionTraining() {
+  usePageMeta({ title: "Cognition", description: "Train your visual attention and processing speed with 3D Multiple Object Tracking — the same cognitive drill used by elite athletes.", path: "/cognition" });
   const { user } = useAuth();
   const [, navigate] = useLocation();
   const isPro = user?.isAdmin || ["pro", "coach"].includes(user?.subscriptionTier ?? "");

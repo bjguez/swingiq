@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { usePageMeta } from "@/hooks/use-page-meta";
 import Layout from "@/components/Layout";
 import VideoComparison from "@/components/VideoComparison";
 import DataDashboard from "@/components/DataDashboard";
@@ -12,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import type { MlbPlayer } from "@shared/schema";
 
 export default function Home() {
+  usePageMeta({ title: "Swing Analysis", description: "Upload your swing and compare it side-by-side with MLB pros. Analyze mechanics, timing, and bat path to become an elite hitter.", path: "/" });
   const search = useSearch();
   const params = useMemo(() => new URLSearchParams(search), [search]);
   const proVideoId = useMemo(() => params.get("proVideoId"), [params]);

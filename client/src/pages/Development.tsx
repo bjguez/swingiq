@@ -1,4 +1,5 @@
 import Layout from "@/components/Layout";
+import { usePageMeta } from "@/hooks/use-page-meta";
 import { Button } from "@/components/ui/button";
 import { Loader2, Lock, MessageSquare, Video, Send, GraduationCap, CheckCircle2, PlayCircle, BookOpen, Star } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -150,6 +151,7 @@ const TYPE_COLORS: Record<string, string> = {
 
 // ── Main page ────────────────────────────────────────────────────────────────
 export default function Development() {
+  usePageMeta({ title: "Development Blueprint", description: "A structured, phase-by-phase hitting development program with drills, video breakdowns, and coach feedback.", path: "/development" });
   const { user } = useAuth();
   const isPaidAny = user?.isAdmin || ["player", "pro", "coach"].includes(user?.subscriptionTier ?? "");
   const [, navigate] = useLocation();
