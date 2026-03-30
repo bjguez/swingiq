@@ -242,7 +242,7 @@ export default function Layout({ children, showScoreTicker = false }: { children
       {/* Footer */}
       <footer className="border-t border-border bg-card/50 mt-auto">
         <div className="container mx-auto px-4 py-6">
-          <div className="flex flex-col md:flex-row gap-8">
+          <div className="flex flex-col md:flex-row md:justify-between gap-8">
             {/* Brand */}
             <div className="md:w-52 shrink-0">
               <div className="flex items-center gap-2 mb-2">
@@ -254,8 +254,8 @@ export default function Layout({ children, showScoreTicker = false }: { children
               </p>
             </div>
 
-            {/* Link sections — grid on the right */}
-            <div className="flex-1 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+            {/* Link sections — aligned to right half */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-x-8 gap-y-4">
               {footerLinks.map(({ section, links }) => (
                 <div key={section}>
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">{section}</p>
