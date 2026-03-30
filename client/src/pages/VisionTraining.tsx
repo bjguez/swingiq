@@ -279,7 +279,7 @@ export default function VisionTraining() {
 
   return (
     <Layout>
-      <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
+      <div className="max-w-3xl mx-auto px-4 py-6 space-y-4">
 
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -297,10 +297,10 @@ export default function VisionTraining() {
         </div>
 
         {/* Canvas */}
-        <div className="relative rounded-xl overflow-hidden border border-border bg-[#0a0f1a]" style={{ height: 380 }}>
+        <div className="relative rounded-xl overflow-hidden border border-border bg-[#0a0f1a]" style={{ height: 520 }}>
           {showCanvas && (
             <Canvas>
-              <PerspectiveCamera makeDefault position={[0, 1.5, 9]} fov={45} />
+              <PerspectiveCamera makeDefault position={[0, 1, 11]} fov={42} />
               <Scene
                 phase={phase}
                 colors={colors}

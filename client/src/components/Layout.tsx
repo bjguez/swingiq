@@ -242,9 +242,9 @@ export default function Layout({ children, showScoreTicker = false }: { children
       {/* Footer */}
       <footer className="border-t border-border bg-card/50 mt-auto">
         <div className="container mx-auto px-4 py-6">
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <div className="flex flex-col md:flex-row gap-8">
             {/* Brand */}
-            <div className="col-span-2 md:col-span-1">
+            <div className="md:w-52 shrink-0">
               <div className="flex items-center gap-2 mb-2">
                 <img src="/logo-option-b-square.svg" alt="Swing Studio" className="w-7 h-7 shrink-0" />
                 <span className="font-display font-bold text-xl tracking-tighter text-primary">Swing Studio</span>
@@ -254,23 +254,25 @@ export default function Layout({ children, showScoreTicker = false }: { children
               </p>
             </div>
 
-            {/* Link sections */}
-            {footerLinks.map(({ section, links }) => (
-              <div key={section}>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">{section}</p>
-                <ul className="space-y-0.5">
-                  {links.map(({ href, label }) => (
-                    <li key={href}>
-                      <Link href={href}>
-                        <span className="text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
-                          {label}
-                        </span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
+            {/* Link sections — grid on the right */}
+            <div className="flex-1 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+              {footerLinks.map(({ section, links }) => (
+                <div key={section}>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">{section}</p>
+                  <ul className="space-y-0.5">
+                    {links.map(({ href, label }) => (
+                      <li key={href}>
+                        <Link href={href}>
+                          <span className="text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
+                            {label}
+                          </span>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
           </div>
 
           <div className="border-t border-border mt-4 pt-4 flex flex-col sm:flex-row items-center justify-between gap-2">
