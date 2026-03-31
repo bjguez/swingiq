@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchVideos, fetchPlayers } from "@/lib/api";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { Link } from "wouter";
 import type { Video, MlbPlayer } from "@shared/schema";
 import {
@@ -227,11 +227,11 @@ export default function Admin() {
     },
   });
 
-  const playerBatsMap = new Map<string, string>(
+  const playerBatsMap = useMemo(() => new Map<string, string>(
     (players as MlbPlayer[]).map(p => [p.name.toLowerCase(), p.bats ?? ""])
-  );
+  ), [players]);
 
-  const filtered = allVideos.filter((v: Video) => {
+  const filtered = useMemo(() => allVideos.filter((v: Video) => {
     if (!v.isProVideo) return false;
     const matchCat = filterCategory === "All" || v.category === filterCategory;
     const matchSearch = !searchQuery ||
@@ -240,7 +240,7 @@ export default function Admin() {
     const matchBats = filterBats === "All" || !v.playerName ||
       playerBatsMap.get(v.playerName.toLowerCase()) === filterBats;
     return matchCat && matchSearch && matchBats;
-  });
+  }), [allVideos, filterCategory, searchQuery, filterBats, playerBatsMap]);
 
   const startEdit = (video: Video) => {
     setEditingId(video.id);
@@ -271,9 +271,9 @@ export default function Admin() {
     updateMutation.mutate({ id: editingId, data: payload as Partial<Video> });
   };
 
-  const proCount = allVideos.filter((v: Video) => v.isProVideo).length;
-  const uploadCount = allVideos.filter((v: Video) => !v.isProVideo).length;
-  const withFileCount = allVideos.filter((v: Video) => v.sourceUrl).length;
+  const proCount = useMemo(() => allVideos.filter((v: Video) => v.isProVideo).length, [allVideos]);
+  const uploadCount = useMemo(() => allVideos.filter((v: Video) => !v.isProVideo).length, [allVideos]);
+  const withFileCount = useMemo(() => allVideos.filter((v: Video) => v.sourceUrl).length, [allVideos]);
 
   return (
     <Layout>

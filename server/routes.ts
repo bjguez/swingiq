@@ -47,7 +47,11 @@ export async function registerRoutes(
 
   app.use("/uploads", express.static(uploadDir, {
     acceptRanges: true,
-    maxAge: "1d",
+    maxAge: "7d",
+    immutable: true,
+    setHeaders(res) {
+      res.setHeader("Cache-Control", "public, max-age=604800, immutable");
+    },
   }));
 
   // PostHog reverse proxy — bypasses ad blockers
@@ -294,7 +298,17 @@ export async function registerRoutes(
         list.push(v);
         userVideoMap.set(v.userId!, list);
       });
-      const result = await Promise.all(allUsers.map(async u => ({
+      // Collect all R2 keys across all user videos, resolve them in one batch
+      const userVideoEntries = allUsers.map(u => userVideoMap.get(u.id) ?? []);
+      const allUserVideos = userVideoEntries.flat();
+      const r2Keys = allUserVideos.map(v => (v.sourceUrl && isR2Key(v.sourceUrl) ? v.sourceUrl : null));
+      const resolvedUrls = await Promise.all(r2Keys.map(k => (k ? getVideoUrl(k) : Promise.resolve(null))));
+
+      // Build resolved URL map by video id
+      const urlById = new Map<string, string | null>();
+      allUserVideos.forEach((v, i) => urlById.set(v.id, resolvedUrls[i]));
+
+      const result = allUsers.map(u => ({
         id: u.id,
         username: u.username,
         email: u.email,
@@ -311,13 +325,13 @@ export async function registerRoutes(
         profileComplete: u.profileComplete,
         accountType: u.accountType ?? "player",
         uploadCount: userVideoMap.get(u.id)?.length ?? 0,
-        videos: await Promise.all((userVideoMap.get(u.id) ?? []).map(async v => ({
+        videos: (userVideoMap.get(u.id) ?? []).map(v => ({
           id: v.id,
           title: v.title,
-          sourceUrl: v.sourceUrl && isR2Key(v.sourceUrl) ? await getVideoUrl(v.sourceUrl) : v.sourceUrl,
+          sourceUrl: urlById.get(v.id) ?? v.sourceUrl,
           createdAt: v.createdAt,
-        }))),
-      })));
+        })),
+      }));
       res.json(result);
     } catch (err: any) {
       res.status(500).json({ message: err.message || "Failed to fetch users" });
@@ -354,9 +368,11 @@ export async function registerRoutes(
       return res.status(403).json({ message: "Forbidden" });
     }
     try {
+      const HEALTH_CHECK_LIMIT = 500;
       const allVideos = await storage.getAllVideos();
       const r2Videos = allVideos.filter(v => v.sourceUrl && isR2Key(v.sourceUrl));
-      const results = await Promise.all(r2Videos.map(async v => ({
+      const capped = r2Videos.slice(0, HEALTH_CHECK_LIMIT);
+      const results = await Promise.all(capped.map(async v => ({
         id: v.id,
         title: v.title,
         playerName: v.playerName,
@@ -366,6 +382,8 @@ export async function registerRoutes(
       })));
       res.json({
         total: results.length,
+        totalInDb: r2Videos.length,
+        capped: r2Videos.length > HEALTH_CHECK_LIMIT,
         missing: results.filter(r => !r.exists).length,
         ok: results.filter(r => r.exists).length,
         videos: results,

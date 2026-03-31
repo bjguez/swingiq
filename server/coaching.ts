@@ -44,12 +44,18 @@ export function setupCoachingRoutes(app: Express) {
         .where(and(eq(videos.userId, req.params.playerId), eq(videos.isProVideo, false)))
         .orderBy(desc(videos.createdAt));
 
-      // Resolve R2 keys to playable URLs
-      const resolved = await Promise.all(playerVideos.map(async v => ({
+      // Batch-resolve all R2 keys (source + thumbnail) in one pass
+      const sourceKeys = playerVideos.map(v => (v.sourceUrl && isR2Key(v.sourceUrl) ? v.sourceUrl : null));
+      const thumbKeys = playerVideos.map(v => (v.thumbnailUrl && isR2Key(v.thumbnailUrl) ? v.thumbnailUrl : null));
+      const [sourceUrls, thumbUrls] = await Promise.all([
+        Promise.all(sourceKeys.map(k => (k ? getVideoUrl(k) : Promise.resolve(null)))),
+        Promise.all(thumbKeys.map(k => (k ? getVideoUrl(k) : Promise.resolve(null)))),
+      ]);
+      const resolved = playerVideos.map((v, i) => ({
         ...v,
-        sourceUrl: v.sourceUrl && isR2Key(v.sourceUrl) ? await getVideoUrl(v.sourceUrl) : v.sourceUrl,
-        thumbnailUrl: v.thumbnailUrl && isR2Key(v.thumbnailUrl) ? await getVideoUrl(v.thumbnailUrl) : v.thumbnailUrl,
-      })));
+        sourceUrl: sourceUrls[i] ?? v.sourceUrl,
+        thumbnailUrl: thumbUrls[i] ?? v.thumbnailUrl,
+      }));
 
       res.json(resolved);
     } catch (err) { next(err); }
@@ -151,12 +157,10 @@ export function setupCoachingRoutes(app: Express) {
         .where(condition)
         .orderBy(desc(coachSessions.createdAt));
 
-      // Resolve voiceover R2 keys
-      const resolved = await Promise.all(rows.map(async row =>
-        row.voiceoverUrl && isR2Key(row.voiceoverUrl)
-          ? { ...row, voiceoverUrl: await getVideoUrl(row.voiceoverUrl) }
-          : row
-      ));
+      // Batch-resolve all voiceover R2 keys at once
+      const r2Keys = rows.map(r => (r.voiceoverUrl && isR2Key(r.voiceoverUrl) ? r.voiceoverUrl : null));
+      const resolvedUrls = await Promise.all(r2Keys.map(k => (k ? getVideoUrl(k) : Promise.resolve(null))));
+      const resolved = rows.map((row, i) => resolvedUrls[i] !== null ? { ...row, voiceoverUrl: resolvedUrls[i] } : row);
 
       res.json(resolved);
     } catch (err) { next(err); }
@@ -187,13 +191,10 @@ export function setupCoachingRoutes(app: Express) {
         .where(eq(coachSessions.playerId, player.id))
         .orderBy(desc(coachSessions.sharedAt));
 
-      // Resolve R2 keys to public URLs
-      const resolved = await Promise.all(rows.map(async row => {
-        if (row.voiceoverUrl && isR2Key(row.voiceoverUrl)) {
-          return { ...row, voiceoverUrl: await getVideoUrl(row.voiceoverUrl) };
-        }
-        return row;
-      }));
+      // Batch-resolve all voiceover R2 keys at once
+      const r2Keys = rows.map(r => (r.voiceoverUrl && isR2Key(r.voiceoverUrl) ? r.voiceoverUrl : null));
+      const resolvedUrls = await Promise.all(r2Keys.map(k => (k ? getVideoUrl(k) : Promise.resolve(null))));
+      const resolved = rows.map((row, i) => resolvedUrls[i] !== null ? { ...row, voiceoverUrl: resolvedUrls[i] } : row);
 
       res.json(resolved);
     } catch (err) { next(err); }
@@ -210,20 +211,19 @@ export function setupCoachingRoutes(app: Express) {
       if (session.coachId !== user.id && session.playerId !== user.id)
         return res.status(403).json({ message: "Access denied" });
 
-      // Resolve video URLs
-      let playerVideoUrl: string | null = null;
-      let proVideoUrl: string | null = null;
-      if (session.playerVideoId) {
-        const [pv] = await db.select().from(videos).where(eq(videos.id, session.playerVideoId));
-        if (pv?.sourceUrl) playerVideoUrl = isR2Key(pv.sourceUrl) ? await getVideoUrl(pv.sourceUrl) : pv.sourceUrl;
-      }
-      if (session.proVideoId) {
-        const [prv] = await db.select().from(videos).where(eq(videos.id, session.proVideoId));
-        if (prv?.sourceUrl) proVideoUrl = isR2Key(prv.sourceUrl) ? await getVideoUrl(prv.sourceUrl) : prv.sourceUrl;
-      }
-      const voiceoverUrl = session.voiceoverUrl && isR2Key(session.voiceoverUrl)
-        ? await getVideoUrl(session.voiceoverUrl)
-        : session.voiceoverUrl;
+      // Batch both video lookups and voiceover URL resolution in parallel
+      const [playerVideoRows, proVideoRows] = await Promise.all([
+        session.playerVideoId ? db.select().from(videos).where(eq(videos.id, session.playerVideoId)) : Promise.resolve([]),
+        session.proVideoId ? db.select().from(videos).where(eq(videos.id, session.proVideoId)) : Promise.resolve([]),
+      ]);
+      const pv = playerVideoRows[0];
+      const prv = proVideoRows[0];
+
+      const [playerVideoUrl, proVideoUrl, voiceoverUrl] = await Promise.all([
+        pv?.sourceUrl ? (isR2Key(pv.sourceUrl) ? getVideoUrl(pv.sourceUrl) : Promise.resolve(pv.sourceUrl)) : Promise.resolve(null),
+        prv?.sourceUrl ? (isR2Key(prv.sourceUrl) ? getVideoUrl(prv.sourceUrl) : Promise.resolve(prv.sourceUrl)) : Promise.resolve(null),
+        session.voiceoverUrl && isR2Key(session.voiceoverUrl) ? getVideoUrl(session.voiceoverUrl) : Promise.resolve(session.voiceoverUrl),
+      ]);
 
       res.json({ ...session, playerVideoUrl, proVideoUrl, voiceoverUrl });
     } catch (err) { next(err); }
@@ -302,7 +302,8 @@ export function setupCoachingRoutes(app: Express) {
       }).from(messages)
         .leftJoin(users, eq(messages.senderId, users.id))
         .where(eq(messages.coachPlayerId, req.params.coachPlayerId))
-        .orderBy(messages.createdAt);
+        .orderBy(messages.createdAt)
+        .limit(200);
 
       // Mark messages from the other person as read
       await db.update(messages).set({ read: true })

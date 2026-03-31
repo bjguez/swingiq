@@ -187,6 +187,7 @@ export default function Development() {
     },
     enabled: !!myRelationship && activeTab === "messages",
     refetchInterval: activeTab === "messages" ? 5000 : false,
+    staleTime: 3000,
   });
 
   const { data: blueprintContent = [] } = useQuery<BlueprintItem[]>({

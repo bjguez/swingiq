@@ -26,7 +26,7 @@ export interface IStorage {
   updatePlayer(id: string, data: Partial<Omit<MlbPlayer, "id">>): Promise<MlbPlayer | undefined>;
   deletePlayer(id: string): Promise<boolean>;
 
-  getAllVideos(): Promise<Video[]>;
+  getAllVideos(limit?: number): Promise<Video[]>;
   getProVideos(): Promise<Video[]>;
   getVideosByUser(userId: string): Promise<Video[]>;
   getVideosByCategory(category: string): Promise<Video[]>;
@@ -128,8 +128,9 @@ export class DatabaseStorage implements IStorage {
     return result.length > 0;
   }
 
-  async getAllVideos(): Promise<Video[]> {
-    return db.select().from(videos);
+  async getAllVideos(limit?: number): Promise<Video[]> {
+    const q = db.select().from(videos);
+    return limit ? q.limit(limit) : q;
   }
 
   async getProVideos(): Promise<Video[]> {

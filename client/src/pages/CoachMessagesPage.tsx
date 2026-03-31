@@ -37,6 +37,7 @@ export default function CoachMessagesPage() {
     },
     enabled: !!relationshipId,
     refetchInterval: 5000,
+    staleTime: 3000,
   });
 
   useEffect(() => {

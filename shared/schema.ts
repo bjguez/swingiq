@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, real, jsonb, boolean, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, real, jsonb, boolean, timestamp, uniqueIndex, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -43,7 +43,9 @@ export const emailVerifications = pgTable("email_verifications", {
   token: text("token").notNull().unique(),
   expiresAt: timestamp("expires_at").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (t) => ({
+  userIdIdx: index("email_verifications_user_id_idx").on(t.userId),
+}));
 
 export const mlbPlayers = pgTable("mlb_players", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -97,7 +99,11 @@ export const videos = pgTable("videos", {
   // Visibility
   showInLibrary: boolean("show_in_library").default(true),
   showInDevelopment: boolean("show_in_development").default(true),
-});
+}, (t) => ({
+  userIdIdx: index("videos_user_id_idx").on(t.userId),
+  playerIdIdx: index("videos_player_id_idx").on(t.playerId),
+  isProVideoIdx: index("videos_is_pro_video_idx").on(t.isProVideo),
+}));
 
 export const drills = pgTable("drills", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -115,7 +121,9 @@ export const coachTeams = pgTable("coach_teams", {
   coachId: varchar("coach_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (t) => ({
+  coachIdIdx: index("coach_teams_coach_id_idx").on(t.coachId),
+}));
 
 export const coachPlayers = pgTable("coach_players", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -126,7 +134,10 @@ export const coachPlayers = pgTable("coach_players", {
   inviteToken: text("invite_token").unique(), // token for accept link
   teamName: text("team_name"), // optional team grouping
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (t) => ({
+  coachIdIdx: index("coach_players_coach_id_idx").on(t.coachId),
+  playerIdIdx: index("coach_players_player_id_idx").on(t.playerId),
+}));
 
 export const sessions = pgTable("sessions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -136,7 +147,9 @@ export const sessions = pgTable("sessions", {
   proVideoId: varchar("pro_video_id").references(() => videos.id),
   annotations: jsonb("annotations"),
   notes: text("notes"),
-});
+}, (t) => ({
+  userIdIdx: index("sessions_user_id_idx").on(t.userId),
+}));
 
 // Coach sessions shared with players
 export const coachSessions = pgTable("coach_sessions", {
@@ -151,7 +164,10 @@ export const coachSessions = pgTable("coach_sessions", {
   highlightEnd: real("highlight_end"),
   sharedAt: timestamp("shared_at"),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (t) => ({
+  coachIdIdx: index("coach_sessions_coach_id_idx").on(t.coachId),
+  playerIdIdx: index("coach_sessions_player_id_idx").on(t.playerId),
+}));
 
 // In-app notifications
 export const notifications = pgTable("notifications", {
@@ -163,7 +179,9 @@ export const notifications = pgTable("notifications", {
   read: boolean("read").default(false).notNull(),
   metadata: jsonb("metadata"), // e.g. { sessionId, coachId }
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (t) => ({
+  userIdIdx: index("notifications_user_id_idx").on(t.userId),
+}));
 
 // Coach-player messages
 export const messages = pgTable("messages", {
@@ -173,7 +191,9 @@ export const messages = pgTable("messages", {
   content: text("content").notNull(),
   read: boolean("read").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (t) => ({
+  coachPlayerIdIdx: index("messages_coach_player_id_idx").on(t.coachPlayerId),
+}));
 
 // Player's saved MLB comps (auto-matched + manually added study players)
 export const userPlayerComps = pgTable("user_player_comps", {
@@ -204,7 +224,9 @@ export const playerPhaseFocus = pgTable("player_phase_focus", {
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   phase: text("phase").notNull(),
   startedAt: timestamp("started_at").defaultNow(),
-});
+}, (t) => ({
+  userIdIdx: index("player_phase_focus_user_id_idx").on(t.userId),
+}));
 
 export const athleteProfiles = pgTable("athlete_profiles", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -218,7 +240,9 @@ export const athleteProfiles = pgTable("athlete_profiles", {
   city: text("city"),
   state: text("state"),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (t) => ({
+  parentUserIdIdx: index("athlete_profiles_parent_user_id_idx").on(t.parentUserId),
+}));
 
 export const statlePlayers = pgTable("statdle_players", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -284,7 +308,9 @@ export const cognitionSessions = pgTable("cognition_sessions", {
   correctRounds: integer("correct_rounds").notNull(),
   totalRounds: integer("total_rounds").notNull(),
   speedHistory: jsonb("speed_history").$type<number[]>(),
-});
+}, (t) => ({
+  userIdIdx: index("cognition_sessions_user_id_idx").on(t.userId),
+}));
 
 export type CognitionSession = typeof cognitionSessions.$inferSelect;
 export type InsertCognitionSession = typeof cognitionSessions.$inferInsert;
