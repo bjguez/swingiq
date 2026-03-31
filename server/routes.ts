@@ -1000,10 +1000,10 @@ export async function registerRoutes(
   // ── Stripe ──────────────────────────────────────────────────────────────
 
   // Webhook — must use raw body, registered before express.json parses it
-  app.post("/api/stripe/webhook", express.raw({ type: "application/json" }), async (req, res) => {
+  app.post("/api/stripe/webhook", async (req, res) => {
     const sig = req.headers["stripe-signature"] as string;
     try {
-      await handleWebhook(req.body as Buffer, sig);
+      await handleWebhook((req as any).rawBody as Buffer, sig);
       res.json({ received: true });
     } catch (err: any) {
       console.error("Stripe webhook error:", err.message);
