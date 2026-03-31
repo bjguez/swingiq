@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, real, jsonb, boolean, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, real, jsonb, boolean, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -183,7 +183,9 @@ export const userPlayerComps = pgTable("user_player_comps", {
   compType: text("comp_type").notNull().default("auto"), // "auto" | "manual"
   rank: integer("rank"), // 1-3 for auto, null for manual
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (t) => ({
+  userPlayerUnique: uniqueIndex("user_player_comps_user_player_unique").on(t.userId, t.mlbPlayerId),
+}));
 
 export const blueprintContent = pgTable("blueprint_content", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
