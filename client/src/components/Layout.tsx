@@ -62,16 +62,18 @@ export default function Layout({ children, showScoreTicker = false }: { children
     ...(!isPaid && !isAdmin ? [{ href: "/pricing", icon: <Tag className="w-4 h-4 mr-2" />, label: "Pricing" }] : []),
   ];
 
+  const isPro = user && ["pro", "coach"].includes(user.subscriptionTier ?? "");
+
   const footerLinks = [
     { section: "Product", links: [
       { href: "/", label: "Analysis" },
       { href: "/library", label: "Pro Library" },
       { href: "/my-swings", label: "My Swings" },
-      { href: "/biometrics", label: "Biometrics" },
-      { href: "/development", label: "Development" },
+      { href: "/biometrics", label: "Biometrics", locked: !isPaid && !isAdmin },
+      { href: "/development", label: "Development", locked: !isPaid && !isAdmin },
     ]},
     { section: "Enhancements", links: [
-      { href: "/cognition", label: "Cognition" },
+      { href: "/cognition", label: "Cognition", locked: !isPro && !isAdmin },
     ]},
     { section: "Games", links: [
       { href: "/statdle", label: "StudioStatdle" },
@@ -260,11 +262,12 @@ export default function Layout({ children, showScoreTicker = false }: { children
                 <div key={section}>
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">{section}</p>
                   <ul className="space-y-0.5">
-                    {links.map(({ href, label }) => (
+                    {links.map(({ href, label, locked }) => (
                       <li key={href}>
                         <Link href={href}>
-                          <span className="text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
+                          <span className="text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer flex items-center gap-1">
                             {label}
+                            {locked && <Lock className="w-3 h-3 text-yellow-500 shrink-0" />}
                           </span>
                         </Link>
                       </li>
