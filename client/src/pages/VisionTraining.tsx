@@ -24,10 +24,9 @@ const SAFE_Z  = BOX_HALF_Z  - SPHERE_RADIUS;
 const HIGHLIGHT_SECS = 3;
 const TRACKING_SECS = 5;
 const TOTAL_ROUNDS = 10;
-const SPEED_UP   = 1.1;
-const SPEED_DOWN = 0.85;
+const SPEED_UP   = 1.1;  // +10% on correct
+const SPEED_DOWN = 0.85; // -15% on miss
 const INITIAL_SPEED = 2.0;
-const MIN_SPEED = INITIAL_SPEED; // floor: never drop below start speed
 
 type Phase = "intro" | "highlight" | "tracking" | "selection" | "result" | "complete";
 
@@ -190,6 +189,7 @@ export default function VisionTraining() {
   const [phase, setPhase] = useState<Phase>("intro");
   const [round, setRound] = useState(0);
   const [speed, setSpeed] = useState(INITIAL_SPEED);
+  const [sessionFloor, setSessionFloor] = useState(INITIAL_SPEED); // floor = user's chosen start speed
   const [targets, setTargets] = useState<number[]>([]);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [timeLeft, setTimeLeft] = useState(0);
@@ -269,7 +269,7 @@ export default function VisionTraining() {
     const t = setTimeout(() => {
       const correct = selectedIds.every(id => targets.includes(id));
       const rawNext = correct ? speed * SPEED_UP : speed * SPEED_DOWN;
-      const newSpeed = Math.max(MIN_SPEED, rawNext);
+      const newSpeed = Math.max(sessionFloor, rawNext);
       setLastCorrect(correct);
       if (correct) setCorrectCount(c => c + 1);
       setSpeed(newSpeed);
@@ -280,12 +280,13 @@ export default function VisionTraining() {
   }, [selectedIds, phase, targets, speed]);
 
   function handleStart() {
+    const chosenSpeed = speed;
     setRound(1);
-    setSpeed(INITIAL_SPEED);
+    setSessionFloor(chosenSpeed);
     setSpeedHistory([]);
     setCorrectCount(0);
     setShareText(null);
-    startRound(INITIAL_SPEED);
+    startRound(chosenSpeed);
   }
 
   function handleNext() {
@@ -322,6 +323,7 @@ export default function VisionTraining() {
     setPhase("intro");
     setRound(0);
     setSpeed(INITIAL_SPEED);
+    setSessionFloor(INITIAL_SPEED);
     setTargets([]);
     setSelectedIds([]);
     setSpeedHistory([]);
@@ -509,10 +511,13 @@ export default function VisionTraining() {
               <motion.div
                 key="tracking"
                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                className="absolute top-3 inset-x-0 flex justify-center pointer-events-none"
+                className="absolute top-3 inset-x-0 flex justify-center gap-2 pointer-events-none"
               >
                 <div className="bg-primary/90 text-primary-foreground text-xs font-bold px-4 py-2 rounded-full shadow">
                   Track them… {timeLeft.toFixed(1)}s
+                </div>
+                <div className="bg-black/60 text-white/80 text-xs font-mono px-3 py-2 rounded-full shadow">
+                  {speed.toFixed(1)} u/s
                 </div>
               </motion.div>
             )}
@@ -522,10 +527,13 @@ export default function VisionTraining() {
               <motion.div
                 key="selection"
                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                className="absolute top-3 inset-x-0 flex justify-center pointer-events-none"
+                className="absolute top-3 inset-x-0 flex justify-center gap-2 pointer-events-none"
               >
                 <div className="bg-purple-500/90 text-white text-xs font-bold px-4 py-2 rounded-full shadow">
                   Tap your 4 spheres ({selectedIds.length}/{NUM_TARGETS} selected)
+                </div>
+                <div className="bg-black/60 text-white/80 text-xs font-mono px-3 py-2 rounded-full shadow">
+                  {speed.toFixed(1)} u/s
                 </div>
               </motion.div>
             )}
