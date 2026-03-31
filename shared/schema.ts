@@ -272,3 +272,17 @@ export type InsertBlueprintContent = typeof blueprintContent.$inferInsert;
 export type PlayerPhaseFocus = typeof playerPhaseFocus.$inferSelect;
 export type AthleteProfile = typeof athleteProfiles.$inferSelect;
 export type InsertAthleteProfile = typeof athleteProfiles.$inferInsert;
+
+export const cognitionSessions = pgTable("cognition_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }),
+  completedAt: timestamp("completed_at").defaultNow(),
+  threshold: real("threshold").notNull(),
+  accuracy: real("accuracy").notNull(),
+  correctRounds: integer("correct_rounds").notNull(),
+  totalRounds: integer("total_rounds").notNull(),
+  speedHistory: jsonb("speed_history").$type<number[]>(),
+});
+
+export type CognitionSession = typeof cognitionSessions.$inferSelect;
+export type InsertCognitionSession = typeof cognitionSessions.$inferInsert;

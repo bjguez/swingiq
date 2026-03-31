@@ -4,27 +4,30 @@ import { PerspectiveCamera } from "@react-three/drei";
 import * as THREE from "three";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
-import { Eye, Trophy, RotateCcw, Play, Lock } from "lucide-react";
+import { Eye, Trophy, RotateCcw, Play, Lock, Share2, Minus, Plus } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
 import { usePageMeta } from "@/hooks/use-page-meta";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import type { CognitionSession } from "@shared/schema";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const NUM_SPHERES = 8;
 const NUM_TARGETS = 4;
 const SPHERE_RADIUS = 0.25;
-const BOX_HALF_XY = 2.8;   // width / height
-const BOX_HALF_Z  = 1.2;   // depth — shallower so balls stay visible
+const BOX_HALF_XY = 2.8;
+const BOX_HALF_Z  = 1.2;
 const SAFE_XY = BOX_HALF_XY - SPHERE_RADIUS;
 const SAFE_Z  = BOX_HALF_Z  - SPHERE_RADIUS;
 const HIGHLIGHT_SECS = 3;
 const TRACKING_SECS = 5;
 const TOTAL_ROUNDS = 10;
-const SPEED_UP = 1.1;    // +10% on correct
-const SPEED_DOWN = 0.7;  // −30% on wrong
+const SPEED_UP   = 1.1;
+const SPEED_DOWN = 0.85;
 const INITIAL_SPEED = 2.0;
+const MIN_SPEED = INITIAL_SPEED; // floor: never drop below start speed
 
 type Phase = "intro" | "highlight" | "tracking" | "selection" | "result" | "complete";
 
@@ -82,10 +85,8 @@ function Scene({
       const dt = Math.min(delta, 0.05);
       const MIN_DIST = SPHERE_RADIUS * 2;
 
-      // Move
       for (let i = 0; i < NUM_SPHERES; i++) pos[i].addScaledVector(vel[i], dt);
 
-      // Wall bounces
       for (let i = 0; i < NUM_SPHERES; i++) {
         const p = pos[i]; const v = vel[i];
         if (p.x >  SAFE_XY) { p.x =  SAFE_XY; v.x = -Math.abs(v.x); }
@@ -96,7 +97,6 @@ function Scene({
         if (p.z < -SAFE_Z)  { p.z = -SAFE_Z;  v.z =  Math.abs(v.z); }
       }
 
-      // Sphere–sphere elastic collision
       for (let i = 0; i < NUM_SPHERES; i++) {
         for (let j = i + 1; j < NUM_SPHERES; j++) {
           tempN.current.subVectors(pos[j], pos[i]);
@@ -117,7 +117,6 @@ function Scene({
       }
     }
 
-    // Always sync mesh positions
     for (let i = 0; i < NUM_SPHERES; i++) {
       if (meshRefs.current[i] && pos[i]) meshRefs.current[i]!.position.copy(pos[i]);
     }
@@ -129,7 +128,6 @@ function Scene({
       <directionalLight position={[5, 8, 5]} intensity={1.2} />
       <pointLight position={[-4, -4, 4]} intensity={0.4} color="#6366f1" />
 
-      {/* Bounding box wireframe */}
       <lineSegments>
         <edgesGeometry args={[new THREE.BoxGeometry(BOX_HALF_XY * 2, BOX_HALF_XY * 2, BOX_HALF_Z * 2)]} />
         <lineBasicMaterial color="#334155" transparent opacity={0.5} />
@@ -155,13 +153,39 @@ function Scene({
   );
 }
 
+// ── History sparkline ─────────────────────────────────────────────────────────
+
+function Sparkline({ history }: { history: number[] }) {
+  if (!history.length) return null;
+  const maxS = Math.max(...history, 0.001);
+  return (
+    <div className="flex items-end gap-0.5 h-10">
+      {history.map((s, i) => {
+        const h = Math.round((s / maxS) * 36) + 4;
+        return (
+          <div
+            key={i}
+            className="flex-1 rounded-sm bg-primary/50"
+            style={{ height: h }}
+            title={`Round ${i + 1}: ${s.toFixed(2)}`}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function VisionTraining() {
   usePageMeta({ title: "Cognition", description: "Train your visual attention and processing speed with 3D Multiple Object Tracking — the same cognitive drill used by elite athletes.", path: "/cognition" });
   const { user } = useAuth();
   const [, navigate] = useLocation();
+  const queryClient = useQueryClient();
   const isPro = user?.isAdmin || ["pro", "coach"].includes(user?.subscriptionTier ?? "");
+
+  // Scroll to top on mount
+  useEffect(() => { window.scrollTo(0, 0); }, []);
 
   const [phase, setPhase] = useState<Phase>("intro");
   const [round, setRound] = useState(0);
@@ -172,10 +196,40 @@ export default function VisionTraining() {
   const [speedHistory, setSpeedHistory] = useState<number[]>([]);
   const [correctCount, setCorrectCount] = useState(0);
   const [lastCorrect, setLastCorrect] = useState<boolean | null>(null);
+  const [shareText, setShareText] = useState<string | null>(null);
 
   const posRef = useRef<THREE.Vector3[]>(initRound(INITIAL_SPEED).positions);
   const velRef = useRef<THREE.Vector3[]>([]);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Session history
+  const { data: pastSessions } = useQuery<CognitionSession[]>({
+    queryKey: ["/api/cognition/sessions"],
+    queryFn: async () => {
+      const res = await fetch("/api/cognition/sessions");
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!user && isPro,
+  });
+
+  const saveSession = useMutation({
+    mutationFn: async (payload: {
+      threshold: number; accuracy: number;
+      correctRounds: number; totalRounds: number; speedHistory: number[];
+    }) => {
+      const res = await fetch("/api/cognition/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error("Failed to save session");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/cognition/sessions"] });
+    },
+  });
 
   function clearTimer() {
     if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
@@ -201,7 +255,6 @@ export default function VisionTraining() {
     }, HIGHLIGHT_SECS * 1000);
   }
 
-  // Countdown during highlight + tracking
   useEffect(() => {
     if (phase !== "highlight" && phase !== "tracking") return;
     const interval = setInterval(() => {
@@ -215,7 +268,8 @@ export default function VisionTraining() {
     if (phase !== "selection" || selectedIds.length !== NUM_TARGETS) return;
     const t = setTimeout(() => {
       const correct = selectedIds.every(id => targets.includes(id));
-      const newSpeed = correct ? speed * SPEED_UP : speed * SPEED_DOWN;
+      const rawNext = correct ? speed * SPEED_UP : speed * SPEED_DOWN;
+      const newSpeed = Math.max(MIN_SPEED, rawNext);
       setLastCorrect(correct);
       if (correct) setCorrectCount(c => c + 1);
       setSpeed(newSpeed);
@@ -230,12 +284,29 @@ export default function VisionTraining() {
     setSpeed(INITIAL_SPEED);
     setSpeedHistory([]);
     setCorrectCount(0);
+    setShareText(null);
     startRound(INITIAL_SPEED);
   }
 
   function handleNext() {
     clearTimer();
     if (round >= TOTAL_ROUNDS) {
+      // compute final stats and save
+      const finalHistory = [...speedHistory, speed];
+      const finalCorrect = correctCount;
+      const threshold = parseFloat(
+        (finalHistory.reduce((a, b) => a + b, 0) / finalHistory.length).toFixed(2)
+      );
+      const accuracy = Math.round((finalCorrect / TOTAL_ROUNDS) * 100);
+      if (user) {
+        saveSession.mutate({
+          threshold,
+          accuracy,
+          correctRounds: finalCorrect,
+          totalRounds: TOTAL_ROUNDS,
+          speedHistory: finalHistory,
+        });
+      }
       setPhase("complete");
     } else {
       const nextRound = round + 1;
@@ -246,7 +317,6 @@ export default function VisionTraining() {
 
   function handleRestart() {
     clearTimer();
-    posRef.current = [];
     posRef.current = initRound(INITIAL_SPEED).positions;
     velRef.current = [];
     setPhase("intro");
@@ -257,6 +327,7 @@ export default function VisionTraining() {
     setSpeedHistory([]);
     setCorrectCount(0);
     setLastCorrect(null);
+    setShareText(null);
   }
 
   function handleSphereClick(id: number) {
@@ -270,21 +341,37 @@ export default function VisionTraining() {
 
   useEffect(() => () => clearTimer(), []);
 
-  // Compute sphere colors
+  const finalHistory = phase === "complete" ? [...speedHistory, speed] : speedHistory;
+  const threshold = finalHistory.length > 0
+    ? (finalHistory.reduce((a, b) => a + b, 0) / finalHistory.length).toFixed(2)
+    : null;
+  const accuracyPct = Math.round((correctCount / TOTAL_ROUNDS) * 100);
+
+  async function handleShare() {
+    const text = `🧠 Swing Studio Cognition\nThreshold speed: ${threshold} u/s\nAccuracy: ${accuracyPct}%\nRounds: ${correctCount}/${TOTAL_ROUNDS}\n\nTrain your 3D object tracking at swingstudio.ai/cognition`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "Swing Studio Cognition", text });
+      } else {
+        await navigator.clipboard.writeText(text);
+        setShareText("Copied to clipboard!");
+        setTimeout(() => setShareText(null), 3000);
+      }
+    } catch {
+      // user cancelled share
+    }
+  }
+
   const colors = Array.from({ length: NUM_SPHERES }, (_, i) => {
     if (phase === "result") {
-      if (targets.includes(i)) return "#22c55e";       // green = target
-      if (selectedIds.includes(i)) return "#ef4444";  // red = wrong pick
+      if (targets.includes(i)) return "#22c55e";
+      if (selectedIds.includes(i)) return "#ef4444";
       return "#3b82f6";
     }
     if (phase === "highlight") return targets.includes(i) ? "#f97316" : "#3b82f6";
     if (phase === "selection") return selectedIds.includes(i) ? "#a855f7" : "#3b82f6";
     return "#3b82f6";
   });
-
-  const threshold = speedHistory.length > 0
-    ? (speedHistory.reduce((a, b) => a + b, 0) / speedHistory.length).toFixed(2)
-    : null;
 
   if (!isPro) {
     return (
@@ -347,7 +434,6 @@ export default function VisionTraining() {
             />
           </Canvas>
 
-          {/* Phase overlays */}
           <AnimatePresence>
 
             {/* Intro */}
@@ -378,6 +464,25 @@ export default function VisionTraining() {
                   <div className="bg-card rounded-lg p-3 border border-border">
                     <div className="text-base font-bold text-foreground">~{Math.round((HIGHLIGHT_SECS + TRACKING_SECS) * TOTAL_ROUNDS / 60)}m</div>
                     <div>total</div>
+                  </div>
+                </div>
+                {/* Manual speed controls */}
+                <div className="flex items-center gap-3 text-sm">
+                  <span className="text-muted-foreground">Starting speed</span>
+                  <div className="flex items-center gap-2 bg-card border border-border rounded-lg px-3 py-1.5">
+                    <button
+                      onClick={() => setSpeed(s => Math.max(1.0, parseFloat((s - 0.5).toFixed(1))))}
+                      className="text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <Minus size={14} />
+                    </button>
+                    <span className="font-mono font-bold w-10 text-center">{speed.toFixed(1)}</span>
+                    <button
+                      onClick={() => setSpeed(s => Math.min(6.0, parseFloat((s + 0.5).toFixed(1))))}
+                      className="text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <Plus size={14} />
+                    </button>
                   </div>
                 </div>
                 <Button onClick={handleStart} size="lg" className="gap-2">
@@ -455,9 +560,9 @@ export default function VisionTraining() {
               <motion.div
                 key="complete"
                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                className="absolute inset-0 flex flex-col items-center justify-center gap-5 p-6 text-center bg-background/90"
+                className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-6 text-center bg-background/90 overflow-y-auto"
               >
-                <Trophy size={36} className="text-yellow-400" />
+                <Trophy size={36} className="text-yellow-400 shrink-0" />
                 <div>
                   <h2 className="text-xl font-bold">Session Complete</h2>
                   <p className="text-sm text-muted-foreground mt-1">Here's how you did</p>
@@ -472,45 +577,60 @@ export default function VisionTraining() {
                     <div className="text-2xl font-bold text-primary">{correctCount}/{TOTAL_ROUNDS}</div>
                     <div className="text-xs text-muted-foreground">Rounds correct</div>
                     <div className="text-[10px] text-muted-foreground">
-                      {Math.round((correctCount / TOTAL_ROUNDS) * 100)}% accuracy
+                      {accuracyPct}% accuracy
                     </div>
                   </div>
                 </div>
 
-                {/* Speed history sparkline (text-based) */}
+                {/* Speed history sparkline */}
                 <div className="w-full max-w-xs">
                   <p className="text-xs text-muted-foreground mb-1 text-left">Speed per round</p>
-                  <div className="flex items-end gap-1 h-12">
-                    {speedHistory.map((s, i) => {
-                      const maxS = Math.max(...speedHistory);
-                      const h = Math.round((s / maxS) * 40) + 4;
-                      return (
-                        <div
-                          key={i}
-                          className="flex-1 rounded-sm bg-primary/60"
-                          style={{ height: h }}
-                          title={`Round ${i + 1}: ${s.toFixed(2)}`}
-                        />
-                      );
-                    })}
-                  </div>
+                  <Sparkline history={finalHistory} />
                 </div>
 
-                <Button onClick={handleRestart} variant="outline" className="gap-2">
-                  <RotateCcw size={14} /> Play Again
-                </Button>
+                <div className="flex gap-2">
+                  <Button onClick={handleRestart} variant="outline" className="gap-2">
+                    <RotateCcw size={14} /> Play Again
+                  </Button>
+                  <Button onClick={handleShare} variant="outline" className="gap-2">
+                    <Share2 size={14} /> {shareText ?? "Share"}
+                  </Button>
+                </div>
               </motion.div>
             )}
 
           </AnimatePresence>
         </div>
 
-        {/* Instructions (below canvas, visible before game starts or always) */}
+        {/* Instructions */}
         {(phase === "intro" || phase === "complete") && (
           <div className="rounded-xl border border-border bg-card p-4 space-y-2 text-sm text-muted-foreground">
             <p className="font-semibold text-foreground text-xs uppercase tracking-widest">How it works</p>
             <p>Multi-object tracking (MOT) is a core visual-cognitive skill, representing your brain's ability to simultaneously tag and follow multiple moving targets in 3D space. Research shows it directly underlies the kind of attention, working memory, and processing speed that separate elite hitters from average ones.</p>
             <p>The adaptive difficulty automatically adjusts speed: faster when you're correct, slower when you miss. Your <span className="text-foreground font-medium">threshold speed</span> is the average across all rounds, a measurable benchmark you can track over time.</p>
+          </div>
+        )}
+
+        {/* Past sessions history */}
+        {pastSessions && pastSessions.length > 0 && phase === "intro" && (
+          <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+            <p className="font-semibold text-foreground text-xs uppercase tracking-widest">Your History</p>
+            <div className="space-y-2">
+              {pastSessions.slice(0, 5).map((s) => (
+                <div key={s.id} className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-3">
+                    <Sparkline history={(s.speedHistory as number[]) ?? []} />
+                    <div>
+                      <span className="font-medium text-foreground">{Number(s.threshold).toFixed(2)} u/s</span>
+                      <span className="text-muted-foreground ml-1.5">{s.correctRounds}/{s.totalRounds} correct</span>
+                    </div>
+                  </div>
+                  <span className="text-xs text-muted-foreground">
+                    {s.completedAt ? new Date(s.completedAt).toLocaleDateString() : ""}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 

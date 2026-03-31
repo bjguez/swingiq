@@ -3,7 +3,9 @@ import { hasCoachAccess } from "./coachAccess";
 import { createProxyMiddleware } from "http-proxy-middleware";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertMlbPlayerSchema, insertVideoSchema, insertDrillSchema, insertSessionSchema } from "@shared/schema";
+import { insertMlbPlayerSchema, insertVideoSchema, insertDrillSchema, insertSessionSchema, cognitionSessions, videos } from "@shared/schema";
+import { db } from "./db";
+import { eq, desc } from "drizzle-orm";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -1037,6 +1039,45 @@ export async function registerRoutes(
     try {
       const url = await createPortalSession((req.user as any).id);
       res.json({ url });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── Cognition sessions ────────────────────────────────────────────────────────
+  app.post("/api/cognition/sessions", async (req, res) => {
+    if (!req.user) return res.status(401).json({ message: "Not authenticated" });
+    try {
+      const { threshold, accuracy, correctRounds, totalRounds, speedHistory } = req.body;
+      if (threshold == null || accuracy == null || correctRounds == null || totalRounds == null) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+      const userId = (req.user as any).id as string;
+      const [session] = await db.insert(cognitionSessions).values({
+        userId,
+        threshold: parseFloat(threshold),
+        accuracy: parseFloat(accuracy),
+        correctRounds: parseInt(correctRounds),
+        totalRounds: parseInt(totalRounds),
+        speedHistory: speedHistory ?? [],
+      }).returning();
+      res.status(201).json(session);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.get("/api/cognition/sessions", async (req, res) => {
+    if (!req.user) return res.status(401).json({ message: "Not authenticated" });
+    try {
+      const userId = (req.user as any).id as string;
+      const sessions = await db
+        .select()
+        .from(cognitionSessions)
+        .where(eq(cognitionSessions.userId, userId))
+        .orderBy(desc(cognitionSessions.completedAt))
+        .limit(20);
+      res.json(sessions);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
