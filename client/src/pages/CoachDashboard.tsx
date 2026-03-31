@@ -401,7 +401,7 @@ export default function CoachDashboard() {
   const isLoading = teamsLoading || playersLoading;
 
   const daysRemaining = (user as any)?.coachTrialDaysRemaining ?? 0;
-  const isOnTrial = user?.subscriptionTier !== "coach" && (user as any)?.coachTrialStartedAt;
+  const isOnTrial = !user?.isAdmin && user?.subscriptionTier !== "coach" && (user as any)?.coachTrialStartedAt;
   const trialExpired = isOnTrial && daysRemaining === 0;
 
   if (trialExpired) {
