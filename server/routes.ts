@@ -207,7 +207,7 @@ export async function registerRoutes(
         // Legacy local file or external URL — return as-is
         return res.json({ url: video.sourceUrl });
       }
-      const url = await getPresignedUrl(key);
+      const url = await getVideoUrl(key);
       res.json({ url });
     } catch (err: any) {
       console.error("Presigned URL error:", err);
