@@ -26,6 +26,7 @@ import AboutPage from "@/pages/AboutPage";
 import TermsPage from "@/pages/TermsPage";
 import StudioStatdle from "@/pages/StudioStatdle";
 import VisionTraining from "@/pages/VisionTraining";
+import Dashboard from "@/pages/Dashboard";
 import { useAuth } from "@/hooks/use-auth";
 import { AthleteProvider } from "@/hooks/use-athletes";
 
@@ -87,6 +88,9 @@ function Router() {
       </Route>
       <Route path="/my-swings">
         <ProtectedRoute component={MySwings} />
+      </Route>
+      <Route path="/dashboard">
+        <ProtectedRoute component={Dashboard} />
       </Route>
       <Route path="/coach">
         <ProtectedRoute component={CoachDashboard} />
