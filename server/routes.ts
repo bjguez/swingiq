@@ -5,7 +5,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertMlbPlayerSchema, insertVideoSchema, insertDrillSchema, insertSessionSchema, cognitionSessions, videos } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, sql as sqlFn } from "drizzle-orm";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -145,13 +145,31 @@ export async function registerRoutes(
 
       const key = await uploadToR2(uploadBuffer, uploadName, "video/mp4");
       const presignedUrl = await getVideoUrl(key);
-      const title = (req.body.title || req.file.originalname).replace(/\.[^.]+$/, "");
       const userId = (req.user as any)?.id ?? null;
+      const username = (req.user as any)?.username ?? null;
 
       // Admin uploads (skipRecord=1) only store the file — the admin form creates the proper record.
       // Regular user uploads create a non-pro video record immediately.
       if (req.body.skipRecord === "1") {
         return res.status(201).json({ sourceUrl: key, presignedUrl });
+      }
+
+      // Auto-generate title: username_YYYY-MM-DD[_N] when no explicit title is sent
+      let title: string;
+      if (req.body.title) {
+        title = req.body.title.replace(/\.[^.]+$/, "");
+      } else if (userId && username) {
+        const today = new Date();
+        const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+        const base = `${username}_${dateStr}`;
+        // Count uploads by this user today to determine sequence suffix
+        const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        const [{ count }] = await db.select({ count: sqlFn<number>`count(*)::int` })
+          .from(videos)
+          .where(sqlFn`${videos.userId} = ${userId} AND ${videos.createdAt} >= ${todayStart} AND ${videos.isProVideo} = false`);
+        title = count > 0 ? `${base}_${count + 1}` : base;
+      } else {
+        title = req.file.originalname.replace(/\.[^.]+$/, "");
       }
 
       const allowedUserCategories = ["Full Swing", "Game Swing", "Gather", "Launch", "Swing"];
