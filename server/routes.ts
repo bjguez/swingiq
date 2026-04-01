@@ -398,12 +398,15 @@ export async function registerRoutes(
         key: v.sourceUrl!,
         exists: await checkR2Exists(v.sourceUrl!),
       })));
+      const publicUrl = process.env.R2_PUBLIC_URL;
       res.json({
         total: results.length,
         totalInDb: r2Videos.length,
         capped: r2Videos.length > HEALTH_CHECK_LIMIT,
         missing: results.filter(r => !r.exists).length,
         ok: results.filter(r => r.exists).length,
+        r2PublicUrl: publicUrl ? `${publicUrl.slice(0, 12)}…` : "(not set)",
+        urlMode: publicUrl ? "cdn" : "presigned",
         videos: results,
       });
     } catch (err: any) {
