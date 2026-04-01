@@ -63,6 +63,12 @@ export default function Admin() {
   const [playingVideo, setPlayingVideo] = useState<{ title: string; url: string } | null>(null);
   const [tierDraft, setTierDraft] = useState<Record<string, string>>({});
 
+  // User tab filters
+  const [userSearch, setUserSearch] = useState("");
+  const [userTypeTab, setUserTypeTab] = useState<"all" | "players" | "coaches">("all");
+  const [userPage, setUserPage] = useState(0);
+  const USER_PAGE_SIZE = 50;
+
   // Video state
   const [filterCategory, setFilterCategory] = useState("All");
   const [filterBats, setFilterBats] = useState("All");
@@ -270,6 +276,28 @@ export default function Admin() {
     };
     updateMutation.mutate({ id: editingId, data: payload as Partial<Video> });
   };
+
+  const filteredUsers = useMemo(() => {
+    let list = adminUsers as any[];
+    if (userTypeTab === "players") list = list.filter(u => u.accountType !== "coach");
+    if (userTypeTab === "coaches") list = list.filter(u => u.accountType === "coach");
+    if (userSearch.trim()) {
+      const q = userSearch.toLowerCase();
+      list = list.filter(u =>
+        u.username?.toLowerCase().includes(q) ||
+        u.email?.toLowerCase().includes(q) ||
+        u.city?.toLowerCase().includes(q) ||
+        u.state?.toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [adminUsers, userTypeTab, userSearch]);
+
+  const userPageCount = Math.max(1, Math.ceil(filteredUsers.length / USER_PAGE_SIZE));
+  const pagedUsers = useMemo(
+    () => filteredUsers.slice(userPage * USER_PAGE_SIZE, (userPage + 1) * USER_PAGE_SIZE),
+    [filteredUsers, userPage]
+  );
 
   const proCount = useMemo(() => allVideos.filter((v: Video) => v.isProVideo).length, [allVideos]);
   const uploadCount = useMemo(() => allVideos.filter((v: Video) => !v.isProVideo).length, [allVideos]);
@@ -499,11 +527,44 @@ export default function Admin() {
       {activeTab === "users" && (
         <>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <StatCard label="Total Users" value={adminUsers.length} />
-            <StatCard label="Paid" value={adminUsers.filter((u: any) => u.subscriptionTier === "player" || u.subscriptionTier === "pro").length} />
-            <StatCard label="Unverified Email" value={adminUsers.filter((u: any) => !u.emailVerified).length} />
-            <StatCard label="Incomplete Profile" value={adminUsers.filter((u: any) => !u.profileComplete).length} />
+            <StatCard label="Total Users" value={(adminUsers as any[]).length} />
+            <StatCard label="Paid" value={(adminUsers as any[]).filter((u: any) => u.subscriptionTier === "player" || u.subscriptionTier === "pro").length} />
+            <StatCard label="Coaches" value={(adminUsers as any[]).filter((u: any) => u.accountType === "coach").length} />
+            <StatCard label="Unverified Email" value={(adminUsers as any[]).filter((u: any) => !u.emailVerified).length} />
           </div>
+
+          {/* Sub-tabs + search */}
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
+            <div className="flex gap-1 bg-secondary/50 rounded-lg p-1">
+              {(["all", "players", "coaches"] as const).map(tab => (
+                <button
+                  key={tab}
+                  onClick={() => { setUserTypeTab(tab); setUserPage(0); setUserSearch(""); }}
+                  className={`px-3 py-1.5 rounded text-xs font-semibold capitalize transition-colors ${
+                    userTypeTab === tab
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {tab === "all" ? `All (${(adminUsers as any[]).length})` : tab === "players" ? `Players (${(adminUsers as any[]).filter((u: any) => u.accountType !== "coach").length})` : `Coaches (${(adminUsers as any[]).filter((u: any) => u.accountType === "coach").length})`}
+                </button>
+              ))}
+            </div>
+            <div className="relative flex-1 max-w-xs">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Search username, email, city…"
+                value={userSearch}
+                onChange={e => { setUserSearch(e.target.value); setUserPage(0); }}
+                className="w-full pl-8 pr-3 py-1.5 text-sm bg-background border border-input rounded-lg focus:outline-none focus:ring-1 focus:ring-ring"
+              />
+            </div>
+            <span className="text-xs text-muted-foreground shrink-0">
+              {filteredUsers.length} result{filteredUsers.length !== 1 ? "s" : ""}
+            </span>
+          </div>
+
           <div className="border border-border rounded-xl overflow-hidden overflow-x-auto">
             <div className="min-w-[900px]">
             <div className="bg-secondary/50 p-3 text-xs font-semibold text-muted-foreground grid grid-cols-12 gap-2 uppercase tracking-wider">
@@ -518,10 +579,12 @@ export default function Admin() {
               <div className="col-span-1 text-center">Uploads</div>
               <div className="col-span-1 text-right">Actions</div>
             </div>
-            <div className="divide-y divide-border/50 max-h-[600px] overflow-y-auto">
-              {adminUsers.length === 0 ? (
-                <div className="p-8 text-center text-muted-foreground">No users yet.</div>
-              ) : adminUsers.map((u: any) => (
+            <div className="divide-y divide-border/50">
+              {filteredUsers.length === 0 ? (
+                <div className="p-8 text-center text-muted-foreground">
+                  {(adminUsers as any[]).length === 0 ? "No users yet." : "No users match your search."}
+                </div>
+              ) : pagedUsers.map((u: any) => (
                 <>
                   <div key={u.id} className="grid grid-cols-12 gap-2 p-3 items-center hover:bg-secondary/20 min-w-[900px]">
                     <div className="col-span-2 text-sm font-semibold flex items-center gap-2 min-w-0">
@@ -665,6 +728,35 @@ export default function Admin() {
             </div>
             </div>
           </div>
+
+          {/* Pagination */}
+          {userPageCount > 1 && (
+            <div className="flex items-center justify-between mt-3">
+              <span className="text-xs text-muted-foreground">
+                Page {userPage + 1} of {userPageCount} · {filteredUsers.length} users
+              </span>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-3 text-xs"
+                  disabled={userPage === 0}
+                  onClick={() => setUserPage(p => p - 1)}
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-3 text-xs"
+                  disabled={userPage >= userPageCount - 1}
+                  onClick={() => setUserPage(p => p + 1)}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
 
           {/* Video Player Dialog */}
           <Dialog open={!!playingVideo} onOpenChange={(o) => { if (!o) setPlayingVideo(null); }}>
