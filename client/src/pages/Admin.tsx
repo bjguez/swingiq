@@ -106,14 +106,18 @@ export default function Admin() {
     enabled: activeTab === "users",
   });
 
-  const { data: r2Health, isLoading: r2Loading, refetch: refetchHealth } = useQuery({
+  const { data: r2Health, isLoading: r2Loading, error: r2Error, refetch: refetchHealth } = useQuery({
     queryKey: ["/api/admin/r2-health"],
     queryFn: async () => {
       const res = await fetch("/api/admin/r2-health");
-      if (!res.ok) throw new Error("Failed to check R2 health");
-      return res.json() as Promise<{ total: number; missing: number; ok: number; videos: { id: string; title: string; playerName: string | null; isProVideo: boolean; key: string; exists: boolean }[] }>;
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(`${res.status}: ${body.message ?? "Failed to check R2 health"}`);
+      }
+      return res.json() as Promise<{ total: number; missing: number; ok: number; r2PublicUrl: string; urlMode: string; videos: { id: string; title: string; playerName: string | null; isProVideo: boolean; key: string; exists: boolean }[] }>;
     },
     enabled: activeTab === "health",
+    retry: false,
   });
 
   const [transcodeProgress, setTranscodeProgress] = useState<{
@@ -956,7 +960,21 @@ export default function Admin() {
             </div>
           )}
 
-          {!r2Health && !r2Loading && !transcodeProgress && (
+          {r2Error && (
+            <div className="border border-destructive/40 bg-destructive/10 rounded-xl p-4 text-sm text-destructive">
+              <span className="font-semibold">Health check failed:</span> {(r2Error as Error).message}
+            </div>
+          )}
+
+          {r2Health && (
+            <div className="text-xs text-muted-foreground mb-2">
+              URL mode: <span className={`font-semibold ${r2Health.urlMode === "cdn" ? "text-green-500" : "text-yellow-500"}`}>{r2Health.urlMode}</span>
+              {r2Health.urlMode === "cdn" && <span className="ml-1">({r2Health.r2PublicUrl})</span>}
+              {r2Health.urlMode !== "cdn" && <span className="ml-1 text-yellow-500">— R2_PUBLIC_URL not set, using expiring presigned URLs</span>}
+            </div>
+          )}
+
+          {!r2Health && !r2Error && !r2Loading && !transcodeProgress && (
             <div className="border border-border rounded-xl p-10 text-center text-muted-foreground text-sm">
               Click "Run Check" to scan all R2-stored videos for missing files.
             </div>
