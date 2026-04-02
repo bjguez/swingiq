@@ -142,29 +142,24 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected }: Vi
 
         url = response.presignedUrl ?? response.sourceUrl;
       } else {
-        // Direct upload: browser → R2 (bypasses server for the file transfer)
-        // Step 1: get presigned PUT URL
-        const presignRes = await fetch(`/api/upload/presigned-put?filename=${encodeURIComponent(file.name)}`);
-        if (!presignRes.ok) throw new Error("Failed to get upload URL");
-        const { key, uploadUrl, contentType } = await presignRes.json();
-
-        // Step 2: PUT file directly to R2 (with progress tracking)
-        await new Promise<void>((resolve, reject) => {
+        // Streaming upload: browser → our server (same-origin, no CORS) → R2 (streamed, no buffering)
+        // Step 1: PUT file to our server which streams it straight to R2
+        const { key } = await new Promise<{ key: string }>((resolve, reject) => {
           const xhr = new XMLHttpRequest();
           xhr.upload.addEventListener("progress", (ev) => {
             if (ev.lengthComputable) setUploadProgress(Math.round((ev.loaded / ev.total) * 100));
           });
           xhr.onload = () => {
-            if (xhr.status >= 200 && xhr.status < 300) resolve();
-            else reject(new Error(`Upload failed: ${xhr.status}`));
+            if (xhr.status >= 200 && xhr.status < 300) resolve(JSON.parse(xhr.responseText));
+            else { try { reject(new Error(JSON.parse(xhr.responseText).message || "Upload failed")); } catch { reject(new Error("Upload failed")); } }
           };
           xhr.onerror = () => reject(new Error("Network error during upload"));
-          xhr.open("PUT", uploadUrl);
-          xhr.setRequestHeader("Content-Type", contentType);
+          xhr.open("PUT", "/api/upload/direct");
+          xhr.setRequestHeader("Content-Type", file.type || "video/mp4");
           xhr.send(file);
         });
 
-        // Step 3: confirm — server creates the DB record
+        // Step 2: confirm — server creates the DB record
         const confirmRes = await fetch("/api/upload/confirm", {
           method: "POST",
           headers: { "Content-Type": "application/json" },

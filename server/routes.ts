@@ -11,7 +11,7 @@ import path from "path";
 import fs from "fs";
 import express from "express";
 import { execFile } from "child_process";
-import { uploadToR2, getVideoUrl, getPresignedUrl, getPresignedPutUrl, deleteFromR2, isR2Key, r2Configured, checkR2Exists } from "./r2";
+import { uploadToR2, getVideoUrl, getPresignedUrl, getPresignedPutUrl, streamToR2, deleteFromR2, isR2Key, r2Configured, checkR2Exists } from "./r2";
 import { randomUUID } from "crypto";
 import { createCheckoutSession, createPortalSession, handleWebhook, PRICES } from "./stripe";
 import { setupCoachRoutes } from "./coach";
@@ -68,20 +68,28 @@ export async function registerRoutes(
   }));
 
 
-  // Step 1 of direct upload: get a presigned PUT URL for uploading straight from browser to R2
-  app.get("/api/upload/presigned-put", async (req, res) => {
+  // Direct streaming upload: browser sends file to this endpoint, server pipes it straight to R2.
+  // Same-origin (no CORS needed), no in-memory buffering — req body streams through to R2.
+  app.put("/api/upload/direct", async (req, res) => {
     if (!req.user) return res.status(401).json({ message: "Not authenticated" });
     if (!r2Configured()) return res.status(503).json({ message: "Storage not configured" });
-    const filename = (req.query.filename as string) || "video.mp4";
-    const ext = path.extname(filename).toLowerCase() || ".mp4";
+
+    const contentType = (req.headers["content-type"] || "video/mp4").split(";")[0].trim();
+    const ext =
+      contentType === "video/quicktime" ? ".mov" :
+      contentType === "video/webm" ? ".webm" :
+      contentType === "video/x-msvideo" ? ".avi" :
+      ".mp4";
     const key = `videos/${randomUUID()}${ext}`;
-    const contentType =
-      ext === ".mov" ? "video/quicktime" :
-      ext === ".webm" ? "video/webm" :
-      ext === ".avi" ? "video/x-msvideo" :
-      "video/mp4";
-    const uploadUrl = await getPresignedPutUrl(key, contentType);
-    res.json({ key, uploadUrl, contentType });
+    const contentLength = parseInt(req.headers["content-length"] || "0", 10);
+
+    try {
+      await streamToR2(key, req, contentType, contentLength);
+      res.json({ key });
+    } catch (err: any) {
+      console.error("Streaming upload to R2 failed:", err);
+      res.status(500).json({ message: "Upload to storage failed" });
+    }
   });
 
   // Step 2 of direct upload: create the DB record after the client has PUT the file directly to R2

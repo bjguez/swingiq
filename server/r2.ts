@@ -46,6 +46,22 @@ export async function getPresignedPutUrl(key: string, contentType: string, expir
   return getSignedUrl(r2, new PutObjectCommand({ Bucket: bucket, Key: key, ContentType: contentType }), { expiresIn });
 }
 
+/** Streams a Node.js readable directly to R2 — no intermediate buffering */
+export async function streamToR2(
+  key: string,
+  stream: NodeJS.ReadableStream,
+  contentType: string,
+  contentLength?: number,
+): Promise<void> {
+  await r2.send(new PutObjectCommand({
+    Bucket: bucket,
+    Key: key,
+    Body: stream as any,
+    ContentType: contentType,
+    ...(contentLength && contentLength > 0 ? { ContentLength: contentLength } : {}),
+  }));
+}
+
 /** Returns a public URL for a key using the custom domain if configured, else falls back to presigned URL */
 export async function getVideoUrl(key: string): Promise<string> {
   const publicBase = process.env.R2_PUBLIC_URL;
