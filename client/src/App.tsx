@@ -39,6 +39,14 @@ function PageviewTracker() {
   return null;
 }
 
+function ScrollToTop() {
+  const [location] = useLocation();
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [location]);
+  return null;
+}
+
 function AdminRoute() {
   const { user, isLoading } = useAuth();
   if (isLoading) return null;
@@ -118,6 +126,7 @@ function App() {
         <AthleteProvider>
           <Toaster />
           <PageviewTracker />
+          <ScrollToTop />
           <Router />
         </AthleteProvider>
       </TooltipProvider>
