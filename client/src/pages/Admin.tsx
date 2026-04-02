@@ -586,10 +586,8 @@ export default function Admin() {
               <div className="col-span-1">Tier</div>
               <div className="col-span-2">Status</div>
               <div className="col-span-1">Type</div>
-              <div className="col-span-1">Bats</div>
-              <div className="col-span-1">Age</div>
-              <div className="col-span-1">City</div>
-              <div className="col-span-1">State</div>
+              <div className="col-span-2">Info</div>
+              <div className="col-span-2">Location</div>
               <div className="col-span-1 text-center">Uploads</div>
               <div className="col-span-1 text-right">Actions</div>
             </div>
@@ -629,10 +627,22 @@ export default function Admin() {
                         {u.accountType === "coach" ? "Coach" : u.accountType === "parent" ? "Parent" : "Player"}
                       </span>
                     </div>
-                    <div className="col-span-1 text-xs text-muted-foreground">{u.bats || "—"}</div>
-                    <div className="col-span-1 text-xs text-muted-foreground">{u.age || "—"}</div>
-                    <div className="col-span-1 text-xs text-muted-foreground truncate">{u.city || "—"}</div>
-                    <div className="col-span-1 text-xs text-muted-foreground">{u.state || "—"}</div>
+                    {u.accountType === "coach" ? (
+                      <>
+                        <div className="col-span-2 text-xs text-muted-foreground truncate">{u.organization || "—"}</div>
+                        <div className="col-span-2 text-xs text-muted-foreground truncate">{[u.city, u.state].filter(Boolean).join(", ") || "—"}</div>
+                      </>
+                    ) : u.accountType === "parent" ? (
+                      <>
+                        <div className="col-span-2 text-xs text-muted-foreground">{u.athletes?.length ? `${u.athletes.length} athlete${u.athletes.length !== 1 ? "s" : ""}` : "No athletes"}</div>
+                        <div className="col-span-2 text-xs text-muted-foreground">—</div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="col-span-2 text-xs text-muted-foreground">{[u.bats ? `Bats ${u.bats}` : null, u.age ? `Age ${u.age}` : null].filter(Boolean).join(" · ") || "—"}</div>
+                        <div className="col-span-2 text-xs text-muted-foreground truncate">{[u.city, u.state].filter(Boolean).join(", ") || "—"}</div>
+                      </>
+                    )}
                     <div className="col-span-1 text-center">
                       <span className={`text-xs font-bold ${u.uploadCount > 0 ? "text-foreground" : "text-muted-foreground"}`}>
                         {u.uploadCount}
@@ -672,8 +682,24 @@ export default function Admin() {
                           {setTierMutation.isPending ? "Saving…" : "Apply"}
                         </Button>
                       </div>
-                      {/* Full profile fields — for player/coach accounts */}
-                      {u.accountType !== "parent" && (
+                      {/* Full profile fields — coaches */}
+                      {u.accountType === "coach" && (
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                          {[
+                            { label: "Organization", value: u.organization || "—" },
+                            { label: "Coaching Level", value: u.coachingLevel?.replace(/_/g, " ") || "—" },
+                            { label: "Location", value: [u.city, u.state].filter(Boolean).join(", ") || "—" },
+                            { label: "Tier", value: u.subscriptionTier === "pro" ? "Pro" : u.subscriptionTier === "coach" ? "Coach" : u.subscriptionTier === "player" ? "Player" : "Rookie" },
+                          ].map(({ label, value }) => (
+                            <div key={label} className="bg-secondary/50 rounded px-3 py-2">
+                              <p className="text-muted-foreground mb-0.5">{label}</p>
+                              <p className="font-semibold text-foreground capitalize">{value}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {/* Full profile fields — players */}
+                      {(!u.accountType || u.accountType === "player") && (
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
                           {[
                             { label: "Tier", value: u.subscriptionTier === "pro" ? "Pro" : u.subscriptionTier === "player" ? "Player" : "Rookie" },

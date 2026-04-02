@@ -351,6 +351,8 @@ export async function registerRoutes(
         weightLbs: u.weightLbs,
         city: u.city,
         state: u.state,
+        organization: u.organization,
+        coachingLevel: u.coachingLevel,
         profileComplete: u.profileComplete,
         accountType: u.accountType ?? "player",
         uploadCount: userVideoMap.get(u.id)?.length ?? 0,
