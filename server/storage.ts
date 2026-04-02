@@ -47,6 +47,7 @@ export interface IStorage {
   updateSession(id: string, data: Partial<InsertSession>): Promise<Session | undefined>;
 
   getAthletesByParent(parentUserId: string): Promise<AthleteProfile[]>;
+  getAllAthletes(): Promise<AthleteProfile[]>;
   getAthlete(id: string): Promise<AthleteProfile | undefined>;
   createAthlete(athlete: InsertAthleteProfile): Promise<AthleteProfile>;
   updateAthlete(id: string, data: Partial<Omit<AthleteProfile, "id" | "parentUserId">>): Promise<AthleteProfile | undefined>;
@@ -210,6 +211,10 @@ export class DatabaseStorage implements IStorage {
 
   async getAthletesByParent(parentUserId: string): Promise<AthleteProfile[]> {
     return db.select().from(athleteProfiles).where(eq(athleteProfiles.parentUserId, parentUserId));
+  }
+
+  async getAllAthletes(): Promise<AthleteProfile[]> {
+    return db.select().from(athleteProfiles);
   }
 
   async getAthlete(id: string): Promise<AthleteProfile | undefined> {

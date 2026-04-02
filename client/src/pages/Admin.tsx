@@ -65,7 +65,7 @@ export default function Admin() {
 
   // User tab filters
   const [userSearch, setUserSearch] = useState("");
-  const [userTypeTab, setUserTypeTab] = useState<"all" | "players" | "coaches">("all");
+  const [userTypeTab, setUserTypeTab] = useState<"all" | "players" | "coaches" | "parents">("all");
   const [userPage, setUserPage] = useState(0);
   const USER_PAGE_SIZE = 50;
 
@@ -283,15 +283,20 @@ export default function Admin() {
 
   const filteredUsers = useMemo(() => {
     let list = adminUsers as any[];
-    if (userTypeTab === "players") list = list.filter(u => u.accountType !== "coach");
+    if (userTypeTab === "players") list = list.filter(u => !u.accountType || u.accountType === "player");
     if (userTypeTab === "coaches") list = list.filter(u => u.accountType === "coach");
+    if (userTypeTab === "parents") list = list.filter(u => u.accountType === "parent");
     if (userSearch.trim()) {
       const q = userSearch.toLowerCase();
       list = list.filter(u =>
         u.username?.toLowerCase().includes(q) ||
         u.email?.toLowerCase().includes(q) ||
         u.city?.toLowerCase().includes(q) ||
-        u.state?.toLowerCase().includes(q)
+        u.state?.toLowerCase().includes(q) ||
+        u.athletes?.some((a: any) =>
+          `${a.firstName} ${a.lastName}`.toLowerCase().includes(q) ||
+          a.city?.toLowerCase().includes(q)
+        )
       );
     }
     return list;
@@ -533,24 +538,29 @@ export default function Admin() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <StatCard label="Total Users" value={(adminUsers as any[]).length} />
             <StatCard label="Paid" value={(adminUsers as any[]).filter((u: any) => u.subscriptionTier === "player" || u.subscriptionTier === "pro").length} />
-            <StatCard label="Coaches" value={(adminUsers as any[]).filter((u: any) => u.accountType === "coach").length} />
-            <StatCard label="Unverified Email" value={(adminUsers as any[]).filter((u: any) => !u.emailVerified).length} />
+            <StatCard label="Coaches / Parents" value={(adminUsers as any[]).filter((u: any) => u.accountType === "coach" || u.accountType === "parent").length} />
+            <StatCard label="Incomplete Profile" value={(adminUsers as any[]).filter((u: any) => !u.profileComplete).length} />
           </div>
 
           {/* Sub-tabs + search */}
           <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
             <div className="flex gap-1 bg-secondary/50 rounded-lg p-1">
-              {(["all", "players", "coaches"] as const).map(tab => (
+              {([
+                { key: "all", label: `All (${(adminUsers as any[]).length})` },
+                { key: "players", label: `Players (${(adminUsers as any[]).filter((u: any) => u.accountType === "player" || !u.accountType).length})` },
+                { key: "coaches", label: `Coaches (${(adminUsers as any[]).filter((u: any) => u.accountType === "coach").length})` },
+                { key: "parents", label: `Parents (${(adminUsers as any[]).filter((u: any) => u.accountType === "parent").length})` },
+              ] as const).map(({ key, label }) => (
                 <button
-                  key={tab}
-                  onClick={() => { setUserTypeTab(tab); setUserPage(0); setUserSearch(""); }}
-                  className={`px-3 py-1.5 rounded text-xs font-semibold capitalize transition-colors ${
-                    userTypeTab === tab
+                  key={key}
+                  onClick={() => { setUserTypeTab(key); setUserPage(0); setUserSearch(""); }}
+                  className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${
+                    userTypeTab === key
                       ? "bg-background text-foreground shadow-sm"
                       : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
-                  {tab === "all" ? `All (${(adminUsers as any[]).length})` : tab === "players" ? `Players (${(adminUsers as any[]).filter((u: any) => u.accountType !== "coach").length})` : `Coaches (${(adminUsers as any[]).filter((u: any) => u.accountType === "coach").length})`}
+                  {label}
                 </button>
               ))}
             </div>
@@ -662,24 +672,57 @@ export default function Admin() {
                           {setTierMutation.isPending ? "Saving…" : "Apply"}
                         </Button>
                       </div>
-                      {/* Full profile fields */}
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                        {[
-                          { label: "Tier", value: u.subscriptionTier === "pro" ? "Pro" : u.subscriptionTier === "player" ? "Player" : "Rookie" },
-                          { label: "Bats", value: u.bats || "—" },
-                          { label: "Throws", value: u.throws || "—" },
-                          { label: "Skill", value: u.skillLevel?.replace(/_/g, " ") || "—" },
-                          { label: "Age", value: u.age || "—" },
-                          { label: "Height", value: u.heightInches ? `${Math.floor(u.heightInches / 12)}'${u.heightInches % 12}"` : "—" },
-                          { label: "Weight", value: u.weightLbs ? `${u.weightLbs} lbs` : "—" },
-                          { label: "Location", value: [u.city, u.state].filter(Boolean).join(", ") || "—" },
-                        ].map(({ label, value }) => (
-                          <div key={label} className="bg-secondary/50 rounded px-3 py-2">
-                            <p className="text-muted-foreground mb-0.5">{label}</p>
-                            <p className="font-semibold text-foreground capitalize">{value}</p>
-                          </div>
-                        ))}
-                      </div>
+                      {/* Full profile fields — for player/coach accounts */}
+                      {u.accountType !== "parent" && (
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                          {[
+                            { label: "Tier", value: u.subscriptionTier === "pro" ? "Pro" : u.subscriptionTier === "player" ? "Player" : "Rookie" },
+                            { label: "Bats", value: u.bats || "—" },
+                            { label: "Throws", value: u.throws || "—" },
+                            { label: "Skill", value: u.skillLevel?.replace(/_/g, " ") || "—" },
+                            { label: "Age", value: u.age || "—" },
+                            { label: "Height", value: u.heightInches ? `${Math.floor(u.heightInches / 12)}'${u.heightInches % 12}"` : "—" },
+                            { label: "Weight", value: u.weightLbs ? `${u.weightLbs} lbs` : "—" },
+                            { label: "Location", value: [u.city, u.state].filter(Boolean).join(", ") || "—" },
+                          ].map(({ label, value }) => (
+                            <div key={label} className="bg-secondary/50 rounded px-3 py-2">
+                              <p className="text-muted-foreground mb-0.5">{label}</p>
+                              <p className="font-semibold text-foreground capitalize">{value}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {/* Athletes — for parent accounts */}
+                      {u.accountType === "parent" && (
+                        <div>
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                            Athletes ({u.athletes?.length ?? 0})
+                          </p>
+                          {(!u.athletes || u.athletes.length === 0) ? (
+                            <p className="text-xs text-muted-foreground">No athletes added yet.</p>
+                          ) : (
+                            <div className="space-y-2">
+                              {u.athletes.map((a: any) => (
+                                <div key={a.id} className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs bg-secondary/30 rounded-lg p-3">
+                                  {[
+                                    { label: "Name", value: `${a.firstName} ${a.lastName}` },
+                                    { label: "Bats", value: a.bats || "—" },
+                                    { label: "Throws", value: a.throws || "—" },
+                                    { label: "Skill", value: a.skillLevel?.replace(/_/g, " ") || "—" },
+                                    { label: "Age", value: a.age || "—" },
+                                    { label: "Location", value: [a.city, a.state].filter(Boolean).join(", ") || "—" },
+                                  ].map(({ label, value }) => (
+                                    <div key={label} className="bg-secondary/50 rounded px-3 py-2">
+                                      <p className="text-muted-foreground mb-0.5">{label}</p>
+                                      <p className="font-semibold text-foreground capitalize">{value}</p>
+                                    </div>
+                                  ))}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
                       {/* Video list */}
                       {u.videos.length > 0 ? (
                         <div>

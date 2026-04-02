@@ -308,8 +308,11 @@ export async function registerRoutes(
       return res.status(403).json({ message: "Forbidden" });
     }
     try {
-      const allUsers = await storage.getAllUsers();
-      const allVideos = await storage.getAllVideos();
+      const [allUsers, allVideos, allAthletes] = await Promise.all([
+        storage.getAllUsers(),
+        storage.getAllVideos(),
+        storage.getAllAthletes(),
+      ]);
       const userVideoMap = new Map<string, typeof allVideos>();
       allVideos.filter(v => !v.isProVideo && v.userId).forEach(v => {
         const list = userVideoMap.get(v.userId!) ?? [];
@@ -325,6 +328,14 @@ export async function registerRoutes(
       // Build resolved URL map by video id
       const urlById = new Map<string, string | null>();
       allUserVideos.forEach((v, i) => urlById.set(v.id, resolvedUrls[i]));
+
+      // Group athletes by parent user id
+      const athletesByParent = new Map<string, typeof allAthletes>();
+      allAthletes.forEach(a => {
+        const list = athletesByParent.get(a.parentUserId) ?? [];
+        list.push(a);
+        athletesByParent.set(a.parentUserId, list);
+      });
 
       const result = allUsers.map(u => ({
         id: u.id,
@@ -348,6 +359,17 @@ export async function registerRoutes(
           title: v.title,
           sourceUrl: urlById.get(v.id) ?? v.sourceUrl,
           createdAt: v.createdAt,
+        })),
+        athletes: (athletesByParent.get(u.id) ?? []).map(a => ({
+          id: a.id,
+          firstName: a.firstName,
+          lastName: a.lastName,
+          age: a.age,
+          bats: a.bats,
+          throws: a.throws,
+          skillLevel: a.skillLevel,
+          city: a.city,
+          state: a.state,
         })),
       }));
       res.json(result);
