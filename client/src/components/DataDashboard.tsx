@@ -620,7 +620,7 @@ function UserVideosSection({ videos, onSelectVideo }: {
           <h3 className="font-display font-bold text-xl uppercase text-muted-foreground">Recent Swings</h3>
           <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full font-mono">{videos.length}</span>
         </div>
-        <Link href="/my-swings">
+        <Link href="/my-studio">
           <button className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors">
             View All <ChevronRight className="w-3 h-3" />
           </button>

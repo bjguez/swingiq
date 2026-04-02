@@ -95,7 +95,7 @@ function Router() {
       <Route path="/library">
         <ProtectedRoute component={Library} />
       </Route>
-      <Route path="/my-swings">
+      <Route path="/my-studio">
         <ProtectedRoute component={MySwings} />
       </Route>
       <Route path="/dashboard">

@@ -56,7 +56,7 @@ export default function Layout({ children, showScoreTicker = false }: { children
   ] : [
     { href: "/", icon: <Video className="w-4 h-4 mr-2" />, label: "Analysis" },
     { href: "/library", icon: <Library className="w-4 h-4 mr-2" />, label: "Pro Library" },
-    { href: "/my-swings", icon: <Film className="w-4 h-4 mr-2" />, label: "My Swings" },
+    { href: "/my-studio", icon: <Film className="w-4 h-4 mr-2" />, label: "My Studio" },
     { href: "/biometrics", icon: <Dna className="w-4 h-4 mr-2" />, label: "Biometrics", badge: (!isPaid && !isAdmin) ? <Lock className="w-3 h-3 ml-1.5 text-yellow-500" /> : undefined },
     { href: "/development", icon: <BarChart2 className="w-4 h-4 mr-2" />, label: "Development", badge: (!isPaid && !isAdmin) ? <Lock className="w-3 h-3 ml-1.5 text-yellow-500" /> : undefined },
     ...(!isPaid && !isAdmin ? [{ href: "/pricing", icon: <Tag className="w-4 h-4 mr-2" />, label: "Pricing" }] : []),
@@ -68,7 +68,7 @@ export default function Layout({ children, showScoreTicker = false }: { children
     { section: "Product", links: [
       { href: "/", label: "Analysis" },
       { href: "/library", label: "Pro Library" },
-      { href: "/my-swings", label: "My Swings" },
+      { href: "/my-studio", label: "My Studio" },
       { href: "/biometrics", label: "Biometrics", locked: !isPaid && !isAdmin },
       { href: "/development", label: "Development", locked: !isPaid && !isAdmin },
     ]},

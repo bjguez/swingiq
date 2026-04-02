@@ -3,6 +3,6 @@ import { useLocation } from "wouter";
 
 export default function Dashboard() {
   const [, navigate] = useLocation();
-  useEffect(() => { navigate("/my-swings", { replace: true }); }, []);
+  useEffect(() => { navigate("/my-studio", { replace: true }); }, []);
   return null;
 }

@@ -59,7 +59,7 @@ function SectionDivider({ icon, title, href, onNavigate }: {
 }) {
   return (
     <div className="flex items-center justify-between pt-2">
-      <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+      <h2 className="text-lg font-bold font-display uppercase flex items-center gap-2">
         {icon}{title}
       </h2>
       {href && onNavigate && (
@@ -77,7 +77,7 @@ function SectionDivider({ icon, title, href, onNavigate }: {
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 export default function MySwings() {
-  usePageMeta({ title: "My Swings", description: "Your swing library and player hub.", path: "/my-swings" });
+  usePageMeta({ title: "My Studio", description: "Your swing library, training plan, and player hub.", path: "/my-studio" });
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [, navigate] = useLocation();
@@ -213,7 +213,7 @@ export default function MySwings() {
             <span className="px-2 py-0.5 rounded text-xs font-semibold bg-primary/20 text-primary uppercase tracking-wider">My Library</span>
             <span className="text-sm text-muted-foreground">{userVideos.length} swing{userVideos.length !== 1 ? "s" : ""}</span>
           </div>
-          <h1 className="text-3xl md:text-4xl font-bold font-display uppercase">My Swings</h1>
+          <h1 className="text-3xl md:text-4xl font-bold font-display uppercase">My Studio</h1>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {userVideos.length > 0 && (
@@ -440,31 +440,32 @@ export default function MySwings() {
             onNavigate={navigate}
           />
           {autoComps.length > 0 ? (
-            <div className="flex gap-3 overflow-x-auto pb-1">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
               {autoComps.map((comp, i) => (
                 <div
                   key={comp.id}
                   onClick={() => navigate("/biometrics")}
-                  className="bg-card border border-border rounded-xl p-4 flex items-center gap-3 shrink-0 cursor-pointer hover:border-primary/40 transition-colors min-w-44"
+                  className="bg-card border border-border rounded-xl p-5 flex flex-col items-center gap-3 cursor-pointer hover:border-primary/40 transition-colors text-center"
                 >
                   {comp.player.savantId ? (
                     <img
-                      src={`https://img.mlbstatic.com/mlb-photos/image/upload/w_60,q_auto:good/v1/people/${comp.player.savantId}/headshot/67/current`}
+                      src={`https://img.mlbstatic.com/mlb-photos/image/upload/w_120,q_auto:good/v1/people/${comp.player.savantId}/headshot/67/current`}
                       alt={comp.player.name}
-                      className="w-10 h-10 rounded-full object-cover bg-secondary/50 shrink-0"
+                      className="w-16 h-16 rounded-full object-cover bg-secondary/50"
                       onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
                     />
                   ) : (
-                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0 text-xs font-bold text-primary">
+                    <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center text-lg font-bold text-primary">
                       {comp.player.name[0]}
                     </div>
                   )}
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-1">
-                      {i === 0 && <Trophy className="w-3 h-3 text-yellow-400 shrink-0" />}
-                      <p className="text-sm font-semibold truncate">{comp.player.name}</p>
+                  <div className="min-w-0 w-full">
+                    <div className="flex items-center justify-center gap-1 mb-0.5">
+                      {i === 0 && <Trophy className="w-3.5 h-3.5 text-yellow-400 shrink-0" />}
+                      <p className="font-semibold truncate">{comp.player.name}</p>
                     </div>
                     <p className="text-xs text-muted-foreground truncate">{comp.player.team}</p>
+                    <p className="text-xs text-muted-foreground">Bats {comp.player.bats}</p>
                   </div>
                 </div>
               ))}
