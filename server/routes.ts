@@ -473,6 +473,21 @@ export async function registerRoutes(
     res.json({ id: updated.id, username: updated.username, subscriptionTier: updated.subscriptionTier });
   });
 
+  app.post("/api/admin/set-account-type", async (req, res) => {
+    const adminUsername = process.env.ADMIN_USERNAME;
+    if (!req.user || (req.user as any).username !== adminUsername) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    const { userId, accountType } = req.body;
+    const validTypes = ["player", "coach", "parent"];
+    if (!userId || !validTypes.includes(accountType)) {
+      return res.status(400).json({ message: `accountType must be one of: ${validTypes.join(", ")}` });
+    }
+    const updated = await storage.updateUser(userId, { accountType });
+    if (!updated) return res.status(404).json({ message: "User not found" });
+    res.json({ id: updated.id, username: updated.username, accountType: updated.accountType });
+  });
+
   app.get("/api/admin/r2-health", async (req, res) => {
     const adminUsername = process.env.ADMIN_USERNAME;
     if (!req.user || (req.user as any).username !== adminUsername) {

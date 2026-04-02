@@ -62,6 +62,7 @@ export default function Admin() {
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [playingVideo, setPlayingVideo] = useState<{ title: string; url: string } | null>(null);
   const [tierDraft, setTierDraft] = useState<Record<string, string>>({});
+  const [accountTypeDraft, setAccountTypeDraft] = useState<Record<string, string>>({});
 
   // User tab filters
   const [userSearch, setUserSearch] = useState("");
@@ -198,6 +199,25 @@ export default function Admin() {
     },
     onError: (err: Error) => {
       toast({ title: err.message || "Failed to set tier", variant: "destructive" });
+    },
+  });
+
+  const setAccountTypeMutation = useMutation({
+    mutationFn: async ({ userId, accountType }: { userId: string; accountType: string }) => {
+      const res = await fetch("/api/admin/set-account-type", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, accountType }),
+      });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.message); }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast({ title: `${data.username} account type set to ${data.accountType}` });
+    },
+    onError: (err: Error) => {
+      toast({ title: err.message || "Failed to set account type", variant: "destructive" });
     },
   });
 
@@ -680,6 +700,27 @@ export default function Admin() {
                           className="h-7 px-3 text-xs"
                         >
                           {setTierMutation.isPending ? "Saving…" : "Apply"}
+                        </Button>
+                      </div>
+                      {/* Set Account Type */}
+                      <div className="flex items-center gap-3 p-3 rounded-lg border border-border bg-secondary/40">
+                        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider shrink-0">Account Type</span>
+                        <select
+                          value={accountTypeDraft[u.id] ?? u.accountType ?? "player"}
+                          onChange={e => setAccountTypeDraft(d => ({ ...d, [u.id]: e.target.value }))}
+                          className="text-sm bg-background border border-input rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-ring"
+                        >
+                          {["player", "coach", "parent"].map(t => (
+                            <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>
+                          ))}
+                        </select>
+                        <Button
+                          size="sm"
+                          onClick={() => setAccountTypeMutation.mutate({ userId: u.id, accountType: accountTypeDraft[u.id] ?? u.accountType ?? "player" })}
+                          disabled={setAccountTypeMutation.isPending}
+                          className="h-7 px-3 text-xs"
+                        >
+                          {setAccountTypeMutation.isPending ? "Saving…" : "Apply"}
                         </Button>
                       </div>
                       {/* Full profile fields — coaches */}
