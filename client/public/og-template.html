@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=1200"/>
+<style>
+  @font-face { font-family: 'Inter'; font-weight: 400 700; font-style: normal; src: url('fonts/6aa8d83d.woff2') format('woff2'); }
+  @font-face { font-family: 'Rajdhani'; font-weight: 600; font-style: normal; src: url('fonts/a68d5303.woff2') format('woff2'); }
+  @font-face { font-family: 'Rajdhani'; font-weight: 700; font-style: normal; src: url('fonts/8f24e53c.woff2') format('woff2'); }
+</style>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:       hsl(224, 35%, 8%);
+    --card:     hsl(220, 30%, 11%);
+    --border:   hsl(220, 25%, 18%);
+    --primary:  hsl(142, 71%, 45%);
+    --fg:       hsl(210, 40%, 98%);
+    --muted:    hsl(215, 20%, 55%);
+    --secondary:hsl(220, 25%, 15%);
+  }
+
+  body {
+    width: 1200px;
+    height: 630px;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: 'Inter', sans-serif;
+    position: relative;
+  }
+
+  /* Glow */
+  .glow {
+    position: absolute;
+    top: -120px; left: -120px;
+    width: 600px; height: 600px;
+    background: radial-gradient(circle, hsl(142 71% 45% / 0.12) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  /* Layout */
+  .page {
+    display: flex;
+    align-items: stretch;
+    height: 100%;
+    padding: 52px 56px 52px 64px;
+    gap: 56px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* LEFT */
+  .left {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+
+  .logo-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .logo-box {
+    width: 34px; height: 34px;
+    background: var(--primary);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 700;
+    font-size: 18px;
+    color: hsl(224, 35%, 8%);
+  }
+  .brand {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 700;
+    font-size: 22px;
+    letter-spacing: -0.4px;
+    color: var(--fg);
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    background: hsl(142 71% 45% / 0.1);
+    border: 1px solid hsl(142 71% 45% / 0.25);
+    border-radius: 999px;
+    padding: 5px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--primary);
+    letter-spacing: 0.3px;
+    width: fit-content;
+  }
+  .badge-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--primary);
+  }
+
+  .headline {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 700;
+    line-height: 1.0;
+    letter-spacing: -1.5px;
+  }
+  .headline .line1 {
+    font-size: 88px;
+    color: var(--fg);
+    display: block;
+  }
+  .headline .line2 {
+    font-size: 88px;
+    color: var(--primary);
+    display: block;
+  }
+
+  .sub {
+    font-size: 18px;
+    color: var(--muted);
+    line-height: 1.55;
+    max-width: 440px;
+  }
+
+  .cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--primary);
+    color: hsl(224, 35%, 8%);
+    font-family: 'Inter', sans-serif;
+    font-weight: 700;
+    font-size: 16px;
+    padding: 13px 28px;
+    border-radius: 10px;
+    width: fit-content;
+  }
+
+  .domain {
+    font-size: 14px;
+    color: hsl(215, 20%, 38%);
+    font-weight: 500;
+  }
+
+  /* RIGHT — mockup */
+  .mockup {
+    width: 430px;
+    flex-shrink: 0;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .titlebar {
+    background: var(--secondary);
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .dot.r { background: #ef4444; opacity: 0.6; }
+  .dot.y { background: #f59e0b; opacity: 0.6; }
+  .dot.g { background: #22c55e; opacity: 0.6; }
+  .urlbar {
+    flex: 1;
+    background: hsl(224, 35%, 8%);
+    border-radius: 6px;
+    padding: 3px 10px;
+    font-size: 10px;
+    color: hsl(215, 20%, 40%);
+    font-family: monospace;
+    text-align: center;
+  }
+
+  .panels {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    flex: 1;
+    overflow: hidden;
+  }
+  .panel {
+    display: flex;
+    flex-direction: column;
+    background: hsl(224, 35%, 6%);
+    position: relative;
+    overflow: hidden;
+  }
+  .panel + .panel {
+    border-left: 1px solid var(--border);
+  }
+  .panel-label {
+    padding: 7px 10px;
+    background: var(--secondary);
+    border-bottom: 1px solid var(--border);
+    font-size: 10px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .panel-label .dot-sm {
+    width: 5px; height: 5px; border-radius: 50%;
+  }
+  .panel-label.left-label .dot-sm { background: var(--primary); }
+  .panel-label.right-label .dot-sm { background: hsl(260, 80%, 70%); }
+  .panel-label.right-label { color: hsl(260, 80%, 75%); }
+  .panel-label.left-label { color: var(--primary); }
+
+  .video-area {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .play-btn {
+    width: 52px; height: 52px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .play-btn.green {
+    background: hsl(142 71% 45% / 0.12);
+    border: 1.5px solid hsl(142 71% 45% / 0.35);
+  }
+  .play-btn.purple {
+    background: hsl(260 80% 65% / 0.12);
+    border: 1.5px solid hsl(260 80% 65% / 0.35);
+  }
+  .play-icon {
+    width: 0; height: 0;
+    border-style: solid;
+    margin-left: 4px;
+  }
+  .play-icon.green {
+    border-width: 9px 0 9px 16px;
+    border-color: transparent transparent transparent hsl(142, 71%, 45%);
+    opacity: 0.85;
+  }
+  .play-icon.purple {
+    border-width: 9px 0 9px 16px;
+    border-color: transparent transparent transparent hsl(260, 80%, 70%);
+    opacity: 0.85;
+  }
+  .video-name {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--fg);
+    text-align: center;
+  }
+  .video-sub {
+    font-size: 9px;
+    color: var(--muted);
+    text-align: center;
+    margin-top: -6px;
+  }
+
+  .scrubber-bar {
+    background: var(--secondary);
+    border-top: 1px solid var(--border);
+    padding: 8px 12px 6px;
+    flex-shrink: 0;
+  }
+  .scrubber-track {
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    position: relative;
+    margin-bottom: 7px;
+  }
+  .scrubber-fill {
+    height: 100%;
+    width: 38%;
+    background: var(--primary);
+    border-radius: 2px;
+  }
+  .scrubber-thumb {
+    width: 10px; height: 10px;
+    background: var(--primary);
+    border-radius: 50%;
+    position: absolute;
+    top: 50%;
+    left: 38%;
+    transform: translate(-50%, -50%);
+    border: 2px solid hsl(142 71% 20%);
+  }
+  .pills {
+    display: flex;
+    gap: 5px;
+  }
+  .pill {
+    background: hsl(142 71% 45% / 0.1);
+    border: 1px solid hsl(142 71% 45% / 0.2);
+    border-radius: 4px;
+    padding: 2px 7px;
+    font-size: 8px;
+    font-weight: 600;
+    color: var(--primary);
+  }
+
+  .bottom-strip {
+    background: var(--secondary);
+    border-top: 1px solid var(--border);
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    flex-shrink: 0;
+  }
+  .feature-cell {
+    padding: 10px 12px;
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .feature-cell:last-child { border-right: none; }
+  .feature-cell-name {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--fg);
+  }
+  .feature-cell-sub {
+    font-size: 9px;
+    color: var(--primary);
+  }
+</style>
+</head>
+<body>
+<div class="glow"></div>
+<div class="page">
+
+  <!-- LEFT -->
+  <div class="left">
+    <div class="logo-row">
+      <div class="logo-box">S</div>
+      <span class="brand">Swing Studio</span>
+    </div>
+
+    <div>
+      <div class="badge" style="margin-bottom:20px">
+        <div class="badge-dot"></div>
+        Trusted by players, parents &amp; pros
+      </div>
+      <div class="headline">
+        <span class="line1">Your Swing.</span>
+        <span class="line2">Compared<br>to the Best.</span>
+      </div>
+    </div>
+
+    <p class="sub">Side-by-side analysis with MLB hitters.<br>Free to start — no card required.</p>
+
+    <div class="cta">
+      Analyze Free &nbsp;→
+    </div>
+
+    <span class="domain">swingstudio.ai</span>
+  </div>
+
+  <!-- RIGHT: MOCKUP -->
+  <div class="mockup">
+    <div class="titlebar">
+      <div class="dot r"></div>
+      <div class="dot y"></div>
+      <div class="dot g"></div>
+      <div class="urlbar">swingstudio.ai/analysis</div>
+    </div>
+
+    <div class="panels">
+      <div class="panel">
+        <div class="panel-label left-label">
+          <div class="dot-sm"></div>
+          Your Swing
+        </div>
+        <div class="video-area">
+          <div class="play-btn green">
+            <div class="play-icon green"></div>
+          </div>
+          <div class="video-name">john_2025-04-01</div>
+          <div class="video-sub">Full Swing · Uploaded</div>
+        </div>
+        <div class="scrubber-bar">
+          <div class="scrubber-track">
+            <div class="scrubber-fill"></div>
+            <div class="scrubber-thumb"></div>
+          </div>
+          <div class="pills">
+            <div class="pill">0.5x</div>
+            <div class="pill">frame 24</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-label right-label">
+          <div class="dot-sm"></div>
+          Shohei Ohtani · MLB
+        </div>
+        <div class="video-area">
+          <div class="play-btn purple">
+            <div class="play-icon purple"></div>
+          </div>
+          <div class="video-name" style="color:hsl(260,80%,80%)">Shohei Ohtani</div>
+          <div class="video-sub">Full Swing · MLB Library</div>
+        </div>
+        <div class="scrubber-bar">
+          <div class="scrubber-track">
+            <div class="scrubber-fill" style="background:hsl(260,80%,65%); width:38%"></div>
+            <div class="scrubber-thumb" style="background:hsl(260,80%,65%); left:38%; border-color:hsl(260,80%,20%)"></div>
+          </div>
+          <div class="pills">
+            <div class="pill" style="background:hsl(260 80% 65% / 0.1); border-color:hsl(260 80% 65% / 0.25); color:hsl(260,80%,75%)">synced</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="bottom-strip">
+      <div class="feature-cell">
+        <span class="feature-cell-name">Biometrics</span>
+        <span class="feature-cell-sub">MLB body comps</span>
+      </div>
+      <div class="feature-cell">
+        <span class="feature-cell-name">Blueprint</span>
+        <span class="feature-cell-sub">Phase drills</span>
+      </div>
+      <div class="feature-cell">
+        <span class="feature-cell-name">Cognition</span>
+        <span class="feature-cell-sub">Vision training</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
