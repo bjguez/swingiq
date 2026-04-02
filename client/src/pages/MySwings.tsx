@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -6,35 +6,114 @@ import { useLocation } from "wouter";
 import { fetchVideos, deleteVideo } from "@/lib/api";
 import { VideoLibraryModal } from "@/components/VideoLibraryModal";
 import { UserVideoCard } from "@/components/UserVideoCard";
-import { Trash2, Upload, Film, Search } from "lucide-react";
-import type { Video } from "@shared/schema";
-import { ALL_USER_CATEGORIES } from "@/lib/categories";
+import {
+  Trash2, Upload, Film, Search, Brain, BookOpen, Dna, Users,
+  ChevronRight, Trophy, Lock, Star, MapPin, Zap,
+} from "lucide-react";
+import {
+  LineChart, Line, XAxis, YAxis, Tooltip as ChartTooltip, ResponsiveContainer,
+} from "recharts";
+import type { Video, CognitionSession } from "@shared/schema";
+import { useAuth } from "@/hooks/use-auth";
+import { usePageMeta } from "@/hooks/use-page-meta";
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+type Comp = {
+  id: string; compType: string; rank: number | null;
+  player: { name: string; team: string; savantId: string | null; bats: string };
+};
+
+type CoachSession = {
+  id: string; notes: string | null; sharedAt: string | null; createdAt: string;
+  coachFirstName: string | null; coachLastName: string | null; coachUsername: string;
+  coachOrganization: string | null;
+};
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+const PHASE_LABELS: Record<string, string> = {
+  foundation: "Foundation", gather: "Gather", lag: "Lag",
+  on_plane: "On Plane", contact: "Contact", finish: "Finish",
+};
+
+const PHASE_COLORS: Record<string, string> = {
+  foundation: "bg-blue-500/15 text-blue-400 border-blue-500/20",
+  gather:     "bg-purple-500/15 text-purple-400 border-purple-500/20",
+  lag:        "bg-orange-500/15 text-orange-400 border-orange-500/20",
+  on_plane:   "bg-yellow-500/15 text-yellow-400 border-yellow-500/20",
+  contact:    "bg-green-500/15 text-green-400 border-green-500/20",
+  finish:     "bg-pink-500/15 text-pink-400 border-pink-500/20",
+};
+
+const TIER_LABELS: Record<string, { label: string; cls: string }> = {
+  free:   { label: "Free",   cls: "bg-secondary text-muted-foreground" },
+  rookie: { label: "Rookie", cls: "bg-secondary text-muted-foreground" },
+  player: { label: "Player", cls: "bg-blue-500/15 text-blue-400" },
+  pro:    { label: "Pro",    cls: "bg-primary/15 text-primary" },
+  coach:  { label: "Coach",  cls: "bg-purple-500/15 text-purple-400" },
+};
+
+function SectionDivider({ icon, title, href, onNavigate }: {
+  icon: React.ReactNode; title: string; href?: string; onNavigate?: (href: string) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between pt-2">
+      <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+        {icon}{title}
+      </h2>
+      {href && onNavigate && (
+        <button
+          onClick={() => onNavigate(href)}
+          className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-0.5 transition-colors"
+        >
+          View all <ChevronRight className="w-3 h-3" />
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
 
 export default function MySwings() {
+  usePageMeta({ title: "My Swings", description: "Your swing library and player hub.", path: "/my-swings" });
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const [, navigate] = useLocation();
-  const { data: allVideos = [], isLoading } = useQuery({
-    queryKey: ["/api/videos"],
-    queryFn: () => fetchVideos(),
-  });
 
+  const isPaid = user?.isAdmin || ["player", "pro", "coach"].includes(user?.subscriptionTier ?? "");
+  const isFree = !!user && !isPaid;
+  const tierInfo = TIER_LABELS[user?.subscriptionTier ?? "free"] ?? TIER_LABELS.free;
+  const displayName = [user?.firstName, user?.lastName].filter(Boolean).join(" ") || user?.username || "";
+  const location = [user?.city, user?.state].filter(Boolean).join(", ");
+
+  // ── Video data ─────────────────────────────────────────────────────────────
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState<Set<string>>(new Set());
   const [bulkMode, setBulkMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeCategory, setActiveCategory] = useState("All");
 
-  const userVideos = (allVideos as Video[]).filter(v => !v.isProVideo && v.sourceUrl);
+  const { data: allVideos = [], isLoading } = useQuery({
+    queryKey: ["/api/videos"],
+    queryFn: () => fetchVideos(),
+    enabled: !!user,
+  });
 
-  const filteredVideos = userVideos.filter(v => {
-    const matchCategory = activeCategory === "All" || v.category === activeCategory;
+  const userVideos = useMemo(
+    () => (allVideos as Video[]).filter(v => !v.isProVideo && v.sourceUrl),
+    [allVideos]
+  );
+
+  const filteredVideos = useMemo(() => {
     const q = searchQuery.toLowerCase();
-    const matchSearch = !q ||
+    return userVideos.filter(v =>
+      !q ||
       v.title.toLowerCase().includes(q) ||
       ((v as any).notes?.toLowerCase().includes(q)) ||
-      ((v as any).tags?.some((t: string) => t.toLowerCase().includes(q)));
-    return matchCategory && matchSearch;
-  });
+      ((v as any).tags?.some((t: string) => t.toLowerCase().includes(q)))
+    );
+  }, [userVideos, searchQuery]);
 
   const toggleSelect = (id: string) => {
     setSelected(prev => {
@@ -49,7 +128,7 @@ export default function MySwings() {
 
   const handleBulkDelete = async () => {
     if (selected.size === 0) return;
-    const ids = [...selected];
+    const ids = Array.from(selected);
     setDeleting(new Set(ids));
     await Promise.allSettled(ids.map(id => deleteVideo(id)));
     queryClient.invalidateQueries({ queryKey: ["/api/videos"] });
@@ -57,8 +136,77 @@ export default function MySwings() {
     setDeleting(new Set());
   };
 
+  // ── Dashboard data ─────────────────────────────────────────────────────────
+
+  const { data: sessionsData } = useQuery({
+    queryKey: ["/api/cognition/sessions"],
+    queryFn: () => fetch("/api/cognition/sessions").then(r => r.json()),
+    enabled: !!user,
+  });
+  const cognitionSessions: CognitionSession[] = Array.isArray(sessionsData) ? sessionsData : [];
+  const freeSessionCount: number = (!Array.isArray(sessionsData) && sessionsData?.freeSessionCount) ?? 0;
+  const FREE_COGNITION_LIMIT = 3;
+
+  const { data: focusPhases = [] } = useQuery<string[]>({
+    queryKey: ["/api/blueprint/focus"],
+    queryFn: () => fetch("/api/blueprint/focus").then(r => r.json()),
+    enabled: !!user,
+  });
+
+  const { data: comps = [] } = useQuery<Comp[]>({
+    queryKey: ["/api/biometrics/comps"],
+    queryFn: () => fetch("/api/biometrics/comps").then(r => r.json()),
+    enabled: !!user && isPaid,
+  });
+
+  const { data: coachSessions = [] } = useQuery<CoachSession[]>({
+    queryKey: ["/api/coaching/sessions/received"],
+    queryFn: () => fetch("/api/coaching/sessions/received").then(r => r.json()),
+    enabled: !!user && isPaid,
+  });
+
+  const cognitionChartData = useMemo(
+    () => [...cognitionSessions].reverse().slice(-10).map((s, i) => ({
+      round: i + 1,
+      threshold: Number(s.threshold).toFixed(2),
+    })),
+    [cognitionSessions]
+  );
+
+  const bestCognition = useMemo(
+    () => cognitionSessions.reduce<CognitionSession | null>((best, s) =>
+      !best || Number(s.threshold) > Number(best.threshold) ? s : best, null),
+    [cognitionSessions]
+  );
+
+  const latestCognition = cognitionSessions[0] ?? null;
+  const autoComps = comps.filter(c => c.compType === "auto").sort((a, b) => (a.rank ?? 99) - (b.rank ?? 99));
+
+  if (!user) return null;
+
   return (
     <Layout>
+
+      {/* ── Player identity row ── */}
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0 text-sm font-bold text-primary uppercase">
+          {displayName[0] ?? "?"}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-bold text-base truncate">{displayName}</span>
+            <span className={`text-xs font-semibold px-2 py-0.5 rounded ${tierInfo.cls}`}>{tierInfo.label}</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground mt-0.5">
+            {user.username && <span>@{user.username}</span>}
+            {user.skillLevel && <span className="capitalize">{user.skillLevel.replace(/_/g, " ")}</span>}
+            {user.bats && <span>Bats {user.bats}</span>}
+            {location && <span className="flex items-center gap-0.5"><MapPin className="w-3 h-3" />{location}</span>}
+          </div>
+        </div>
+      </div>
+
+      {/* ── My Swings header ── */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
@@ -66,28 +214,17 @@ export default function MySwings() {
             <span className="text-sm text-muted-foreground">{userVideos.length} swing{userVideos.length !== 1 ? "s" : ""}</span>
           </div>
           <h1 className="text-3xl md:text-4xl font-bold font-display uppercase">My Swings</h1>
-          <p className="text-muted-foreground">Your uploaded swing videos.</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {userVideos.length > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="border-border"
-              onClick={() => { setBulkMode(b => !b); clearSelection(); }}
-            >
+            <Button variant="outline" size="sm" className="border-border"
+              onClick={() => { setBulkMode(b => !b); clearSelection(); }}>
               {bulkMode ? "Cancel" : "Manage"}
             </Button>
           )}
           {bulkMode && selected.size > 0 && (
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={handleBulkDelete}
-              disabled={deleting.size > 0}
-            >
-              <Trash2 className="w-4 h-4 mr-2" />
-              Delete {selected.size} selected
+            <Button variant="destructive" size="sm" onClick={handleBulkDelete} disabled={deleting.size > 0}>
+              <Trash2 className="w-4 h-4 mr-2" />Delete {selected.size} selected
             </Button>
           )}
           {bulkMode && (
@@ -95,46 +232,30 @@ export default function MySwings() {
               {selected.size === userVideos.length ? "Deselect All" : "Select All"}
             </Button>
           )}
-          <VideoLibraryModal
-            mode="user"
-            trigger={
-              <Button size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold">
-                <Upload className="w-4 h-4 mr-2" />
-                Upload Swing
-              </Button>
-            }
-          />
+          <VideoLibraryModal mode="user" trigger={
+            <Button size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold">
+              <Upload className="w-4 h-4 mr-2" />Upload Swing
+            </Button>
+          } />
         </div>
       </div>
 
-      {/* Search + category filter */}
+      {/* Search */}
       {userVideos.length > 0 && (
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <input
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search title, notes, tags…"
-              className="w-full pl-9 pr-3 py-2 text-sm bg-secondary/30 border border-border rounded-lg focus:outline-none focus:border-primary text-foreground placeholder:text-muted-foreground"
-            />
-          </div>
-          <div className="flex gap-1.5 flex-wrap">
-            {["All", ...ALL_USER_CATEGORIES].map(cat => (
-              <button
-                key={cat}
-                onClick={() => setActiveCategory(cat)}
-                className={`px-3 py-1.5 rounded-md text-xs font-semibold border transition-colors ${activeCategory === cat ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:text-foreground"}`}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
+        <div className="relative max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search title, notes, tags…"
+            className="w-full pl-9 pr-3 py-2 text-sm bg-secondary/30 border border-border rounded-lg focus:outline-none focus:border-primary text-foreground placeholder:text-muted-foreground"
+          />
         </div>
       )}
 
+      {/* Video grid */}
       {isLoading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mt-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {[1, 2, 3, 4].map(i => (
             <div key={i} className="bg-card border border-border rounded-xl overflow-hidden animate-pulse">
               <div className="aspect-video bg-secondary" />
@@ -146,7 +267,7 @@ export default function MySwings() {
           ))}
         </div>
       ) : userVideos.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
+        <div className="flex flex-col items-center justify-center py-16 gap-4 text-center">
           <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center">
             <Film className="w-8 h-8 text-muted-foreground/50" />
           </div>
@@ -156,14 +277,14 @@ export default function MySwings() {
           </div>
         </div>
       ) : filteredVideos.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-12 gap-3 text-center">
+        <div className="flex flex-col items-center justify-center py-10 gap-3 text-center">
           <p className="text-muted-foreground text-sm">No swings match your search.</p>
-          <button onClick={() => { setSearchQuery(""); setActiveCategory("All"); }} className="text-xs text-primary hover:underline">Clear filters</button>
+          <button onClick={() => setSearchQuery("")} className="text-xs text-primary hover:underline">Clear search</button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mt-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {bulkMode && (
-            <div className="col-span-full flex items-center gap-2 text-sm text-muted-foreground">
+            <div className="col-span-full text-sm text-muted-foreground">
               {selected.size} of {filteredVideos.length} selected
             </div>
           )}
@@ -175,13 +296,227 @@ export default function MySwings() {
               selected={selected.has(video.id)}
               onToggleSelect={toggleSelect}
               onSelect={(v) => navigate(`/?videoId=${v.id}`)}
-              showDelete={true}
-              showTrim={true}
+              showDelete showTrim
               playLabel="Analyze"
             />
           ))}
         </div>
       )}
+
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {/* ── Development Blueprint ── */}
+      <div className="border-t border-border pt-6 space-y-4">
+        <SectionDivider
+          icon={<BookOpen className="w-3.5 h-3.5" />}
+          title="Development Blueprint"
+          href="/development"
+          onNavigate={navigate}
+        />
+
+        {focusPhases.length > 0 ? (
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+              <Star className="w-3 h-3 text-primary" />Currently working on:
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {focusPhases.map(p => (
+                <span
+                  key={p}
+                  className={`text-xs font-semibold px-3 py-1.5 rounded-full border ${PHASE_COLORS[p] ?? "bg-secondary text-muted-foreground border-border"}`}
+                >
+                  {PHASE_LABELS[p] ?? p}
+                </span>
+              ))}
+            </div>
+            <button onClick={() => navigate("/development")} className="text-xs text-primary hover:underline">
+              Open Blueprint →
+            </button>
+          </div>
+        ) : (
+          <div className="bg-card border border-border rounded-xl p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <p className="font-semibold text-sm mb-1">Build your development plan</p>
+              <p className="text-xs text-muted-foreground max-w-sm">
+                A phase-by-phase hitting curriculum — Foundation, Gather, Lag, On Plane, Contact, Finish.
+                {isFree && " Foundation is free. Upgrade to unlock all phases."}
+              </p>
+            </div>
+            <Button size="sm" onClick={() => navigate("/development")} variant="outline">
+              Open Blueprint
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* ── Cognition ── */}
+      <div className="border-t border-border pt-6 space-y-4">
+        <SectionDivider
+          icon={<Brain className="w-3.5 h-3.5" />}
+          title="Cognition"
+          href="/cognition"
+          onNavigate={navigate}
+        />
+
+        {cognitionSessions.length > 0 ? (
+          <div className="bg-card border border-border rounded-xl p-5 space-y-4">
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <p className="text-xs text-muted-foreground mb-0.5">Latest</p>
+                <p className="text-xl font-bold text-primary">{Number(latestCognition?.threshold).toFixed(2)}</p>
+                <p className="text-[10px] text-muted-foreground">u/s threshold</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground mb-0.5">Personal Best</p>
+                <p className="text-xl font-bold text-yellow-400 flex items-center gap-1">
+                  <Trophy className="w-4 h-4" />{Number(bestCognition?.threshold).toFixed(2)}
+                </p>
+                <p className="text-[10px] text-muted-foreground">u/s threshold</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground mb-0.5">Accuracy</p>
+                <p className="text-xl font-bold text-green-400">{latestCognition?.accuracy}%</p>
+                <p className="text-[10px] text-muted-foreground">{latestCognition?.correctRounds}/{latestCognition?.totalRounds} rounds</p>
+              </div>
+            </div>
+            {cognitionChartData.length > 1 && (
+              <ResponsiveContainer width="100%" height={80}>
+                <LineChart data={cognitionChartData}>
+                  <XAxis dataKey="round" tick={false} axisLine={false} tickLine={false} />
+                  <YAxis domain={["auto", "auto"]} hide />
+                  <ChartTooltip
+                    contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
+                    formatter={(v: any) => [`${v} u/s`, "Threshold"]}
+                    labelFormatter={(l) => `Session ${l}`}
+                  />
+                  <Line type="monotone" dataKey="threshold" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        ) : isFree ? (
+          <div className="bg-card border border-border rounded-xl p-5 space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-semibold text-sm mb-1">3D Multiple Object Tracking</p>
+                <p className="text-xs text-muted-foreground max-w-sm">
+                  Train the same visual attention skills used by elite hitters. Free plan includes {FREE_COGNITION_LIMIT} sessions — results won't be saved.
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Sessions used: <span className="font-semibold text-foreground">{freeSessionCount} / {FREE_COGNITION_LIMIT}</span>
+                </p>
+              </div>
+              {freeSessionCount < FREE_COGNITION_LIMIT
+                ? <Button size="sm" onClick={() => navigate("/cognition")}>Try it free</Button>
+                : <Button size="sm" onClick={() => navigate("/pricing")}>Upgrade</Button>
+              }
+            </div>
+            <div className="border-t border-border pt-3 space-y-1.5">
+              <p className="text-xs font-semibold text-muted-foreground">Unlock with Player+</p>
+              <ul className="text-xs text-muted-foreground space-y-1">
+                <li className="flex items-center gap-1.5"><span className="text-primary">✓</span> Unlimited sessions</li>
+                <li className="flex items-center gap-1.5"><span className="text-primary">✓</span> Full history & threshold trend</li>
+                <li className="flex items-center gap-1.5"><span className="text-primary">✓</span> Track improvement over time</li>
+              </ul>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-card border border-border rounded-xl p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <p className="font-semibold text-sm mb-1">3D Multiple Object Tracking</p>
+              <p className="text-xs text-muted-foreground max-w-sm">Train your visual attention and processing speed the way elite hitters do.</p>
+            </div>
+            <Button size="sm" onClick={() => navigate("/cognition")}>Play Now</Button>
+          </div>
+        )}
+      </div>
+
+      {/* ── MLB Comps ── */}
+      {isPaid && (
+        <div className="border-t border-border pt-6 space-y-4">
+          <SectionDivider
+            icon={<Dna className="w-3.5 h-3.5" />}
+            title="MLB Comps"
+            href="/biometrics"
+            onNavigate={navigate}
+          />
+          {autoComps.length > 0 ? (
+            <div className="flex gap-3 overflow-x-auto pb-1">
+              {autoComps.map((comp, i) => (
+                <div
+                  key={comp.id}
+                  onClick={() => navigate("/biometrics")}
+                  className="bg-card border border-border rounded-xl p-4 flex items-center gap-3 shrink-0 cursor-pointer hover:border-primary/40 transition-colors min-w-44"
+                >
+                  {comp.player.savantId ? (
+                    <img
+                      src={`https://img.mlbstatic.com/mlb-photos/image/upload/w_60,q_auto:good/v1/people/${comp.player.savantId}/headshot/67/current`}
+                      alt={comp.player.name}
+                      className="w-10 h-10 rounded-full object-cover bg-secondary/50 shrink-0"
+                      onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0 text-xs font-bold text-primary">
+                      {comp.player.name[0]}
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1">
+                      {i === 0 && <Trophy className="w-3 h-3 text-yellow-400 shrink-0" />}
+                      <p className="text-sm font-semibold truncate">{comp.player.name}</p>
+                    </div>
+                    <p className="text-xs text-muted-foreground truncate">{comp.player.team}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="bg-card border border-border rounded-xl p-5 flex items-center justify-between gap-4">
+              <div>
+                <p className="font-semibold text-sm mb-1">Find your MLB comps</p>
+                <p className="text-xs text-muted-foreground">Enter your physical profile to get matched with MLB hitters with similar builds.</p>
+              </div>
+              <Button size="sm" variant="outline" onClick={() => navigate("/biometrics")}>Set up</Button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Recent Coaching ── */}
+      {isPaid && coachSessions.length > 0 && (
+        <div className="border-t border-border pt-6 space-y-4">
+          <SectionDivider
+            icon={<Users className="w-3.5 h-3.5" />}
+            title="Recent Coaching"
+            href="/development"
+            onNavigate={navigate}
+          />
+          <div className="space-y-2">
+            {coachSessions.slice(0, 3).map(s => {
+              const coachName = [s.coachFirstName, s.coachLastName].filter(Boolean).join(" ") || s.coachUsername;
+              const date = s.sharedAt ?? s.createdAt;
+              return (
+                <div
+                  key={s.id}
+                  onClick={() => navigate("/development?session=" + s.id)}
+                  className="bg-card border border-border rounded-xl px-4 py-3 flex items-start justify-between gap-3 cursor-pointer hover:border-primary/40 transition-colors"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">
+                      From <span className="text-primary">{coachName}</span>
+                      {s.coachOrganization && <span className="text-muted-foreground text-xs ml-1">· {s.coachOrganization}</span>}
+                    </p>
+                    {s.notes && <p className="text-xs text-muted-foreground truncate mt-0.5">{s.notes}</p>}
+                  </div>
+                  <span className="text-xs text-muted-foreground shrink-0">
+                    {new Date(date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
     </Layout>
   );
 }

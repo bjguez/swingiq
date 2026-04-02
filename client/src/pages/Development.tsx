@@ -154,6 +154,7 @@ export default function Development() {
   usePageMeta({ title: "Development Blueprint", description: "A structured, phase-by-phase hitting development program with drills, video breakdowns, and coach feedback.", path: "/development" });
   const { user } = useAuth();
   const isPaidAny = user?.isAdmin || ["player", "pro", "coach"].includes(user?.subscriptionTier ?? "");
+  const isFree = !!user && !isPaidAny;
   const [, navigate] = useLocation();
   const search = useSearch();
   const [authGateOpen, setAuthGateOpen] = useState(false);
@@ -318,23 +319,44 @@ export default function Development() {
 
           {/* Phase tab bar */}
           <div className="flex border-b border-border overflow-x-auto scrollbar-none">
-            {BLUEPRINT_PHASES.map(phase => (
-              <button
-                key={phase.id}
-                onClick={() => setBlueprintPhase(phase.id)}
-                className={`px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors whitespace-nowrap flex items-center gap-1.5 ${
-                  blueprintPhase === phase.id
-                    ? "border-primary text-foreground"
-                    : "border-transparent text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {phase.label}
-                {focusPhases.includes(phase.id) && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-primary inline-block" />
-                )}
-              </button>
-            ))}
+            {BLUEPRINT_PHASES.map(phase => {
+              const locked = isFree && phase.id !== "foundation";
+              return (
+                <button
+                  key={phase.id}
+                  onClick={() => !locked && setBlueprintPhase(phase.id)}
+                  title={locked ? "Upgrade to unlock all phases" : undefined}
+                  className={`px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors whitespace-nowrap flex items-center gap-1.5 ${
+                    locked
+                      ? "border-transparent text-muted-foreground/40 cursor-not-allowed"
+                      : blueprintPhase === phase.id
+                      ? "border-primary text-foreground"
+                      : "border-transparent text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {phase.label}
+                  {locked
+                    ? <Lock className="w-3 h-3 text-yellow-500/70" />
+                    : focusPhases.includes(phase.id) && <span className="w-1.5 h-1.5 rounded-full bg-primary inline-block" />
+                  }
+                </button>
+              );
+            })}
           </div>
+
+          {/* Free tier upsell banner under phase bar */}
+          {isFree && (
+            <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-2 text-sm">
+                <Lock className="w-4 h-4 text-yellow-500 shrink-0" />
+                <span className="text-yellow-400 font-medium">Free plan — Foundation phase only.</span>
+                <span className="text-muted-foreground hidden sm:inline">Upgrade to unlock all 6 phases.</span>
+              </div>
+              <button onClick={() => navigate("/pricing")} className="text-xs font-semibold text-yellow-400 hover:text-yellow-300 underline shrink-0">
+                Upgrade
+              </button>
+            </div>
+          )}
 
           {/* Phase content */}
           <div className="space-y-5 pb-6">
@@ -344,18 +366,20 @@ export default function Development() {
                 <h2 className="text-xl font-bold font-display uppercase">{currentPhaseData.label}</h2>
                 <p className="text-sm text-muted-foreground">{currentPhaseData.subtitle}</p>
               </div>
-              <button
-                onClick={() => toggleFocus.mutate(blueprintPhase)}
-                disabled={toggleFocus.isPending}
-                className={`shrink-0 flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors border ${
-                  isWorkingOn
-                    ? "bg-primary/15 border-primary/40 text-primary"
-                    : "border-border text-muted-foreground hover:text-foreground hover:border-foreground/30"
-                }`}
-              >
-                <Star className={`w-3.5 h-3.5 ${isWorkingOn ? "fill-primary" : ""}`} />
-                {isWorkingOn ? "Working on this" : "Add to focus"}
-              </button>
+              {!(isFree && blueprintPhase !== "foundation") && (
+                <button
+                  onClick={() => toggleFocus.mutate(blueprintPhase)}
+                  disabled={toggleFocus.isPending}
+                  className={`shrink-0 flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors border ${
+                    isWorkingOn
+                      ? "bg-primary/15 border-primary/40 text-primary"
+                      : "border-border text-muted-foreground hover:text-foreground hover:border-foreground/30"
+                  }`}
+                >
+                  <Star className={`w-3.5 h-3.5 ${isWorkingOn ? "fill-primary" : ""}`} />
+                  {isWorkingOn ? "Working on this" : "Add to focus"}
+                </button>
+              )}
             </div>
 
             {/* Feel cue */}

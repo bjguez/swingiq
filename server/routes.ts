@@ -5,7 +5,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertMlbPlayerSchema, insertVideoSchema, insertDrillSchema, insertSessionSchema, cognitionSessions, videos } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, sql as sqlFn } from "drizzle-orm";
+import { eq, desc, sql as sqlFn, count as drizzleCount } from "drizzle-orm";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -1177,6 +1177,8 @@ export async function registerRoutes(
   });
 
   // ── Cognition sessions ────────────────────────────────────────────────────────
+  const FREE_COGNITION_LIMIT = 3;
+
   app.post("/api/cognition/sessions", async (req, res) => {
     if (!req.user) return res.status(401).json({ message: "Not authenticated" });
     try {
@@ -1185,6 +1187,17 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Missing required fields" });
       }
       const userId = (req.user as any).id as string;
+      const tier = (req.user as any).subscriptionTier ?? "free";
+      const isFree = !["player", "pro", "coach"].includes(tier) && !(req.user as any).isAdmin;
+      if (isFree) {
+        const [{ count }] = await db
+          .select({ count: drizzleCount() })
+          .from(cognitionSessions)
+          .where(eq(cognitionSessions.userId, userId));
+        if (Number(count) >= FREE_COGNITION_LIMIT) {
+          return res.status(403).json({ message: "free_limit_reached" });
+        }
+      }
       const [session] = await db.insert(cognitionSessions).values({
         userId,
         threshold: parseFloat(threshold),
@@ -1203,6 +1216,16 @@ export async function registerRoutes(
     if (!req.user) return res.status(401).json({ message: "Not authenticated" });
     try {
       const userId = (req.user as any).id as string;
+      const tier = (req.user as any).subscriptionTier ?? "free";
+      const isFree = !["player", "pro", "coach"].includes(tier) && !(req.user as any).isAdmin;
+      // Free users: return session count only (no history stored client-side)
+      if (isFree) {
+        const [{ count }] = await db
+          .select({ count: drizzleCount() })
+          .from(cognitionSessions)
+          .where(eq(cognitionSessions.userId, userId));
+        return res.json({ freeSessionCount: Number(count), limit: FREE_COGNITION_LIMIT });
+      }
       const sessions = await db
         .select()
         .from(cognitionSessions)

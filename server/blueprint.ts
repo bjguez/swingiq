@@ -15,13 +15,22 @@ async function resolveUrl(key: string | null | undefined): Promise<string | null
 
 export function setupBlueprintRoutes(app: Express) {
 
+  const FREE_BLUEPRINT_PHASES = ["foundation"];
+
   // ── GET all blueprint content (optionally filtered by phase) ─────────────
   app.get("/api/blueprint/content", async (req, res) => {
     try {
+      const user = req.user as User | undefined;
+      const tier = (user as any)?.subscriptionTier ?? "free";
+      const isFree = user && !["player", "pro", "coach"].includes(tier) && !(user as any).isAdmin;
       const { phase } = req.query;
-      const rows = phase
+
+      // Free tier: restrict to foundation only
+      const effectivePhase = isFree ? "foundation" : (phase as string | undefined);
+
+      const rows = effectivePhase
         ? await db.select().from(blueprintContent)
-            .where(eq(blueprintContent.phase, phase as string))
+            .where(eq(blueprintContent.phase, effectivePhase))
             .orderBy(asc(blueprintContent.sortOrder), asc(blueprintContent.createdAt))
         : await db.select().from(blueprintContent)
             .orderBy(asc(blueprintContent.phase), asc(blueprintContent.sortOrder), asc(blueprintContent.createdAt));
@@ -127,6 +136,11 @@ export function setupBlueprintRoutes(app: Express) {
       const { phase } = req.params;
       if (!VALID_PHASES.includes(phase as any)) {
         return res.status(400).json({ message: "Invalid phase" });
+      }
+      const tier = (user as any).subscriptionTier ?? "free";
+      const isFree = !["player", "pro", "coach"].includes(tier) && !(user as any).isAdmin;
+      if (isFree && !FREE_BLUEPRINT_PHASES.includes(phase)) {
+        return res.status(403).json({ message: "free_plan_restricted" });
       }
       // Toggle: if exists, delete; if not, insert
       const existing = await db.select().from(playerPhaseFocus)

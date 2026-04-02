@@ -182,6 +182,8 @@ export default function VisionTraining() {
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
   const isPro = user?.isAdmin || ["pro", "coach"].includes(user?.subscriptionTier ?? "");
+  const isPaid = user?.isAdmin || ["player", "pro", "coach"].includes(user?.subscriptionTier ?? "");
+  const isFree = !!user && !isPaid;
 
   // Scroll to top on mount
   useEffect(() => { window.scrollTo(0, 0); }, []);
@@ -202,16 +204,22 @@ export default function VisionTraining() {
   const velRef = useRef<THREE.Vector3[]>([]);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Session history
-  const { data: pastSessions } = useQuery<CognitionSession[]>({
+  // Session history (paid) or session count (free)
+  const { data: sessionsData } = useQuery({
     queryKey: ["/api/cognition/sessions"],
     queryFn: async () => {
       const res = await fetch("/api/cognition/sessions");
-      if (!res.ok) return [];
+      if (!res.ok) return null;
       return res.json();
     },
-    enabled: !!user && isPro,
+    enabled: !!user,
   });
+
+  // pastSessions is array for paid, null for free (free gets count object instead)
+  const pastSessions: CognitionSession[] | null = Array.isArray(sessionsData) ? sessionsData : null;
+  const freeSessionCount: number = (!Array.isArray(sessionsData) && sessionsData?.freeSessionCount) ?? 0;
+  const FREE_LIMIT = 3;
+  const freeAtLimit = isFree && freeSessionCount >= FREE_LIMIT;
 
   const saveSession = useMutation({
     mutationFn: async (payload: {
@@ -223,6 +231,7 @@ export default function VisionTraining() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
+      if (res.status === 403) return null; // free limit reached, silently skip
       if (!res.ok) throw new Error("Failed to save session");
       return res.json();
     },
@@ -375,7 +384,7 @@ export default function VisionTraining() {
     return "#3b82f6";
   });
 
-  if (!isPro) {
+  if (!user) {
     return (
       <Layout>
         <div className="max-w-lg mx-auto px-4 py-16 text-center space-y-6">
@@ -383,22 +392,38 @@ export default function VisionTraining() {
             <Lock size={28} className="text-primary" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold mb-2">Cognition is a Pro feature</h1>
+            <h1 className="text-2xl font-bold mb-2">Sign in to play Cognition</h1>
+            <p className="text-muted-foreground">Train your visual attention and processing speed the way professional athletes do.</p>
+          </div>
+          <Button onClick={() => navigate("/auth")} size="lg">Sign In</Button>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (freeAtLimit) {
+    return (
+      <Layout>
+        <div className="max-w-lg mx-auto px-4 py-16 text-center space-y-6">
+          <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
+            <Lock size={28} className="text-primary" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold mb-2">You've used your {FREE_LIMIT} free sessions</h1>
             <p className="text-muted-foreground">
-              3D Multiple Object Tracking is available on the Pro and Coach plans.
-              Train your visual attention and processing speed the way professional athletes do.
+              Upgrade to unlock unlimited sessions, save your history, and track your threshold over time.
             </p>
           </div>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <Button onClick={() => navigate("/pricing")} size="lg">
-              Upgrade to Pro
-            </Button>
-            {!user && (
-              <Button variant="outline" size="lg" onClick={() => navigate("/auth")}>
-                Sign In
-              </Button>
-            )}
+          <div className="bg-card border border-border rounded-xl p-4 text-left space-y-2 text-sm">
+            <p className="font-semibold text-foreground">What you get with Player+</p>
+            <ul className="space-y-1 text-muted-foreground">
+              <li className="flex items-center gap-2"><span className="text-primary">✓</span> Unlimited cognition sessions</li>
+              <li className="flex items-center gap-2"><span className="text-primary">✓</span> Full session history & threshold trend</li>
+              <li className="flex items-center gap-2"><span className="text-primary">✓</span> All Blueprint phases unlocked</li>
+              <li className="flex items-center gap-2"><span className="text-primary">✓</span> Biometrics & MLB comps</li>
+            </ul>
           </div>
+          <Button onClick={() => navigate("/pricing")} size="lg">Upgrade Plan</Button>
         </div>
       </Layout>
     );
@@ -487,6 +512,12 @@ export default function VisionTraining() {
                     </button>
                   </div>
                 </div>
+                {isFree && (
+                  <div className="w-full max-w-xs bg-yellow-500/10 border border-yellow-500/25 rounded-lg px-3 py-2 text-xs text-yellow-400 text-left space-y-0.5">
+                    <p className="font-semibold">Free plan — {FREE_LIMIT - freeSessionCount} session{FREE_LIMIT - freeSessionCount !== 1 ? "s" : ""} remaining</p>
+                    <p className="text-yellow-400/70">Session results won't be saved. <button onClick={() => navigate("/pricing")} className="underline hover:text-yellow-300">Upgrade</button> to track your history.</p>
+                  </div>
+                )}
                 <Button onClick={handleStart} size="lg" className="gap-2">
                   <Play size={16} /> Start Session
                 </Button>
