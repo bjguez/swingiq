@@ -48,9 +48,9 @@ const EXERCISES = [
   {
     id: "ghost_ball",
     name: "Ghost Ball",
-    tagline: "React the moment it appears",
-    description: "The ball hides, then suddenly reappears somewhere on screen. Tap it as fast as you can. Starts slow, gets rapid. Trains visual reaction speed.",
-    metric: "Reaction time",
+    tagline: "Find it the instant it appears",
+    description: "The ball hides, then flashes somewhere on screen. Lock onto it the moment it appears before it vanishes. Starts with long flashes, gets shorter and faster. Trains rapid visual acquisition.",
+    metric: "Completion",
     free: false,
     duration: 30,
     color: "#f97316",
@@ -71,8 +71,8 @@ type ExerciseId = typeof EXERCISES[number]["id"];
 
 // ── Shared 3D constants ───────────────────────────────────────────────────────
 
-const BOX_X = 3.2;
-const BOX_Y = 1.8;
+const BOX_X = 5.0;
+const BOX_Y = 2.8;
 
 function randPos() {
   return new THREE.Vector3(
@@ -86,15 +86,16 @@ function randPos() {
 
 function PursuitScene({ running, onUpdate }: { running: boolean; onUpdate: (speed: number) => void }) {
   const pos = useRef(new THREE.Vector3(0, 0, 0));
-  const vel = useRef(new THREE.Vector3(1.2, 0.9, 0).normalize().multiplyScalar(1.5));
+  const vel = useRef(new THREE.Vector3(1.2, 0.9, 0).normalize().multiplyScalar(2.5));
   const meshRef = useRef<THREE.Mesh>(null);
-  const speedRef = useRef(1.5);
+  const speedRef = useRef(2.5);
   const elapsed = useRef(0);
 
   useFrame((_, delta) => {
     if (!running || !meshRef.current) return;
     elapsed.current += delta;
-    speedRef.current = 1.5 + elapsed.current * 0.08;
+    // Starts at 2.5 u/s, hits ~9 u/s by 30s
+    speedRef.current = 2.5 + elapsed.current * 0.22;
     vel.current.normalize().multiplyScalar(speedRef.current);
 
     pos.current.addScaledVector(vel.current, delta);
@@ -124,15 +125,16 @@ function PursuitScene({ running, onUpdate }: { running: boolean; onUpdate: (spee
 
 function PeripheralLockScene({ running }: { running: boolean }) {
   const pos = useRef(new THREE.Vector3(2, 0.5, 0));
-  const vel = useRef(new THREE.Vector3(-0.9, 0.7, 0).normalize().multiplyScalar(1.8));
+  const vel = useRef(new THREE.Vector3(-0.9, 0.7, 0).normalize().multiplyScalar(2.5));
   const meshRef = useRef<THREE.Mesh>(null);
-  const speedRef = useRef(1.8);
+  const speedRef = useRef(2.5);
   const elapsed = useRef(0);
 
   useFrame((_, delta) => {
     if (!running || !meshRef.current) return;
     elapsed.current += delta;
-    speedRef.current = 1.8 + elapsed.current * 0.06;
+    // Starts at 2.5 u/s, hits ~8 u/s by 30s
+    speedRef.current = 2.5 + elapsed.current * 0.18;
 
     pos.current.addScaledVector(vel.current.normalize().multiplyScalar(speedRef.current), delta);
 
@@ -217,33 +219,32 @@ function PeripheralFlashScene({ running }: { running: boolean }) {
 
 // ── Exercise 4: Ghost Ball ────────────────────────────────────────────────────
 
-function GhostBallScene({
-  running, onTap,
-}: {
-  running: boolean;
-  onTap: (correct: boolean) => void;
-}) {
+function GhostBallScene({ running }: { running: boolean }) {
   const [ballPos, setBallPos] = useState<THREE.Vector3 | null>(null);
   const [visible, setVisible] = useState(false);
-  const intervalRef = useRef(1.8);
+  const intervalRef = useRef(1.6);
   const timerRef = useRef(0);
   const visibleTimer = useRef(0);
-  const VISIBLE_SECS = 0.6;
+  // Visible duration shrinks over time for increasing challenge
+  const VISIBLE_SECS = useRef(0.55);
+  const elapsed = useRef(0);
 
   useFrame((_, delta) => {
     if (!running) return;
+    elapsed.current += delta;
+    // Speed up flash cadence over time
     if (visible) {
       visibleTimer.current += delta;
-      if (visibleTimer.current >= VISIBLE_SECS) {
+      if (visibleTimer.current >= VISIBLE_SECS.current) {
         setVisible(false);
         visibleTimer.current = 0;
-        onTap(false); // missed
       }
     } else {
       timerRef.current += delta;
       if (timerRef.current >= intervalRef.current) {
         timerRef.current = 0;
-        intervalRef.current = Math.max(0.5, intervalRef.current * 0.9);
+        intervalRef.current = Math.max(0.35, intervalRef.current * 0.88);
+        VISIBLE_SECS.current = Math.max(0.25, 0.55 - elapsed.current * 0.008);
         setBallPos(randPos());
         setVisible(true);
         visibleTimer.current = 0;
@@ -251,17 +252,10 @@ function GhostBallScene({
     }
   });
 
-  const handleClick = useCallback(() => {
-    if (!visible) return;
-    setVisible(false);
-    visibleTimer.current = 0;
-    onTap(true);
-  }, [visible, onTap]);
-
   if (!ballPos || !visible) return null;
 
   return (
-    <mesh position={ballPos} onClick={handleClick}>
+    <mesh position={ballPos}>
       <sphereGeometry args={[0.26, 24, 24]} />
       <meshStandardMaterial color="#f97316" emissive="#f97316" emissiveIntensity={0.5} />
     </mesh>
@@ -371,7 +365,10 @@ function DrillRunner({
     if (phase !== "running") return;
     if (timeLeft <= 0) {
       const durationSecs = Math.round((Date.now() - startTimeRef.current) / 1000);
-      const accuracy = (hits + misses) > 0 ? Math.round((hits / (hits + misses)) * 100) : undefined;
+      // ghost_ball is a pure observation drill — no accuracy metric
+      const accuracy = exerciseId !== "ghost_ball" && (hits + misses) > 0
+        ? Math.round((hits / (hits + misses)) * 100)
+        : undefined;
       setPhase("done");
       onComplete({ maxSpeed: maxSpeedRef.current || undefined, accuracy, durationSecs });
       return;
@@ -393,9 +390,9 @@ function DrillRunner({
   return (
     <div className="space-y-3">
       {/* Canvas */}
-      <div className="relative rounded-xl overflow-hidden border border-border bg-[#050a14]" style={{ height: 480 }}>
+      <div className="relative rounded-xl overflow-hidden border border-border bg-[#050a14] w-full" style={{ height: "min(60vw, 560px)", minHeight: 300 }}>
         <Canvas>
-          <PerspectiveCamera makeDefault position={[0, 0, 8]} fov={50} />
+          <PerspectiveCamera makeDefault position={[0, 0, 9]} fov={60} />
           <ambientLight intensity={0.6} />
           <pointLight position={[5, 5, 5]} intensity={0.8} />
           {phase === "running" && exerciseId === "pursuit" && (
@@ -408,7 +405,7 @@ function DrillRunner({
             <PeripheralFlashScene running={true} />
           )}
           {phase === "running" && exerciseId === "ghost_ball" && (
-            <GhostBallScene running={true} onTap={handleTap} />
+            <GhostBallScene running={true} />
           )}
           {phase === "running" && exerciseId === "color_filter" && (
             <ColorFilterScene running={true} onTap={handleTap} />
@@ -442,7 +439,7 @@ function DrillRunner({
                   {currentSpeed.toFixed(1)} u/s
                 </div>
               )}
-              {(exerciseId === "ghost_ball" || exerciseId === "color_filter") && (
+              {exerciseId === "color_filter" && (
                 <div className="bg-black/60 text-white text-xs font-mono px-3 py-1.5 rounded-full">
                   {hits} hits · {misses} miss
                 </div>
