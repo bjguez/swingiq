@@ -10,6 +10,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
 import { usePageMeta } from "@/hooks/use-page-meta";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import type { AcuityCompletion } from "@shared/schema";
 
 // ── Exercise definitions ──────────────────────────────────────────────────────
@@ -94,8 +95,8 @@ function PursuitScene({ running, onUpdate }: { running: boolean; onUpdate: (spee
   useFrame((_, delta) => {
     if (!running || !meshRef.current) return;
     elapsed.current += delta;
-    // Starts at 2.5 u/s, hits ~9 u/s by 30s
-    speedRef.current = 2.5 + elapsed.current * 0.22;
+    // Starts at 3 u/s, hits ~21 u/s by 30s (exponential ramp)
+    speedRef.current = 3.0 * Math.pow(1.065, elapsed.current);
     vel.current.normalize().multiplyScalar(speedRef.current);
 
     pos.current.addScaledVector(vel.current, delta);
@@ -133,8 +134,8 @@ function PeripheralLockScene({ running }: { running: boolean }) {
   useFrame((_, delta) => {
     if (!running || !meshRef.current) return;
     elapsed.current += delta;
-    // Starts at 2.5 u/s, hits ~8 u/s by 30s
-    speedRef.current = 2.5 + elapsed.current * 0.18;
+    // Starts at 3 u/s, hits ~19 u/s by 30s (exponential ramp)
+    speedRef.current = 3.0 * Math.pow(1.06, elapsed.current);
 
     pos.current.addScaledVector(vel.current.normalize().multiplyScalar(speedRef.current), delta);
 
@@ -184,7 +185,7 @@ function PeripheralFlashScene({ running }: { running: boolean }) {
     timer.current += delta;
     if (timer.current >= interval.current) {
       timer.current = 0;
-      interval.current = Math.max(0.4, interval.current * 0.92);
+      interval.current = Math.max(0.18, interval.current * 0.87);
       // Jump to random position, avoid center
       let newPos: THREE.Vector3;
       do {
@@ -243,8 +244,8 @@ function GhostBallScene({ running }: { running: boolean }) {
       timerRef.current += delta;
       if (timerRef.current >= intervalRef.current) {
         timerRef.current = 0;
-        intervalRef.current = Math.max(0.35, intervalRef.current * 0.88);
-        VISIBLE_SECS.current = Math.max(0.25, 0.55 - elapsed.current * 0.008);
+        intervalRef.current = Math.max(0.2, intervalRef.current * 0.84);
+        VISIBLE_SECS.current = Math.max(0.15, 0.55 - elapsed.current * 0.012);
         setBallPos(randPos());
         setVisible(true);
         visibleTimer.current = 0;
@@ -264,35 +265,32 @@ function GhostBallScene({ running }: { running: boolean }) {
 
 // ── Exercise 5: Color Filter ──────────────────────────────────────────────────
 
-function ColorFilterScene({
-  running, onTap,
-}: {
-  running: boolean;
-  onTap: (correct: boolean) => void;
-}) {
+function ColorFilterScene({ running }: { running: boolean }) {
   const [balls, setBalls] = useState<{ pos: THREE.Vector3; isTarget: boolean; id: number }[]>([]);
   const [showing, setShowing] = useState(false);
-  const intervalRef = useRef(2.0);
+  const intervalRef = useRef(1.8);
   const timerRef = useRef(0);
   const showTimer = useRef(0);
-  const SHOW_SECS = 0.7;
+  const showSecsRef = useRef(0.65);
+  const elapsed = useRef(0);
   const idRef = useRef(0);
 
   useFrame((_, delta) => {
     if (!running) return;
+    elapsed.current += delta;
     if (showing) {
       showTimer.current += delta;
-      if (showTimer.current >= SHOW_SECS) {
+      if (showTimer.current >= showSecsRef.current) {
         setShowing(false);
         showTimer.current = 0;
         setBalls([]);
-        onTap(false); // missed
       }
     } else {
       timerRef.current += delta;
       if (timerRef.current >= intervalRef.current) {
         timerRef.current = 0;
-        intervalRef.current = Math.max(0.5, intervalRef.current * 0.9);
+        intervalRef.current = Math.max(0.3, intervalRef.current * 0.88);
+        showSecsRef.current = Math.max(0.2, 0.65 - elapsed.current * 0.01);
         const posA = randPos();
         let posB: THREE.Vector3;
         do { posB = randPos(); } while (posB.distanceTo(posA) < 1.0);
@@ -310,17 +308,7 @@ function ColorFilterScene({
   return (
     <>
       {showing && balls.map(b => (
-        <mesh
-          key={b.id}
-          position={b.pos}
-          onClick={(e) => {
-            e.stopPropagation();
-            if (!showing) return;
-            setShowing(false);
-            setBalls([]);
-            onTap(b.isTarget);
-          }}
-        >
+        <mesh key={b.id} position={b.pos}>
           <sphereGeometry args={[0.26, 24, 24]} />
           <meshStandardMaterial
             color={b.isTarget ? "#22c55e" : "#ef4444"}
@@ -365,10 +353,8 @@ function DrillRunner({
     if (phase !== "running") return;
     if (timeLeft <= 0) {
       const durationSecs = Math.round((Date.now() - startTimeRef.current) / 1000);
-      // ghost_ball is a pure observation drill — no accuracy metric
-      const accuracy = exerciseId !== "ghost_ball" && (hits + misses) > 0
-        ? Math.round((hits / (hits + misses)) * 100)
-        : undefined;
+      // ghost_ball and color_filter are pure observation drills — no accuracy metric
+      const accuracy = undefined;
       setPhase("done");
       onComplete({ maxSpeed: maxSpeedRef.current || undefined, accuracy, durationSecs });
       return;
@@ -408,7 +394,7 @@ function DrillRunner({
             <GhostBallScene running={true} />
           )}
           {phase === "running" && exerciseId === "color_filter" && (
-            <ColorFilterScene running={true} onTap={handleTap} />
+            <ColorFilterScene running={true} />
           )}
         </Canvas>
 
@@ -439,11 +425,6 @@ function DrillRunner({
                   {currentSpeed.toFixed(1)} u/s
                 </div>
               )}
-              {exerciseId === "color_filter" && (
-                <div className="bg-black/60 text-white text-xs font-mono px-3 py-1.5 rounded-full">
-                  {hits} hits · {misses} miss
-                </div>
-              )}
             </motion.div>
           )}
           {phase === "running" && exerciseId === "peripheral_lock" && (
@@ -467,18 +448,6 @@ function DrillRunner({
             >
               <div className="bg-red-500/80 text-white text-xs font-semibold px-4 py-2 rounded-full">
                 Eyes on the crosshair — feel it jump
-              </div>
-            </motion.div>
-          )}
-          {phase === "running" && exerciseId === "color_filter" && (
-            <motion.div
-              key="hint3"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="absolute bottom-4 inset-x-0 flex justify-center pointer-events-none"
-            >
-              <div className="bg-black/60 text-white text-xs font-semibold px-4 py-2 rounded-full">
-                Tap the <span className="text-green-400">green</span> ball only
               </div>
             </motion.div>
           )}
@@ -556,9 +525,8 @@ export default function Acuity() {
   const [phase, setPhase] = useState<"picker" | "running" | "complete">("picker");
   const [completionStats, setCompletionStats] = useState<{ maxSpeed?: number; accuracy?: number; durationSecs: number } | null>(null);
 
-  const { data: completionsData } = useQuery({
+  const { data: completionsData } = useQuery<{ completions: AcuityCompletion[]; freeCompletionCount?: number; freeLimit?: number }>({
     queryKey: ["/api/acuity/completions"],
-    queryFn: () => fetch("/api/acuity/completions").then(r => r.json()),
     enabled: !!user,
   });
 
@@ -576,11 +544,7 @@ export default function Acuity() {
 
   const saveCompletion = useMutation({
     mutationFn: (payload: { exerciseId: string; durationSecs: number; maxSpeed?: number; accuracy?: number }) =>
-      fetch("/api/acuity/completions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      }).then(r => { if (r.status === 403) return null; return r.json(); }),
+      apiRequest("POST", "/api/acuity/completions", payload).then(r => r.json()).catch(() => null),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/acuity/completions"] }),
   });
 

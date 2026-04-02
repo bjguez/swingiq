@@ -1,7 +1,7 @@
 import { Express } from "express";
 import { db } from "./db";
 import { acuityCompletions } from "../shared/schema";
-import { eq, desc, count as drizzleCount } from "drizzle-orm";
+import { eq, desc, count as drizzleCount, and } from "drizzle-orm";
 import type { User } from "../shared/schema";
 
 const FREE_EXERCISES = ["pursuit"];
@@ -64,7 +64,7 @@ export function setupAcuityRoutes(app: Express) {
         const [{ count }] = await db
           .select({ count: drizzleCount() })
           .from(acuityCompletions)
-          .where(eq(acuityCompletions.userId, user.id) && eq(acuityCompletions.exerciseId, "pursuit"));
+          .where(and(eq(acuityCompletions.userId, user.id), eq(acuityCompletions.exerciseId, "pursuit")));
         if (Number(count) >= FREE_COMPLETIONS_LIMIT) {
           return res.status(403).json({ message: "free_limit_reached" });
         }
