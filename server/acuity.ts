@@ -15,7 +15,8 @@ export function setupAcuityRoutes(app: Express) {
     if (!req.user) return res.status(401).json({ message: "Not authenticated" });
     const user = req.user as User;
     const tier = (user as any).subscriptionTier ?? "free";
-    const isFree = !["player", "pro", "coach"].includes(tier) && !(user as any).isAdmin;
+    const isAdmin = !!process.env.ADMIN_USERNAME && (user as any).username === process.env.ADMIN_USERNAME;
+    const isFree = !["player", "pro", "coach"].includes(tier) && !isAdmin;
     try {
       const rows = await db
         .select()
@@ -45,7 +46,8 @@ export function setupAcuityRoutes(app: Express) {
     if (!req.user) return res.status(401).json({ message: "Not authenticated" });
     const user = req.user as User;
     const tier = (user as any).subscriptionTier ?? "free";
-    const isFree = !["player", "pro", "coach"].includes(tier) && !(user as any).isAdmin;
+    const isAdmin = !!process.env.ADMIN_USERNAME && (user as any).username === process.env.ADMIN_USERNAME;
+    const isFree = !["player", "pro", "coach"].includes(tier) && !isAdmin;
 
     try {
       const { exerciseId, durationSecs, maxSpeed, accuracy } = req.body;
