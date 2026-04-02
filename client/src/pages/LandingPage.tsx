@@ -95,7 +95,7 @@ const TIERS = [
     sub: "Always free",
     cta: "Get Started",
     highlight: false,
-    features: ["Up to 10 video uploads", "Side-by-side swing comparison", "Full MLB player library", "Frame-by-frame analysis tools"],
+    features: ["Up to 5 video uploads", "Full MLB player library", "Frame-by-frame analysis tools"],
   },
   {
     name: "Player",
@@ -103,7 +103,7 @@ const TIERS = [
     sub: "per month",
     cta: "Start Player",
     highlight: true,
-    features: ["Unlimited video uploads", "Full video library management", "Biometrics — match your body to MLB comps", "Exit velocity & barrel rate analysis"],
+    features: ["Unlimited video uploads", "Full video library management", "Side-by-side comparison with any MLB hitter", "Biometrics — match your body to MLB comps"],
   },
   {
     name: "Pro",
@@ -262,14 +262,13 @@ export default function LandingPage() {
           <div className="absolute right-0 top-0 bottom-0 w-16 bg-gradient-to-l from-background to-transparent z-10 pointer-events-none" />
           <div className="flex w-max marquee-track">
             {[...MLB_TEAMS, ...MLB_TEAMS].map((team, i) => (
-              <div key={i} className="flex flex-col items-center justify-center gap-2 mx-6 shrink-0">
+              <div key={i} className="flex items-center justify-center mx-6 shrink-0">
                 <img
                   src={`https://www.mlbstatic.com/team-logos/${team.id}.svg`}
                   alt={team.name}
                   className="w-12 h-12 object-contain opacity-70 hover:opacity-100 transition-opacity"
                   onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
                 />
-                <span className="text-[10px] text-muted-foreground font-medium whitespace-nowrap">{team.name}</span>
               </div>
             ))}
           </div>
