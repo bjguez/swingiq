@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Play, Pencil, Check, X, Trash2, Scissors, Film, StickyNote, Tag, ChevronDown } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useQueryClient } from "@tanstack/react-query";
 import { renameVideo, deleteVideo, updateVideoNotes } from "@/lib/api";
 import VideoTrimmer from "./VideoTrimmer";
@@ -192,13 +193,30 @@ export function UserVideoCard({
 
           {!bulkMode && (
             <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
-              <button
-                onClick={(e) => { e.stopPropagation(); setNotesOpen(o => !o); }}
-                className={`p-1.5 rounded transition-colors ${notesOpen ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-primary hover:bg-primary/10"}`}
-                title="Swing Notes"
-              >
-                <StickyNote className="w-3.5 h-3.5" />
-              </button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setNotesOpen(o => !o); }}
+                    className={`p-1.5 rounded transition-colors ${notesOpen ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-primary hover:bg-primary/10"}`}
+                  >
+                    <StickyNote className="w-3.5 h-3.5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-50 space-y-1">
+                  {notes ? (
+                    <p className="text-xs leading-snug line-clamp-4">{notes}</p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground italic">No notes yet</p>
+                  )}
+                  {tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1 pt-0.5">
+                      {tags.map(tag => (
+                        <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-primary/20 text-primary font-medium">#{tag}</span>
+                      ))}
+                    </div>
+                  )}
+                </TooltipContent>
+              </Tooltip>
               {showTrim && video.sourceUrl && (
                 <VideoTrimmer
                   videoId={video.id}

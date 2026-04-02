@@ -8,7 +8,7 @@ import { VideoLibraryModal } from "@/components/VideoLibraryModal";
 import { UserVideoCard } from "@/components/UserVideoCard";
 import {
   Trash2, Upload, Film, Search, Brain, BookOpen, Dna, Users,
-  ChevronRight, Trophy, Lock, Star, MapPin, Zap,
+  ChevronRight, Trophy, Lock, Star, MapPin, Eye,
 } from "lucide-react";
 import {
   LineChart, Line, XAxis, YAxis, Tooltip as ChartTooltip, ResponsiveContainer,
@@ -158,6 +158,23 @@ export default function MySwings() {
     queryFn: () => fetch("/api/biometrics/comps").then(r => r.json()),
     enabled: !!user && isPaid,
   });
+
+  const { data: acuityData } = useQuery({
+    queryKey: ["/api/acuity/completions"],
+    queryFn: () => fetch("/api/acuity/completions").then(r => r.json()),
+    enabled: !!user,
+  });
+  const acuityCompletions: any[] = Array.isArray(acuityData?.completions) ? acuityData.completions : [];
+  const acuityFreeCount: number = acuityData?.freeCompletionCount ?? 0;
+  const ACUITY_FREE_LIMIT = 3;
+
+  const ACUITY_EXERCISES = [
+    { id: "pursuit",          label: "Ball Pursuit",      free: true },
+    { id: "peripheral_lock",  label: "Peripheral Lock",   free: false },
+    { id: "peripheral_flash", label: "Peripheral Flash",  free: false },
+    { id: "ghost_ball",       label: "Ghost Ball",        free: false },
+    { id: "color_filter",     label: "Color Filter",      free: false },
+  ];
 
   const { data: coachSessions = [] } = useQuery<CoachSession[]>({
     queryKey: ["/api/coaching/sessions/received"],
@@ -426,6 +443,66 @@ export default function MySwings() {
               <p className="text-xs text-muted-foreground max-w-sm">Train your visual attention and processing speed the way elite hitters do.</p>
             </div>
             <Button size="sm" onClick={() => navigate("/cognition")}>Play Now</Button>
+          </div>
+        )}
+      </div>
+
+      {/* ── Visual Acuity ── */}
+      <div className="border-t border-border pt-6 space-y-4">
+        <SectionDivider
+          icon={<Eye className="w-3.5 h-3.5" />}
+          title="Visual Acuity"
+          href="/acuity"
+          onNavigate={navigate}
+        />
+        {isPaid ? (
+          acuityCompletions.length > 0 ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+              {ACUITY_EXERCISES.map(ex => {
+                const exCompletions = acuityCompletions.filter((c: any) => c.exerciseId === ex.id);
+                const last = exCompletions[0];
+                return (
+                  <div
+                    key={ex.id}
+                    onClick={() => navigate("/acuity")}
+                    className="bg-card border border-border rounded-xl p-4 flex flex-col gap-1 cursor-pointer hover:border-primary/40 transition-colors"
+                  >
+                    <p className="text-xs font-semibold truncate">{ex.label}</p>
+                    <p className="text-xl font-bold text-primary">{exCompletions.length}</p>
+                    <p className="text-[10px] text-muted-foreground">
+                      {last
+                        ? new Date(last.completedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+                        : "Not started"}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="bg-card border border-border rounded-xl p-5 flex items-center justify-between gap-4">
+              <div>
+                <p className="font-semibold text-sm mb-1">5 eye training exercises</p>
+                <p className="text-xs text-muted-foreground">Train ball tracking, peripheral vision, and reaction speed.</p>
+              </div>
+              <Button size="sm" onClick={() => navigate("/acuity")}>Start Training</Button>
+            </div>
+          )
+        ) : (
+          <div className="bg-card border border-border rounded-xl p-5 space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-semibold text-sm mb-1">Eye Training Drills</p>
+                <p className="text-xs text-muted-foreground max-w-sm">
+                  Ball Pursuit is free. {ACUITY_FREE_LIMIT - acuityFreeCount > 0
+                    ? `${ACUITY_FREE_LIMIT - acuityFreeCount} free session${ACUITY_FREE_LIMIT - acuityFreeCount !== 1 ? "s" : ""} remaining.`
+                    : "Free limit reached. Upgrade for all 5 exercises."}
+                </p>
+              </div>
+              {acuityFreeCount < ACUITY_FREE_LIMIT
+                ? <Button size="sm" onClick={() => navigate("/acuity")}>Try it free</Button>
+                : <Button size="sm" onClick={() => navigate("/pricing")}>Upgrade</Button>
+              }
+            </div>
           </div>
         )}
       </div>

@@ -74,6 +74,7 @@ export default function Layout({ children, showScoreTicker = false }: { children
     ]},
     { section: "Enhancements", links: [
       { href: "/cognition", label: "Cognition" },
+      { href: "/acuity", label: "Visual Acuity" },
     ]},
     { section: "Games", links: [
       { href: "/statdle", label: "StudioStatdle" },

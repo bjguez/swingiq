@@ -314,3 +314,18 @@ export const cognitionSessions = pgTable("cognition_sessions", {
 
 export type CognitionSession = typeof cognitionSessions.$inferSelect;
 export type InsertCognitionSession = typeof cognitionSessions.$inferInsert;
+
+export const acuityCompletions = pgTable("acuity_completions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }),
+  exerciseId: varchar("exercise_id").notNull(), // "pursuit" | "peripheral_lock" | "peripheral_flash" | "ghost_ball" | "color_filter"
+  completedAt: timestamp("completed_at").defaultNow(),
+  durationSecs: integer("duration_secs"),       // how long the session lasted
+  maxSpeed: real("max_speed"),                  // highest speed reached (exercises 1,2,3)
+  accuracy: real("accuracy"),                   // 0-100 for exercises 4,5
+}, (t) => ({
+  userIdIdx: index("acuity_completions_user_id_idx").on(t.userId),
+}));
+
+export type AcuityCompletion = typeof acuityCompletions.$inferSelect;
+export type InsertAcuityCompletion = typeof acuityCompletions.$inferInsert;
