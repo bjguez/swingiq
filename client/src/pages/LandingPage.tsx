@@ -174,7 +174,7 @@ export default function LandingPage() {
             transition={{ duration: 0.5 }}
           >
             <span className="inline-block mb-6 px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary text-xs font-semibold tracking-wider uppercase">
-              Trusted by all 30 MLB organizations
+              Trusted by players, parents, and pros
             </span>
             <h1 className="font-display font-bold text-5xl sm:text-6xl md:text-7xl tracking-tighter leading-none mb-6">
               Your Swing.
@@ -253,7 +253,7 @@ export default function LandingPage() {
       <section className="border-y border-border bg-card/30 py-10 overflow-hidden">
         <div className="container mx-auto px-4 mb-6 text-center">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
-            Trusted by organizations across all of Major League Baseball
+            Trusted by players and coaches across Major League Baseball
           </p>
         </div>
         <div className="relative overflow-hidden">
