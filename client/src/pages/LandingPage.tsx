@@ -137,7 +137,7 @@ export default function LandingPage() {
           0% { transform: translateX(0); }
           100% { transform: translateX(-50%); }
         }
-        .marquee-track { animation: marquee 40s linear infinite; }
+        .marquee-track { animation: marquee 80s linear infinite; }
         .marquee-track:hover { animation-play-state: paused; }
       `}</style>
 
