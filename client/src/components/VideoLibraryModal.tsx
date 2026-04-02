@@ -112,36 +112,72 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected }: Vi
     setUploadProgress(0);
     setUploadError(null);
 
-    const formData = new FormData();
-    formData.append("video", file);
-    formData.append("title", file.name);
-    formData.append("category", uploadCategory);
-    if (startTime !== undefined && endTime !== undefined) {
-      formData.append("startTime", startTime.toString());
-      formData.append("endTime", endTime.toString());
-    }
+    const needsTrim = startTime !== undefined && endTime !== undefined;
 
     try {
-      const xhr = new XMLHttpRequest();
-      xhr.upload.addEventListener("progress", (ev) => {
-        if (ev.lengthComputable) setUploadProgress(Math.round((ev.loaded / ev.total) * 100));
-      });
+      let url: string;
 
-      const response = await new Promise<any>((resolve, reject) => {
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            resolve(JSON.parse(xhr.responseText));
-          } else {
-            try { reject(new Error(JSON.parse(xhr.responseText).message || "Upload failed")); }
-            catch { reject(new Error("Upload failed")); }
-          }
-        };
-        xhr.onerror = () => reject(new Error("Network error during upload"));
-        xhr.open("POST", "/api/upload");
-        xhr.send(formData);
-      });
+      if (needsTrim) {
+        // Trim requires server-side FFmpeg — send to server as before
+        const formData = new FormData();
+        formData.append("video", file);
+        formData.append("category", uploadCategory);
+        formData.append("startTime", startTime!.toString());
+        formData.append("endTime", endTime!.toString());
 
-      const url = response.presignedUrl ?? response.sourceUrl;
+        const xhr = new XMLHttpRequest();
+        xhr.upload.addEventListener("progress", (ev) => {
+          if (ev.lengthComputable) setUploadProgress(Math.round((ev.loaded / ev.total) * 100));
+        });
+
+        const response = await new Promise<any>((resolve, reject) => {
+          xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) resolve(JSON.parse(xhr.responseText));
+            else { try { reject(new Error(JSON.parse(xhr.responseText).message || "Upload failed")); } catch { reject(new Error("Upload failed")); } }
+          };
+          xhr.onerror = () => reject(new Error("Network error during upload"));
+          xhr.open("POST", "/api/upload");
+          xhr.send(formData);
+        });
+
+        url = response.presignedUrl ?? response.sourceUrl;
+      } else {
+        // Direct upload: browser → R2 (bypasses server for the file transfer)
+        // Step 1: get presigned PUT URL
+        const presignRes = await fetch(`/api/upload/presigned-put?filename=${encodeURIComponent(file.name)}`);
+        if (!presignRes.ok) throw new Error("Failed to get upload URL");
+        const { key, uploadUrl, contentType } = await presignRes.json();
+
+        // Step 2: PUT file directly to R2 (with progress tracking)
+        await new Promise<void>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.upload.addEventListener("progress", (ev) => {
+            if (ev.lengthComputable) setUploadProgress(Math.round((ev.loaded / ev.total) * 100));
+          });
+          xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) resolve();
+            else reject(new Error(`Upload failed: ${xhr.status}`));
+          };
+          xhr.onerror = () => reject(new Error("Network error during upload"));
+          xhr.open("PUT", uploadUrl);
+          xhr.setRequestHeader("Content-Type", contentType);
+          xhr.send(file);
+        });
+
+        // Step 3: confirm — server creates the DB record
+        const confirmRes = await fetch("/api/upload/confirm", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ key, category: uploadCategory }),
+        });
+        if (!confirmRes.ok) {
+          const err = await confirmRes.json().catch(() => ({}));
+          throw new Error((err as any).message || "Failed to save video");
+        }
+        const video = await confirmRes.json();
+        url = video.presignedUrl ?? video.sourceUrl;
+      }
+
       queryClient.invalidateQueries({ queryKey: ["/api/videos"] });
       onVideoSelected?.(url, "My Swing");
       setIsOpen(false);
@@ -151,7 +187,7 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected }: Vi
     }
 
     if (fileInputRef.current) fileInputRef.current.value = "";
-  }, [onVideoSelected, queryClient]);
+  }, [onVideoSelected, queryClient, uploadCategory]);
 
   const handleUploadClick = () => {
     if (!user) { setAuthGateOpen(true); return; }

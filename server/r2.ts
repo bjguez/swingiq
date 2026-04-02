@@ -41,6 +41,11 @@ export async function getPresignedUrl(key: string, expiresIn = 604800): Promise<
   return getSignedUrl(r2, new GetObjectCommand({ Bucket: bucket, Key: key }), { expiresIn });
 }
 
+/** Generates a presigned PUT URL so browsers can upload directly to R2 (bypasses the server) */
+export async function getPresignedPutUrl(key: string, contentType: string, expiresIn = 3600): Promise<string> {
+  return getSignedUrl(r2, new PutObjectCommand({ Bucket: bucket, Key: key, ContentType: contentType }), { expiresIn });
+}
+
 /** Returns a public URL for a key using the custom domain if configured, else falls back to presigned URL */
 export async function getVideoUrl(key: string): Promise<string> {
   const publicBase = process.env.R2_PUBLIC_URL;
@@ -68,7 +73,7 @@ export async function configureR2Cors(): Promise<void> {
         CORSRules: [
           {
             AllowedOrigins: ["*"],
-            AllowedMethods: ["GET", "HEAD"],
+            AllowedMethods: ["GET", "HEAD", "PUT"],
             AllowedHeaders: ["*"],
             ExposeHeaders: ["Content-Length", "Content-Type", "ETag"],
             MaxAgeSeconds: 86400,

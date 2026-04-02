@@ -11,7 +11,8 @@ import path from "path";
 import fs from "fs";
 import express from "express";
 import { execFile } from "child_process";
-import { uploadToR2, getVideoUrl, getPresignedUrl, deleteFromR2, isR2Key, r2Configured, checkR2Exists } from "./r2";
+import { uploadToR2, getVideoUrl, getPresignedUrl, getPresignedPutUrl, deleteFromR2, isR2Key, r2Configured, checkR2Exists } from "./r2";
+import { randomUUID } from "crypto";
 import { createCheckoutSession, createPortalSession, handleWebhook, PRICES } from "./stripe";
 import { setupCoachRoutes } from "./coach";
 import { setupCoachingRoutes } from "./coaching";
@@ -66,6 +67,66 @@ export async function registerRoutes(
     pathRewrite: { "^/": "/" },
   }));
 
+
+  // Step 1 of direct upload: get a presigned PUT URL for uploading straight from browser to R2
+  app.get("/api/upload/presigned-put", async (req, res) => {
+    if (!req.user) return res.status(401).json({ message: "Not authenticated" });
+    if (!r2Configured()) return res.status(503).json({ message: "Storage not configured" });
+    const filename = (req.query.filename as string) || "video.mp4";
+    const ext = path.extname(filename).toLowerCase() || ".mp4";
+    const key = `videos/${randomUUID()}${ext}`;
+    const contentType =
+      ext === ".mov" ? "video/quicktime" :
+      ext === ".webm" ? "video/webm" :
+      ext === ".avi" ? "video/x-msvideo" :
+      "video/mp4";
+    const uploadUrl = await getPresignedPutUrl(key, contentType);
+    res.json({ key, uploadUrl, contentType });
+  });
+
+  // Step 2 of direct upload: create the DB record after the client has PUT the file directly to R2
+  app.post("/api/upload/confirm", async (req, res) => {
+    if (!req.user) return res.status(401).json({ message: "Not authenticated" });
+    const { key, category } = req.body;
+    if (!key || typeof key !== "string") return res.status(400).json({ message: "Missing key" });
+
+    const userId = (req.user as any).id as string;
+    const username = (req.user as any).username as string | null;
+
+    // Auto-generate title: username_YYYY-MM-DD[_N]
+    let title: string;
+    if (req.body.title) {
+      title = req.body.title;
+    } else if (userId && username) {
+      const today = new Date();
+      const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+      const base = `${username}_${dateStr}`;
+      const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const [{ count }] = await db.select({ count: sqlFn<number>`count(*)::int` })
+        .from(videos)
+        .where(sqlFn`${videos.userId} = ${userId} AND ${videos.createdAt} >= ${todayStart} AND ${videos.isProVideo} = false`);
+      title = (count as number) > 0 ? `${base}_${(count as number) + 1}` : base;
+    } else {
+      title = key.split("/").pop()?.replace(/\.[^.]+$/, "") ?? "swing";
+    }
+
+    const allowedCategories = ["Full Swing", "Game Swing", "Gather", "Launch", "Swing"];
+    const videoCategory = allowedCategories.includes(category) ? category : "Full Swing";
+
+    const video = await storage.createVideo({
+      title,
+      category: videoCategory,
+      source: "User Upload",
+      sourceUrl: key,
+      isProVideo: false,
+      showInLibrary: false,
+      showInDevelopment: true,
+      userId,
+    });
+
+    const url = await getVideoUrl(key);
+    res.status(201).json({ ...video, presignedUrl: url });
+  });
 
   app.post("/api/upload", upload.single("video"), async (req, res) => {
     try {
