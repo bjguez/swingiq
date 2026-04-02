@@ -87,28 +87,39 @@ function randPos() {
 
 function PursuitScene({ running, onUpdate }: { running: boolean; onUpdate: (speed: number) => void }) {
   const pos = useRef(new THREE.Vector3(0, 0, 0));
-  const vel = useRef(new THREE.Vector3(1.2, 0.9, 0).normalize().multiplyScalar(2.5));
+  const vel = useRef(new THREE.Vector3(1, 0.7, 0).normalize().multiplyScalar(2.5));
   const meshRef = useRef<THREE.Mesh>(null);
   const speedRef = useRef(2.5);
   const elapsed = useRef(0);
+  const dirTimer = useRef(0);
+  const nextDirChange = useRef(0.25 + Math.random() * 0.35);
 
   useFrame((_, delta) => {
     if (!running || !meshRef.current) return;
     elapsed.current += delta;
-    // Starts at 3 u/s, hits ~40 u/s by 30s
     speedRef.current = 3.0 * Math.pow(1.09, elapsed.current);
-    vel.current.normalize().multiplyScalar(speedRef.current);
 
+    // Random direction change on an irregular timer — mid-flight, not wall-triggered
+    dirTimer.current += delta;
+    if (dirTimer.current >= nextDirChange.current) {
+      dirTimer.current = 0;
+      nextDirChange.current = 0.2 + Math.random() * 0.4; // 0.2–0.6s between changes
+      const angle = Math.random() * Math.PI * 2;
+      vel.current.set(Math.cos(angle), Math.sin(angle), 0);
+    }
+    vel.current.normalize().multiplyScalar(speedRef.current);
     pos.current.addScaledVector(vel.current, delta);
 
-    if (Math.abs(pos.current.x) > BOX_X) { vel.current.x *= -1; pos.current.x = Math.sign(pos.current.x) * BOX_X; }
-    if (Math.abs(pos.current.y) > BOX_Y) { vel.current.y *= -1; pos.current.y = Math.sign(pos.current.y) * BOX_Y; }
-
-    // Frequent random direction kicks — unpredictable at high speed
-    if (Math.random() < delta * 3.5) {
-      const kick = 1.2 + Math.random() * 1.6;
-      vel.current.add(new THREE.Vector3((Math.random() - 0.5) * kick, (Math.random() - 0.5) * kick, 0));
-      vel.current.normalize().multiplyScalar(speedRef.current);
+    // Wall bounce with noisy angle so it doesn't repeat paths
+    if (Math.abs(pos.current.x) > BOX_X) {
+      vel.current.x *= -1;
+      vel.current.y += (Math.random() - 0.5) * speedRef.current * 0.6;
+      pos.current.x = Math.sign(pos.current.x) * BOX_X;
+    }
+    if (Math.abs(pos.current.y) > BOX_Y) {
+      vel.current.y *= -1;
+      vel.current.x += (Math.random() - 0.5) * speedRef.current * 0.6;
+      pos.current.y = Math.sign(pos.current.y) * BOX_Y;
     }
 
     meshRef.current.position.copy(pos.current);
@@ -126,28 +137,42 @@ function PursuitScene({ running, onUpdate }: { running: boolean; onUpdate: (spee
 // ── Exercise 2: Peripheral Lock ───────────────────────────────────────────────
 
 function PeripheralLockScene({ running }: { running: boolean }) {
-  const pos = useRef(new THREE.Vector3(2, 0.5, 0));
-  const vel = useRef(new THREE.Vector3(-0.9, 0.7, 0).normalize().multiplyScalar(2.5));
+  const pos = useRef(new THREE.Vector3(2.5, 1.0, 0));
+  const vel = useRef(new THREE.Vector3(-1, 0.6, 0).normalize().multiplyScalar(2.5));
   const meshRef = useRef<THREE.Mesh>(null);
   const speedRef = useRef(2.5);
   const elapsed = useRef(0);
+  const dirTimer = useRef(0);
+  const nextDirChange = useRef(0.2 + Math.random() * 0.3);
 
   useFrame((_, delta) => {
     if (!running || !meshRef.current) return;
     elapsed.current += delta;
-    // Starts at 3 u/s, hits ~35 u/s by 30s
     speedRef.current = 3.0 * Math.pow(1.085, elapsed.current);
 
-    pos.current.addScaledVector(vel.current.normalize().multiplyScalar(speedRef.current), delta);
-
-    if (Math.abs(pos.current.x) > BOX_X) { vel.current.x *= -1; pos.current.x = Math.sign(pos.current.x) * BOX_X; }
-    if (Math.abs(pos.current.y) > BOX_Y) { vel.current.y *= -1; pos.current.y = Math.sign(pos.current.y) * BOX_Y; }
-
-    // Chaotic direction changes — not geometric bouncing
-    if (Math.random() < delta * 4.0) {
-      const kick = 1.0 + Math.random() * 1.8;
-      vel.current.add(new THREE.Vector3((Math.random() - 0.5) * kick, (Math.random() - 0.5) * kick, 0));
+    // Irregular direction changes — the ball should feel alive, not mechanical
+    dirTimer.current += delta;
+    if (dirTimer.current >= nextDirChange.current) {
+      dirTimer.current = 0;
+      nextDirChange.current = 0.15 + Math.random() * 0.35;
+      const angle = Math.random() * Math.PI * 2;
+      vel.current.set(Math.cos(angle), Math.sin(angle), 0);
     }
+    vel.current.normalize().multiplyScalar(speedRef.current);
+    pos.current.addScaledVector(vel.current, delta);
+
+    // Noisy wall bounces
+    if (Math.abs(pos.current.x) > BOX_X) {
+      vel.current.x *= -1;
+      vel.current.y += (Math.random() - 0.5) * speedRef.current * 0.5;
+      pos.current.x = Math.sign(pos.current.x) * BOX_X;
+    }
+    if (Math.abs(pos.current.y) > BOX_Y) {
+      vel.current.y *= -1;
+      vel.current.x += (Math.random() - 0.5) * speedRef.current * 0.5;
+      pos.current.y = Math.sign(pos.current.y) * BOX_Y;
+    }
+
     meshRef.current.position.copy(pos.current);
   });
 
