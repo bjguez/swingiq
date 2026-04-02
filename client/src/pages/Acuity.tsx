@@ -95,8 +95,8 @@ function PursuitScene({ running, onUpdate }: { running: boolean; onUpdate: (spee
   useFrame((_, delta) => {
     if (!running || !meshRef.current) return;
     elapsed.current += delta;
-    // Starts at 3 u/s, hits ~21 u/s by 30s (exponential ramp)
-    speedRef.current = 3.0 * Math.pow(1.065, elapsed.current);
+    // Starts at 3 u/s, hits ~40 u/s by 30s
+    speedRef.current = 3.0 * Math.pow(1.09, elapsed.current);
     vel.current.normalize().multiplyScalar(speedRef.current);
 
     pos.current.addScaledVector(vel.current, delta);
@@ -104,9 +104,10 @@ function PursuitScene({ running, onUpdate }: { running: boolean; onUpdate: (spee
     if (Math.abs(pos.current.x) > BOX_X) { vel.current.x *= -1; pos.current.x = Math.sign(pos.current.x) * BOX_X; }
     if (Math.abs(pos.current.y) > BOX_Y) { vel.current.y *= -1; pos.current.y = Math.sign(pos.current.y) * BOX_Y; }
 
-    // Randomly nudge direction every ~2s
-    if (Math.random() < delta * 0.5) {
-      vel.current.add(new THREE.Vector3((Math.random() - 0.5) * 0.8, (Math.random() - 0.5) * 0.8, 0));
+    // Frequent random direction kicks — unpredictable at high speed
+    if (Math.random() < delta * 3.5) {
+      const kick = 1.2 + Math.random() * 1.6;
+      vel.current.add(new THREE.Vector3((Math.random() - 0.5) * kick, (Math.random() - 0.5) * kick, 0));
       vel.current.normalize().multiplyScalar(speedRef.current);
     }
 
@@ -134,16 +135,18 @@ function PeripheralLockScene({ running }: { running: boolean }) {
   useFrame((_, delta) => {
     if (!running || !meshRef.current) return;
     elapsed.current += delta;
-    // Starts at 3 u/s, hits ~19 u/s by 30s (exponential ramp)
-    speedRef.current = 3.0 * Math.pow(1.06, elapsed.current);
+    // Starts at 3 u/s, hits ~35 u/s by 30s
+    speedRef.current = 3.0 * Math.pow(1.085, elapsed.current);
 
     pos.current.addScaledVector(vel.current.normalize().multiplyScalar(speedRef.current), delta);
 
     if (Math.abs(pos.current.x) > BOX_X) { vel.current.x *= -1; pos.current.x = Math.sign(pos.current.x) * BOX_X; }
     if (Math.abs(pos.current.y) > BOX_Y) { vel.current.y *= -1; pos.current.y = Math.sign(pos.current.y) * BOX_Y; }
 
-    if (Math.random() < delta * 0.4) {
-      vel.current.add(new THREE.Vector3((Math.random() - 0.5) * 0.6, (Math.random() - 0.5) * 0.6, 0));
+    // Chaotic direction changes — not geometric bouncing
+    if (Math.random() < delta * 4.0) {
+      const kick = 1.0 + Math.random() * 1.8;
+      vel.current.add(new THREE.Vector3((Math.random() - 0.5) * kick, (Math.random() - 0.5) * kick, 0));
     }
     meshRef.current.position.copy(pos.current);
   });
@@ -178,19 +181,19 @@ function PeripheralFlashScene({ running }: { running: boolean }) {
   const pos = useRef(new THREE.Vector3(2.2, 0.8, 0));
   const meshRef = useRef<THREE.Mesh>(null);
   const timer = useRef(0);
-  const interval = useRef(1.8);
+  const interval = useRef(1.5);
 
   useFrame((_, delta) => {
     if (!running || !meshRef.current) return;
     timer.current += delta;
     if (timer.current >= interval.current) {
       timer.current = 0;
-      interval.current = Math.max(0.18, interval.current * 0.87);
-      // Jump to random position, avoid center
+      interval.current = Math.max(0.15, interval.current * 0.85);
+      // Minimum distance of 3 units from current position + avoid center
       let newPos: THREE.Vector3;
       do {
         newPos = randPos();
-      } while (newPos.length() < 0.8);
+      } while (newPos.length() < 0.8 || newPos.distanceTo(pos.current) < 3.0);
       pos.current.copy(newPos);
     }
     meshRef.current.position.copy(pos.current);
@@ -246,7 +249,12 @@ function GhostBallScene({ running }: { running: boolean }) {
         timerRef.current = 0;
         intervalRef.current = Math.max(0.2, intervalRef.current * 0.84);
         VISIBLE_SECS.current = Math.max(0.15, 0.55 - elapsed.current * 0.012);
-        setBallPos(randPos());
+        // Minimum distance of 3 units so the eye always has to travel
+        let nextPos: THREE.Vector3;
+        setBallPos(prev => {
+          do { nextPos = randPos(); } while (prev && nextPos.distanceTo(prev) < 3.0);
+          return nextPos;
+        });
         setVisible(true);
         visibleTimer.current = 0;
       }
@@ -268,10 +276,10 @@ function GhostBallScene({ running }: { running: boolean }) {
 function ColorFilterScene({ running }: { running: boolean }) {
   const [balls, setBalls] = useState<{ pos: THREE.Vector3; isTarget: boolean; id: number }[]>([]);
   const [showing, setShowing] = useState(false);
-  const intervalRef = useRef(1.8);
+  const intervalRef = useRef(1.5);
   const timerRef = useRef(0);
   const showTimer = useRef(0);
-  const showSecsRef = useRef(0.65);
+  const showSecsRef = useRef(0.6);
   const elapsed = useRef(0);
   const idRef = useRef(0);
 
@@ -289,8 +297,8 @@ function ColorFilterScene({ running }: { running: boolean }) {
       timerRef.current += delta;
       if (timerRef.current >= intervalRef.current) {
         timerRef.current = 0;
-        intervalRef.current = Math.max(0.3, intervalRef.current * 0.88);
-        showSecsRef.current = Math.max(0.2, 0.65 - elapsed.current * 0.01);
+        intervalRef.current = Math.max(0.2, intervalRef.current * 0.85);
+        showSecsRef.current = Math.max(0.15, 0.6 - elapsed.current * 0.012);
         const posA = randPos();
         let posB: THREE.Vector3;
         do { posB = randPos(); } while (posB.distanceTo(posA) < 1.0);
@@ -335,10 +343,12 @@ function DrillRunner({
   const [countdown, setCountdown] = useState(3);
   const [timeLeft, setTimeLeft] = useState<number>(ex.duration);
   const [currentSpeed, setCurrentSpeed] = useState(0);
-  const [hits, setHits] = useState(0);
-  const [misses, setMisses] = useState(0);
   const startTimeRef = useRef<number>(Date.now());
   const maxSpeedRef = useRef(0);
+  // Keep onComplete in a ref so the timer effect always calls the latest version
+  // regardless of how many times the parent re-renders
+  const onCompleteRef = useRef(onComplete);
+  useEffect(() => { onCompleteRef.current = onComplete; });
 
   // Countdown
   useEffect(() => {
@@ -353,10 +363,8 @@ function DrillRunner({
     if (phase !== "running") return;
     if (timeLeft <= 0) {
       const durationSecs = Math.round((Date.now() - startTimeRef.current) / 1000);
-      // ghost_ball and color_filter are pure observation drills — no accuracy metric
-      const accuracy = undefined;
       setPhase("done");
-      onComplete({ maxSpeed: maxSpeedRef.current || undefined, accuracy, durationSecs });
+      onCompleteRef.current({ maxSpeed: maxSpeedRef.current || undefined, accuracy: undefined, durationSecs });
       return;
     }
     const t = setTimeout(() => setTimeLeft(s => s - 1), 1000);
@@ -366,11 +374,6 @@ function DrillRunner({
   const handleSpeedUpdate = useCallback((s: number) => {
     setCurrentSpeed(s);
     if (s > maxSpeedRef.current) maxSpeedRef.current = s;
-  }, []);
-
-  const handleTap = useCallback((correct: boolean) => {
-    if (correct) setHits(h => h + 1);
-    else setMisses(m => m + 1);
   }, []);
 
   return (
