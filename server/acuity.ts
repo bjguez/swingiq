@@ -64,7 +64,7 @@ export function setupAcuityRoutes(app: Express) {
         const [{ count }] = await db
           .select({ count: drizzleCount() })
           .from(acuityCompletions)
-          .where(eq(acuityCompletions.userId, user.id));
+          .where(eq(acuityCompletions.userId, user.id) && eq(acuityCompletions.exerciseId, "pursuit"));
         if (Number(count) >= FREE_COMPLETIONS_LIMIT) {
           return res.status(403).json({ message: "free_limit_reached" });
         }
