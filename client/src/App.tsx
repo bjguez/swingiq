@@ -27,6 +27,7 @@ import TermsPage from "@/pages/TermsPage";
 import StudioStatdle from "@/pages/StudioStatdle";
 import VisionTraining from "@/pages/VisionTraining";
 import Dashboard from "@/pages/Dashboard";
+import LandingPage from "@/pages/LandingPage";
 import { useAuth } from "@/hooks/use-auth";
 import { AthleteProvider } from "@/hooks/use-athletes";
 
@@ -75,7 +76,7 @@ function Router() {
       <Route path="/invite/accept" component={AcceptInvitePage} />
       <Route path="/pricing" component={PricingPage} />
       <Route path="/">
-        <ProtectedRoute component={Home} />
+        {!isLoading && !user ? <LandingPage /> : <ProtectedRoute component={Home} />}
       </Route>
       <Route path="/biometrics">
         <ProtectedRoute component={Biometrics} />
