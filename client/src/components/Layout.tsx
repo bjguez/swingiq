@@ -74,7 +74,9 @@ export default function Layout({ children, showScoreTicker = false }: { children
       { href: "/development", label: "Development", locked: !isPaid && !isAdmin },
     ]},
     { section: "Enhance", links: [
-      { href: "/enhance", label: "Enhance" },
+      { href: "/enhance?tab=cognition",  label: "Cognition" },
+      { href: "/enhance?tab=acuity",     label: "Visual Acuity" },
+      { href: "/enhance?tab=discipline", label: "Discipline" },
     ]},
     { section: "Games", links: [
       { href: "/statdle", label: "StudioStatdle" },
