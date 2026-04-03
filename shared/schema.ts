@@ -329,3 +329,24 @@ export const acuityCompletions = pgTable("acuity_completions", {
 
 export type AcuityCompletion = typeof acuityCompletions.$inferSelect;
 export type InsertAcuityCompletion = typeof acuityCompletions.$inferInsert;
+
+export const disciplineSessions = pgTable("discipline_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }),
+  completedAt: timestamp("completed_at").defaultNow(),
+  totalPitches: integer("total_pitches").notNull(),
+  swings: integer("swings").notNull(),           // total swings taken
+  goodSwings: integer("good_swings").notNull(),  // swings at strikes
+  chases: integer("chases").notNull(),           // swings at balls
+  calledStrikes: integer("called_strikes").notNull(), // strikes taken
+  goodTakes: integer("good_takes").notNull(),    // balls correctly taken
+  disciplinePct: real("discipline_pct").notNull(), // (goodSwings + goodTakes) / totalPitches
+  chaseRate: real("chase_rate").notNull(),        // chases / balls
+  calledStrikeRate: real("called_strike_rate").notNull(), // calledStrikes / strikes
+  avgReactionMs: real("avg_reaction_ms"),        // avg ms from decision window open to swing
+}, (t) => ({
+  userIdIdx: index("discipline_sessions_user_id_idx").on(t.userId),
+}));
+
+export type DisciplineSession = typeof disciplineSessions.$inferSelect;
+export type InsertDisciplineSession = typeof disciplineSessions.$inferInsert;

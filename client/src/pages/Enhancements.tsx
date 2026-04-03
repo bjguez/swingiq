@@ -6,7 +6,7 @@ import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import {
   Eye, Brain, Lock, Play, RotateCcw, CheckCircle2, ChevronRight,
-  Trophy, Share2, Minus, Plus,
+  Trophy, Share2, Minus, Plus, Target,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/hooks/use-auth";
@@ -14,9 +14,9 @@ import { useLocation, useSearch } from "wouter";
 import { usePageMeta } from "@/hooks/use-page-meta";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import type { AcuityCompletion, CognitionSession } from "@shared/schema";
+import type { AcuityCompletion, CognitionSession, DisciplineSession } from "@shared/schema";
 
-type Tab = "cognition" | "acuity";
+type Tab = "cognition" | "acuity" | "discipline";
 
 // ═══════════════════════════════════════════════════════════════
 // COGNITION — 3D Multiple Object Tracking
@@ -927,6 +927,477 @@ function AcuityTab({ isPaid, isFree }: { isPaid: boolean; isFree: boolean }) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// DISCIPLINE — Go / No-Go pitch trainer
+// ═══════════════════════════════════════════════════════════════
+
+const TOTAL_PITCHES = 20;
+
+type PitchLocation = "strike" | "ball";
+type PitchResult = "good_swing" | "good_eye" | "chase" | "called_strike";
+
+interface Pitch {
+  location: PitchLocation;
+  swung: boolean;
+  reactionMs: number | null; // null = took
+  result: PitchResult;
+}
+
+function getPitchResult(location: PitchLocation, swung: boolean): PitchResult {
+  if (location === "strike" && swung)  return "good_swing";
+  if (location === "ball"   && !swung) return "good_eye";
+  if (location === "ball"   && swung)  return "chase";
+  return "called_strike";
+}
+
+const RESULT_LABELS: Record<PitchResult, { text: string; color: string }> = {
+  good_swing:    { text: "Good swing!", color: "#22c55e" },
+  good_eye:      { text: "Good eye!",   color: "#22c55e" },
+  chase:         { text: "Chase",       color: "#ef4444" },
+  called_strike: { text: "Called strike", color: "#f97316" },
+};
+
+// 3D scene — ball travels toward camera on z-axis
+function PitchBallScene({
+  running,
+  location,
+  onDecisionWindowOpen,
+}: {
+  running: boolean;
+  location: PitchLocation;
+  onDecisionWindowOpen: () => void;
+}) {
+  const meshRef = useRef<THREE.Mesh>(null);
+  const z = useRef(-28);
+  const notified = useRef(false);
+  const DECISION_Z = -8; // when decision window opens
+  const PLATE_Z = 3;
+
+  useFrame((_, delta) => {
+    if (!running || !meshRef.current) return;
+    z.current += delta * 22; // ~22 units/s travel
+    if (!notified.current && z.current >= DECISION_Z) {
+      notified.current = true;
+      onDecisionWindowOpen();
+    }
+    const scale = 1 + Math.max(0, (z.current + 28) / 28) * 1.4;
+    meshRef.current.position.z = z.current;
+    meshRef.current.scale.setScalar(scale);
+    if (z.current > PLATE_Z + 1) meshRef.current.visible = false;
+  });
+
+  // Horizontal offset based on location
+  const xOffset = location === "ball" ? (Math.random() > 0.5 ? 1.2 : -1.2) : (Math.random() - 0.5) * 0.6;
+  const yOffset = location === "strike" ? (Math.random() - 0.5) * 0.8 : (Math.random() > 0.5 ? 1.1 : -0.8);
+
+  return (
+    <>
+      {/* Strike zone rectangle */}
+      <mesh position={[0, 0, -2]}>
+        <planeGeometry args={[1.7, 2.0]} />
+        <meshBasicMaterial color="#ffffff" transparent opacity={0.06} side={THREE.DoubleSide} />
+      </mesh>
+      <lineSegments position={[0, 0, -2]}>
+        <edgesGeometry args={[new THREE.PlaneGeometry(1.7, 2.0)]} />
+        <lineBasicMaterial color="#ffffff" transparent opacity={0.25} />
+      </lineSegments>
+      {/* Ball */}
+      <mesh ref={meshRef} position={[xOffset, yOffset, -28]}>
+        <sphereGeometry args={[0.12, 20, 20]} />
+        <meshStandardMaterial color="#f5f0e8" roughness={0.6} />
+      </mesh>
+    </>
+  );
+}
+
+type DisciplinePhase = "intro" | "pitching" | "feedback" | "complete";
+
+function DisciplineTab() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  const [phase, setPhase] = useState<DisciplinePhase>("intro");
+  const [pitches, setPitches] = useState<Pitch[]>([]);
+  const [currentLocation, setCurrentLocation] = useState<PitchLocation>("strike");
+  const [ballRunning, setBallRunning] = useState(false);
+  const [decisionOpen, setDecisionOpen] = useState(false);
+  const [lastResult, setLastResult] = useState<PitchResult | null>(null);
+  const [showResult, setShowResult] = useState(false);
+  const [waitingNextPitch, setWaitingNextPitch] = useState(false);
+
+  const decisionOpenTimeRef = useRef<number | null>(null);
+  const swungRef = useRef(false);
+  const currentLocationRef = useRef<PitchLocation>("strike");
+  const pitchesRef = useRef<Pitch[]>([]);
+
+  const { data: history = [] } = useQuery<DisciplineSession[]>({
+    queryKey: ["/api/discipline/sessions"],
+    enabled: !!user,
+  });
+
+  const saveSession = useMutation({
+    mutationFn: (payload: Omit<DisciplineSession, "id" | "userId" | "completedAt">) =>
+      apiRequest("POST", "/api/discipline/sessions", payload).then(r => r.json()).catch(() => null),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/discipline/sessions"] }),
+  });
+
+  // Keep refs in sync
+  useEffect(() => { currentLocationRef.current = currentLocation; }, [currentLocation]);
+  useEffect(() => { pitchesRef.current = pitches; }, [pitches]);
+
+  function launchNextPitch() {
+    if (pitchesRef.current.length >= TOTAL_PITCHES) return;
+    const loc: PitchLocation = Math.random() < 0.55 ? "strike" : "ball"; // slight strike bias
+    swungRef.current = false;
+    setCurrentLocation(loc);
+    setDecisionOpen(false);
+    setShowResult(false);
+    setWaitingNextPitch(false);
+    setBallRunning(true);
+  }
+
+  function handleDecisionWindowOpen() {
+    decisionOpenTimeRef.current = Date.now();
+    setDecisionOpen(true);
+    // Auto-resolve as "take" after window closes
+    const windowMs = Math.max(350, 700 - pitchesRef.current.length * 17);
+    setTimeout(() => {
+      if (!swungRef.current) resolvePitch(false);
+    }, windowMs);
+  }
+
+  function resolvePitch(swung: boolean) {
+    if (swungRef.current && !swung) return; // already resolved
+    swungRef.current = true;
+    setBallRunning(false);
+    setDecisionOpen(false);
+
+    const loc = currentLocationRef.current;
+    const reactionMs = swung && decisionOpenTimeRef.current != null
+      ? Date.now() - decisionOpenTimeRef.current
+      : null;
+    const result = getPitchResult(loc, swung);
+    const pitch: Pitch = { location: loc, swung, reactionMs, result };
+
+    setPitches(prev => {
+      const updated = [...prev, pitch];
+      pitchesRef.current = updated;
+      if (updated.length >= TOTAL_PITCHES) {
+        finishSession(updated);
+      } else {
+        setLastResult(result);
+        setShowResult(true);
+        setWaitingNextPitch(true);
+      }
+      return updated;
+    });
+  }
+
+  function finishSession(allPitches: Pitch[]) {
+    const strikes = allPitches.filter(p => p.location === "strike");
+    const balls = allPitches.filter(p => p.location === "ball");
+    const goodSwings = allPitches.filter(p => p.result === "good_swing").length;
+    const chases = allPitches.filter(p => p.result === "chase").length;
+    const calledStrikes = allPitches.filter(p => p.result === "called_strike").length;
+    const goodTakes = allPitches.filter(p => p.result === "good_eye").length;
+    const swings = allPitches.filter(p => p.swung).length;
+
+    const disciplinePct = Math.round(((goodSwings + goodTakes) / TOTAL_PITCHES) * 100);
+    const chaseRate = balls.length > 0 ? Math.round((chases / balls.length) * 100) : 0;
+    const calledStrikeRate = strikes.length > 0 ? Math.round((calledStrikes / strikes.length) * 100) : 0;
+
+    const swingReactions = allPitches.filter(p => p.swung && p.reactionMs != null).map(p => p.reactionMs!);
+    const avgReactionMs = swingReactions.length > 0
+      ? Math.round(swingReactions.reduce((a, b) => a + b, 0) / swingReactions.length)
+      : null;
+
+    setLastResult(allPitches[allPitches.length - 1].result);
+    setShowResult(true);
+    setPhase("complete");
+
+    saveSession.mutate({
+      totalPitches: TOTAL_PITCHES,
+      swings,
+      goodSwings,
+      chases,
+      calledStrikes,
+      goodTakes,
+      disciplinePct,
+      chaseRate,
+      calledStrikeRate,
+      avgReactionMs,
+    });
+  }
+
+  // Space bar handler
+  useEffect(() => {
+    if (phase !== "pitching") return;
+    function onKey(e: KeyboardEvent) {
+      if (e.code !== "Space") return;
+      e.preventDefault();
+      if (waitingNextPitch) { launchNextPitch(); return; }
+      if (decisionOpen) resolvePitch(true);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [phase, decisionOpen, waitingNextPitch]);
+
+  function handleSwingButton() {
+    if (waitingNextPitch) { launchNextPitch(); return; }
+    if (decisionOpen) resolvePitch(true);
+  }
+
+  function startSession() {
+    setPitches([]);
+    pitchesRef.current = [];
+    setPhase("pitching");
+    setShowResult(false);
+    setLastResult(null);
+    setWaitingNextPitch(false);
+    setTimeout(launchNextPitch, 800);
+  }
+
+  function reset() {
+    setBallRunning(false);
+    setDecisionOpen(false);
+    setShowResult(false);
+    setLastResult(null);
+    setWaitingNextPitch(false);
+    setPitches([]);
+    pitchesRef.current = [];
+    setPhase("intro");
+  }
+
+  const pitchNum = pitches.length;
+  const lastSession = history[0];
+
+  return (
+    <div className="max-w-3xl mx-auto space-y-6">
+      <div>
+        <h2 className="text-xl font-bold flex items-center gap-2"><Target size={20} className="text-primary" /> Discipline</h2>
+        <p className="text-xs text-muted-foreground">See a pitch. Decide: swing or take. Train your zone awareness.</p>
+      </div>
+
+      {phase === "intro" && (
+        <div className="space-y-4">
+          {lastSession && (
+            <div className="bg-card border border-border rounded-xl p-4 grid grid-cols-3 gap-3 text-center">
+              <div>
+                <p className="text-2xl font-bold text-primary">{lastSession.disciplinePct}%</p>
+                <p className="text-xs text-muted-foreground">Discipline</p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-red-400">{lastSession.chaseRate}%</p>
+                <p className="text-xs text-muted-foreground">Chase Rate</p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-orange-400">{lastSession.calledStrikeRate}%</p>
+                <p className="text-xs text-muted-foreground">Called Strikes</p>
+              </div>
+            </div>
+          )}
+          <div className="bg-card border border-border rounded-xl p-5 space-y-3">
+            <p className="font-semibold text-sm uppercase tracking-wide">How it works</p>
+            <ul className="space-y-1.5 text-sm text-muted-foreground">
+              <li>• A pitch travels toward you — strike or ball</li>
+              <li>• When you see it enter the zone, decide: <span className="text-foreground font-medium">swing or take</span></li>
+              <li>• Press <kbd className="px-1.5 py-0.5 rounded border border-border text-xs font-mono">Space</kbd> on desktop or tap <span className="text-foreground font-medium">SWING</span> on mobile</li>
+              <li>• Do nothing = take</li>
+              <li>• Decision window shrinks as you face more pitches</li>
+            </ul>
+            <Button onClick={startSession} className="w-full gap-2 mt-2"><Play className="w-4 h-4" /> Start ({TOTAL_PITCHES} pitches)</Button>
+          </div>
+          {history.length > 1 && (
+            <div className="bg-card border border-border rounded-xl p-4 space-y-2">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Recent Sessions</p>
+              <div className="space-y-2">
+                {history.slice(0, 5).map((s, i) => (
+                  <div key={s.id} className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">{new Date(s.completedAt!).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+                    <div className="flex gap-4">
+                      <span className="text-primary font-semibold">{s.disciplinePct}% disc</span>
+                      <span className="text-red-400">{s.chaseRate}% chase</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {phase === "pitching" && (
+        <div className="space-y-3">
+          {/* Progress */}
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground font-mono">{pitchNum} / {TOTAL_PITCHES} pitches</span>
+            <div className="flex gap-1">
+              {Array.from({ length: TOTAL_PITCHES }).map((_, i) => {
+                const p = pitches[i];
+                const color = !p ? "bg-secondary" :
+                  p.result === "good_swing" || p.result === "good_eye" ? "bg-green-500" :
+                  p.result === "chase" ? "bg-red-500" : "bg-orange-400";
+                return <div key={i} className={`w-2 h-2 rounded-full ${color}`} />;
+              })}
+            </div>
+          </div>
+
+          {/* Canvas */}
+          <div className="relative rounded-xl overflow-hidden border border-border bg-[#050a14] w-full" style={{ height: "min(60vw, 460px)", minHeight: 280 }}>
+            <Canvas>
+              <PerspectiveCamera makeDefault position={[0, 0, 6]} fov={55} />
+              <ambientLight intensity={0.4} />
+              <pointLight position={[3, 3, 3]} intensity={0.8} />
+              {ballRunning && (
+                <PitchBallScene
+                  key={pitchNum}
+                  running={ballRunning}
+                  location={currentLocation}
+                  onDecisionWindowOpen={handleDecisionWindowOpen}
+                />
+              )}
+              {!ballRunning && !waitingNextPitch && pitchNum === 0 && (
+                // Placeholder strike zone before first pitch
+                <>
+                  <mesh position={[0, 0, -2]}>
+                    <planeGeometry args={[1.7, 2.0]} />
+                    <meshBasicMaterial color="#ffffff" transparent opacity={0.04} side={THREE.DoubleSide} />
+                  </mesh>
+                  <lineSegments position={[0, 0, -2]}>
+                    <edgesGeometry args={[new THREE.PlaneGeometry(1.7, 2.0)]} />
+                    <lineBasicMaterial color="#ffffff" transparent opacity={0.18} />
+                  </lineSegments>
+                </>
+              )}
+            </Canvas>
+
+            {/* Result flash */}
+            <AnimatePresence>
+              {showResult && lastResult && (
+                <motion.div
+                  key={`res-${pitchNum}`}
+                  initial={{ opacity: 0, scale: 0.7 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="absolute inset-0 flex items-center justify-center pointer-events-none"
+                >
+                  <span className="text-4xl font-bold font-display drop-shadow-lg" style={{ color: RESULT_LABELS[lastResult].color }}>
+                    {RESULT_LABELS[lastResult].text}
+                  </span>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* "Next pitch" hint */}
+            {waitingNextPitch && (
+              <div className="absolute bottom-4 inset-x-0 flex justify-center pointer-events-none">
+                <div className="bg-black/60 text-white text-xs font-semibold px-4 py-2 rounded-full">
+                  Space / tap SWING for next pitch
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* SWING button — mobile primary interaction */}
+          <button
+            onClick={handleSwingButton}
+            className={`w-full rounded-2xl font-bold text-lg py-6 transition-all select-none ${
+              decisionOpen
+                ? "bg-primary text-primary-foreground shadow-lg shadow-primary/30 scale-[1.02]"
+                : waitingNextPitch
+                ? "bg-secondary text-foreground"
+                : "bg-secondary/50 text-muted-foreground"
+            }`}
+          >
+            {waitingNextPitch ? "Next Pitch" : "SWING"}
+          </button>
+
+          <Button variant="ghost" size="sm" className="text-muted-foreground w-full" onClick={reset}>✕ End Session</Button>
+        </div>
+      )}
+
+      {phase === "complete" && (() => {
+        const strikes = pitches.filter(p => p.location === "strike");
+        const balls = pitches.filter(p => p.location === "ball");
+        const goodSwings = pitches.filter(p => p.result === "good_swing").length;
+        const chases = pitches.filter(p => p.result === "chase").length;
+        const calledStrikes = pitches.filter(p => p.result === "called_strike").length;
+        const goodTakes = pitches.filter(p => p.result === "good_eye").length;
+        const disciplinePct = Math.round(((goodSwings + goodTakes) / TOTAL_PITCHES) * 100);
+        const chaseRate = balls.length > 0 ? Math.round((chases / balls.length) * 100) : 0;
+        const calledStrikeRate = strikes.length > 0 ? Math.round((calledStrikes / strikes.length) * 100) : 0;
+        const swingReactions = pitches.filter(p => p.swung && p.reactionMs != null).map(p => p.reactionMs!);
+        const avgReaction = swingReactions.length > 0
+          ? Math.round(swingReactions.reduce((a, b) => a + b, 0) / swingReactions.length)
+          : null;
+
+        return (
+          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+            className="bg-card border border-border rounded-xl p-6 space-y-5">
+            <div className="text-center">
+              <CheckCircle2 className="w-10 h-10 text-primary mx-auto mb-2" />
+              <h2 className="text-xl font-bold font-display uppercase">Session Complete</h2>
+              <p className="text-sm text-muted-foreground">{TOTAL_PITCHES} pitches</p>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+              <div className="bg-secondary/40 rounded-xl p-3">
+                <p className="text-3xl font-bold text-primary">{disciplinePct}%</p>
+                <p className="text-xs text-muted-foreground">Discipline</p>
+              </div>
+              <div className="bg-secondary/40 rounded-xl p-3">
+                <p className="text-3xl font-bold text-red-400">{chaseRate}%</p>
+                <p className="text-xs text-muted-foreground">Chase Rate</p>
+              </div>
+              <div className="bg-secondary/40 rounded-xl p-3">
+                <p className="text-3xl font-bold text-orange-400">{calledStrikeRate}%</p>
+                <p className="text-xs text-muted-foreground">Called Strikes</p>
+              </div>
+              {avgReaction != null && (
+                <div className="bg-secondary/40 rounded-xl p-3">
+                  <p className="text-3xl font-bold text-foreground">{avgReaction}ms</p>
+                  <p className="text-xs text-muted-foreground">Avg Reaction</p>
+                </div>
+              )}
+            </div>
+
+            {/* Pitch-by-pitch breakdown */}
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Pitch Log</p>
+              <div className="flex flex-wrap gap-1.5">
+                {pitches.map((p, i) => (
+                  <div
+                    key={i}
+                    title={`Pitch ${i + 1}: ${p.location} — ${RESULT_LABELS[p.result].text}`}
+                    className="w-7 h-7 rounded flex items-center justify-center text-[10px] font-bold"
+                    style={{
+                      background: p.result === "good_swing" || p.result === "good_eye" ? "#22c55e22" : p.result === "chase" ? "#ef444422" : "#f9731622",
+                      color: p.result === "good_swing" || p.result === "good_eye" ? "#22c55e" : p.result === "chase" ? "#ef4444" : "#f97316",
+                      border: `1px solid ${p.result === "good_swing" || p.result === "good_eye" ? "#22c55e40" : p.result === "chase" ? "#ef444440" : "#f9731640"}`,
+                    }}
+                  >
+                    {i + 1}
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500 inline-block" /> Good decision</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500 inline-block" /> Chase</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-orange-400 inline-block" /> Called strike</span>
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <Button className="flex-1 gap-2" onClick={startSession}><RotateCcw className="w-3.5 h-3.5" /> Play Again</Button>
+              <Button variant="outline" onClick={reset}>Done</Button>
+            </div>
+          </motion.div>
+        );
+      })()}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
 // MAIN PAGE
 // ═══════════════════════════════════════════════════════════════
 
@@ -936,7 +1407,8 @@ export default function Enhancements() {
   const [, navigate] = useLocation();
   const search = useSearch();
   const params = new URLSearchParams(search);
-  const initialTab = params.get("tab") === "acuity" ? "acuity" : "cognition";
+  const rawTab = params.get("tab");
+  const initialTab: Tab = rawTab === "acuity" ? "acuity" : rawTab === "discipline" ? "discipline" : "cognition";
   const [tab, setTab] = useState<Tab>(initialTab);
 
   const isPaid = !!(user?.isAdmin) || ["player", "pro", "coach"].includes(user?.subscriptionTier ?? "");
@@ -958,8 +1430,9 @@ export default function Enhancements() {
   }
 
   const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
-    { id: "cognition", label: "Cognition", icon: <Brain className="w-4 h-4" /> },
-    { id: "acuity",    label: "Visual Acuity", icon: <Eye className="w-4 h-4" /> },
+    { id: "cognition",  label: "Cognition",     icon: <Brain className="w-4 h-4" /> },
+    { id: "acuity",     label: "Visual Acuity", icon: <Eye className="w-4 h-4" /> },
+    { id: "discipline", label: "Discipline",    icon: <Target className="w-4 h-4" /> },
   ];
 
   return (
@@ -992,8 +1465,9 @@ export default function Enhancements() {
         </div>
 
         {/* Tab content */}
-        {tab === "cognition" && <CognitionTab isPaid={isPaid} isFree={isFree} />}
-        {tab === "acuity"    && <AcuityTab    isPaid={isPaid} isFree={isFree} />}
+        {tab === "cognition"  && <CognitionTab  isPaid={isPaid} isFree={isFree} />}
+        {tab === "acuity"     && <AcuityTab     isPaid={isPaid} isFree={isFree} />}
+        {tab === "discipline" && <DisciplineTab />}
       </div>
     </Layout>
   );
