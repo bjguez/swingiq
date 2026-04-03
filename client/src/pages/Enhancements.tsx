@@ -1042,8 +1042,8 @@ function generatePitchData(location: PitchLocation, level: DisciplineLevel, hand
   const type = pool[Math.floor(Math.random() * pool.length)];
   const base = BASE_BREAK[type];
 
-  // LHP mirrors horizontal break (arm-side becomes the other side)
-  const handMult = hand === "LHP" ? -1 : 1;
+  // RHP breaks away from RHB (negative X = glove-side); LHP mirrors
+  const handMult = hand === "RHP" ? -1 : 1;
   const breakX = base.breakX * lvl.breakMult * handMult;
   const breakY = base.breakY * lvl.breakMult;
   const speed = lvl.speeds[type];
