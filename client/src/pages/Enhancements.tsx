@@ -939,34 +939,82 @@ const DECISION_Z = -9;
 
 type PitchLocation = "strike" | "ball";
 type PitchResult = "good_swing" | "good_eye" | "chase" | "called_strike";
-type PitchType = "fastball" | "curveball" | "slider" | "changeup";
+type PitchType = "fastball" | "curveball" | "slider" | "sweeper" | "changeup";
+type DisciplineLevel = "rookie" | "high_school" | "college" | "mlb";
 
-interface PitchData {
-  location: PitchLocation;
-  type: PitchType;
-  // Start position (near center, slight mound drift)
-  startX: number;
-  startY: number;
-  // Plate-arrival position
-  endX: number;
-  endY: number;
-  // For curved pitches — the break axis and amount
-  breakX: number; // accumulated horizontal break (applied late via t^2)
-  breakY: number; // accumulated vertical break
-  speed: number;  // units/sec
+// ─── Pitch visual config (color + label only) ───────────────────────────────
+const PITCH_DISPLAY: Record<PitchType, { label: string; color: string }> = {
+  fastball:  { label: "Fastball",  color: "#f5f0e8" },
+  curveball: { label: "Curveball", color: "#facc15" },
+  slider:    { label: "Slider",    color: "#38bdf8" },
+  sweeper:   { label: "Sweeper",   color: "#a78bfa" },
+  changeup:  { label: "Changeup",  color: "#fb923c" },
+};
+
+// ─── Statcast-calibrated base movement at 1.0× (College level) ─────────────
+// 1 scene unit ≈ 21 inches (60.5 ft / 34.5 units)
+// Values are glove-side RHB perspective: positive X = arm-side, negative Y = drop
+const BASE_BREAK: Record<PitchType, { breakX: number; breakY: number }> = {
+  fastball:  { breakX: +0.33, breakY: +0.67 }, // +7" arm-side,   +14" rise vs gravity
+  curveball: { breakX: -0.24, breakY: -2.48 }, // -5" glove-side, -52" drop
+  slider:    { breakX: -0.38, breakY: -1.43 }, // -8" glove-side, -30" drop
+  sweeper:   { breakX: -0.71, breakY: -0.67 }, // -15" glove-side,-14" drop (lateral sweep)
+  changeup:  { breakX: +0.38, breakY: -1.10 }, // +8" arm-side,   -23" drop
+};
+
+// ─── Level configs ──────────────────────────────────────────────────────────
+interface LevelConfig {
+  label: string;
+  sublabel: string;        // e.g. "~85 mph"
+  mph: number;
+  speeds: Record<PitchType, number>; // scene units/sec
+  breakMult: number;       // applied to BASE_BREAK
+  windowStart: number;     // decision window ms at pitch 1
+  windowEnd: number;       // decision window ms at pitch 20
+  pitchPool: PitchType[];  // weighted pool — duplicates = higher frequency
 }
 
-const PITCH_CONFIGS: Record<PitchType, {
-  label: string;
-  color: string;
-  speed: number;
-  breakX: number;
-  breakY: number;
-}> = {
-  fastball:  { label: "Fastball",  color: "#f5f0e8", speed: 28, breakX: 0,    breakY: 0.15  },
-  curveball: { label: "Curveball", color: "#facc15", speed: 19, breakX: 0.25, breakY: -2.0  },
-  slider:    { label: "Slider",    color: "#38bdf8", speed: 23, breakX: -1.4, breakY: -0.7  },
-  changeup:  { label: "Changeup",  color: "#fb923c", speed: 20, breakX: 0.15, breakY: -0.4  },
+const DISCIPLINE_LEVELS: Record<DisciplineLevel, LevelConfig> = {
+  rookie: {
+    label: "Rookie",
+    sublabel: "~85 mph",
+    mph: 85,
+    speeds: { fastball: 26, curveball: 17, slider: 22, sweeper: 22, changeup: 20 },
+    breakMult: 0.6,
+    windowStart: 550,
+    windowEnd: 400,
+    pitchPool: ["fastball", "fastball", "fastball", "curveball", "slider", "changeup"],
+  },
+  high_school: {
+    label: "High School",
+    sublabel: "~90 mph",
+    mph: 90,
+    speeds: { fastball: 30, curveball: 20, slider: 26, sweeper: 26, changeup: 23 },
+    breakMult: 0.8,
+    windowStart: 420,
+    windowEnd: 320,
+    pitchPool: ["fastball", "fastball", "fastball", "curveball", "slider", "changeup"],
+  },
+  college: {
+    label: "College",
+    sublabel: "~95 mph",
+    mph: 95,
+    speeds: { fastball: 34, curveball: 23, slider: 29, sweeper: 29, changeup: 26 },
+    breakMult: 1.0,
+    windowStart: 380,
+    windowEnd: 280,
+    pitchPool: ["fastball", "fastball", "curveball", "slider", "changeup", "sweeper"],
+  },
+  mlb: {
+    label: "MLB",
+    sublabel: "~100 mph",
+    mph: 100,
+    speeds: { fastball: 38, curveball: 26, slider: 32, sweeper: 32, changeup: 29 },
+    breakMult: 1.25,
+    windowStart: 350,
+    windowEnd: 220,
+    pitchPool: ["fastball", "fastball", "curveball", "slider", "changeup", "sweeper", "sweeper"],
+  },
 };
 
 // Strike zone bounds (x: ±0.85, y: −1.0 to +1.0)
@@ -974,12 +1022,29 @@ const SZ_X = 0.85;
 const SZ_Y_LO = -1.0;
 const SZ_Y_HI = 1.0;
 
-function generatePitchData(location: PitchLocation): PitchData {
-  const types: PitchType[] = ["fastball", "fastball", "fastball", "curveball", "slider", "changeup"];
-  const type = types[Math.floor(Math.random() * types.length)];
-  const cfg = PITCH_CONFIGS[type];
+interface PitchData {
+  location: PitchLocation;
+  type: PitchType;
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+  breakX: number;
+  breakY: number;
+  speed: number;
+}
 
-  // Slight start drift so the ball doesn't always emerge from dead center
+function generatePitchData(location: PitchLocation, level: DisciplineLevel): PitchData {
+  const lvl = DISCIPLINE_LEVELS[level];
+  const pool = lvl.pitchPool;
+  const type = pool[Math.floor(Math.random() * pool.length)];
+  const base = BASE_BREAK[type];
+
+  const breakX = base.breakX * lvl.breakMult;
+  const breakY = base.breakY * lvl.breakMult;
+  const speed = lvl.speeds[type];
+
+  // Slight release point drift
   const startX = (Math.random() - 0.5) * 0.3;
   const startY = 0.8 + (Math.random() - 0.5) * 0.3;
 
@@ -987,32 +1052,30 @@ function generatePitchData(location: PitchLocation): PitchData {
   let endY: number;
 
   if (location === "strike") {
-    // Land inside zone, accounting for pitch break so the ARRIVAL is in zone
-    endX = (Math.random() - 0.5) * SZ_X * 1.6 - cfg.breakX;
-    endY = SZ_Y_LO + Math.random() * (SZ_Y_HI - SZ_Y_LO) - cfg.breakY;
+    endX = (Math.random() - 0.5) * SZ_X * 1.6 - breakX;
+    endY = SZ_Y_LO + Math.random() * (SZ_Y_HI - SZ_Y_LO) - breakY;
   } else {
-    // Land clearly outside — pick a side
     const side = Math.random();
     if (side < 0.35) {
       // high
-      endX = (Math.random() - 0.5) * SZ_X * 1.4 - cfg.breakX;
-      endY = SZ_Y_HI + 0.5 + Math.random() * 0.6 - cfg.breakY;
+      endX = (Math.random() - 0.5) * SZ_X * 1.4 - breakX;
+      endY = SZ_Y_HI + 0.5 + Math.random() * 0.6 - breakY;
     } else if (side < 0.7) {
-      // low
-      endX = (Math.random() - 0.5) * SZ_X * 1.4 - cfg.breakX;
-      endY = SZ_Y_LO - 0.5 - Math.random() * 0.6 - cfg.breakY;
+      // low / in the dirt
+      endX = (Math.random() - 0.5) * SZ_X * 1.4 - breakX;
+      endY = SZ_Y_LO - 0.5 - Math.random() * 0.7 - breakY;
     } else if (side < 0.85) {
-      // inside
-      endX = (Math.random() > 0.5 ? 1 : -1) * (SZ_X + 0.45 + Math.random() * 0.4) - cfg.breakX;
-      endY = SZ_Y_LO + Math.random() * (SZ_Y_HI - SZ_Y_LO) - cfg.breakY;
+      // off the plate left/right
+      endX = (Math.random() > 0.5 ? 1 : -1) * (SZ_X + 0.45 + Math.random() * 0.4) - breakX;
+      endY = SZ_Y_LO + Math.random() * (SZ_Y_HI - SZ_Y_LO) - breakY;
     } else {
-      // way outside + low — classic dirt ball
-      endX = (Math.random() - 0.5) * SZ_X - cfg.breakX;
-      endY = SZ_Y_LO - 1.0 - Math.random() * 0.5 - cfg.breakY;
+      // way low — classic get-me-over curve that bounces
+      endX = (Math.random() - 0.5) * SZ_X - breakX;
+      endY = SZ_Y_LO - 1.1 - Math.random() * 0.5 - breakY;
     }
   }
 
-  return { location, type, startX, startY, endX, endY, breakX: cfg.breakX, breakY: cfg.breakY, speed: cfg.speed };
+  return { location, type, startX, startY, endX, endY, breakX, breakY, speed };
 }
 
 interface Pitch {
@@ -1064,7 +1127,7 @@ function PitchBallScene({
   const meshRef = useRef<THREE.Mesh>(null);
   const zRef = useRef(START_Z);
   const notified = useRef(false);
-  const cfg = PITCH_CONFIGS[pitchData.type];
+  const cfg = PITCH_DISPLAY[pitchData.type];
 
   // Store path endpoints in refs so re-renders don't change them
   const startX = useRef(pitchData.startX);
@@ -1111,11 +1174,14 @@ function PitchBallScene({
 
 type DisciplinePhase = "intro" | "pitching" | "complete";
 
+const LEVEL_ORDER: DisciplineLevel[] = ["rookie", "high_school", "college", "mlb"];
+
 function DisciplineTab() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
   const [phase, setPhase] = useState<DisciplinePhase>("intro");
+  const [level, setLevel] = useState<DisciplineLevel>("rookie");
   const [pitches, setPitches] = useState<Pitch[]>([]);
   const [currentPitch, setCurrentPitch] = useState<PitchData | null>(null);
   const [ballRunning, setBallRunning] = useState(false);
@@ -1124,10 +1190,13 @@ function DisciplineTab() {
   const [showResult, setShowResult] = useState(false);
   const [waitingNextPitch, setWaitingNextPitch] = useState(false);
 
+  const levelRef = useRef<DisciplineLevel>("rookie");
   const decisionOpenTimeRef = useRef<number | null>(null);
   const swungRef = useRef(false);
   const currentPitchRef = useRef<PitchData | null>(null);
   const pitchesRef = useRef<Pitch[]>([]);
+
+  useEffect(() => { levelRef.current = level; }, [level]);
 
   const { data: history = [] } = useQuery<DisciplineSession[]>({
     queryKey: ["/api/discipline/sessions"],
@@ -1147,7 +1216,7 @@ function DisciplineTab() {
   function launchNextPitch() {
     if (pitchesRef.current.length >= TOTAL_PITCHES) return;
     const loc: PitchLocation = Math.random() < 0.55 ? "strike" : "ball";
-    const data = generatePitchData(loc);
+    const data = generatePitchData(loc, levelRef.current);
     swungRef.current = false;
     currentPitchRef.current = data;
     setCurrentPitch(data);
@@ -1160,7 +1229,9 @@ function DisciplineTab() {
   function handleDecisionWindowOpen() {
     decisionOpenTimeRef.current = Date.now();
     setDecisionOpen(true);
-    const windowMs = Math.max(350, 700 - pitchesRef.current.length * 17);
+    const lvl = DISCIPLINE_LEVELS[levelRef.current];
+    const progress = pitchesRef.current.length / (TOTAL_PITCHES - 1); // 0 → 1
+    const windowMs = Math.round(lvl.windowStart - (lvl.windowStart - lvl.windowEnd) * progress);
     setTimeout(() => {
       if (!swungRef.current) resolvePitch(false);
     }, windowMs);
@@ -1227,6 +1298,7 @@ function DisciplineTab() {
       chaseRate,
       calledStrikeRate,
       avgReactionMs,
+      level: levelRef.current,
     });
   }
 
@@ -1281,6 +1353,7 @@ function DisciplineTab() {
 
       {phase === "intro" && (
         <div className="space-y-4">
+          {/* Last session recap */}
           {lastSession && (
             <div className="bg-card border border-border rounded-xl p-4 grid grid-cols-3 gap-3 text-center">
               <div>
@@ -1297,24 +1370,73 @@ function DisciplineTab() {
               </div>
             </div>
           )}
+
+          {/* Level picker */}
           <div className="bg-card border border-border rounded-xl p-5 space-y-3">
-            <p className="font-semibold text-sm uppercase tracking-wide">How it works</p>
-            <ul className="space-y-1.5 text-sm text-muted-foreground">
-              <li>• A pitch travels toward you — strike or ball</li>
-              <li>• When you see it enter the zone, decide: <span className="text-foreground font-medium">swing or take</span></li>
-              <li>• Press <kbd className="px-1.5 py-0.5 rounded border border-border text-xs font-mono">Space</kbd> on desktop or tap <span className="text-foreground font-medium">SWING</span> on mobile</li>
-              <li>• Do nothing = take</li>
-              <li>• Decision window shrinks as you face more pitches</li>
+            <p className="font-semibold text-sm uppercase tracking-wide">Select Level</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {LEVEL_ORDER.map(lvlKey => {
+                const lvl = DISCIPLINE_LEVELS[lvlKey];
+                const isSelected = level === lvlKey;
+                return (
+                  <button
+                    key={lvlKey}
+                    onClick={() => setLevel(lvlKey)}
+                    className={`rounded-xl p-3 text-left border transition-colors ${
+                      isSelected
+                        ? "border-primary bg-primary/10 text-foreground"
+                        : "border-border bg-secondary/20 text-muted-foreground hover:border-primary/40"
+                    }`}
+                  >
+                    <p className="font-bold text-sm">{lvl.label}</p>
+                    <p className={`text-xs font-mono mt-0.5 ${isSelected ? "text-primary" : "text-muted-foreground"}`}>{lvl.sublabel}</p>
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      {lvlKey === "rookie" && "Straightforward stuff"}
+                      {lvlKey === "high_school" && "More movement, tighter window"}
+                      {lvlKey === "college" && "Sweeper introduced, ±Statcast avg"}
+                      {lvlKey === "mlb" && "Elite break, razor window"}
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Pitch legend */}
+          <div className="bg-card border border-border rounded-xl p-4 space-y-2">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Pitch Arsenal</p>
+            <div className="flex flex-wrap gap-3">
+              {(Object.entries(PITCH_DISPLAY) as [PitchType, typeof PITCH_DISPLAY[PitchType]][])
+                .filter(([t]) => DISCIPLINE_LEVELS[level].pitchPool.includes(t))
+                .filter(([t], i, arr) => arr.findIndex(([tt]) => tt === t) === i)
+                .map(([t, d]) => (
+                  <div key={t} className="flex items-center gap-1.5 text-xs">
+                    <span className="w-2 h-2 rounded-full inline-block" style={{ background: d.color }} />
+                    <span style={{ color: d.color }} className="font-medium">{d.label}</span>
+                  </div>
+                ))}
+            </div>
+          </div>
+
+          <div className="bg-card border border-border rounded-xl p-4 space-y-2">
+            <ul className="space-y-1 text-sm text-muted-foreground">
+              <li>• Pitch travels toward you — strike or ball</li>
+              <li>• Press <kbd className="px-1.5 py-0.5 rounded border border-border text-xs font-mono">Space</kbd> or tap <span className="text-foreground font-medium">SWING</span> to swing — do nothing to take</li>
+              <li>• Decision window tightens each pitch</li>
             </ul>
             <Button onClick={startSession} className="w-full gap-2 mt-2"><Play className="w-4 h-4" /> Start ({TOTAL_PITCHES} pitches)</Button>
           </div>
+
           {history.length > 1 && (
             <div className="bg-card border border-border rounded-xl p-4 space-y-2">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Recent Sessions</p>
               <div className="space-y-2">
-                {history.slice(0, 5).map((s, i) => (
+                {history.slice(0, 5).map(s => (
                   <div key={s.id} className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">{new Date(s.completedAt!).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted-foreground">{new Date(s.completedAt!).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+                      {s.level && <span className="text-[10px] px-1.5 py-0.5 rounded bg-secondary text-muted-foreground font-medium">{DISCIPLINE_LEVELS[s.level as DisciplineLevel]?.label ?? s.level}</span>}
+                    </div>
                     <div className="flex gap-4">
                       <span className="text-primary font-semibold">{s.disciplinePct}% disc</span>
                       <span className="text-red-400">{s.chaseRate}% chase</span>
@@ -1331,7 +1453,7 @@ function DisciplineTab() {
         <div className="space-y-3">
           {/* Progress */}
           <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground font-mono">{pitchNum} / {TOTAL_PITCHES} pitches</span>
+            <span className="text-muted-foreground font-mono">{pitchNum} / {TOTAL_PITCHES} · <span className="text-foreground font-semibold">{DISCIPLINE_LEVELS[level].label}</span> {DISCIPLINE_LEVELS[level].sublabel}</span>
             <div className="flex gap-1">
               {Array.from({ length: TOTAL_PITCHES }).map((_, i) => {
                 const p = pitches[i];
@@ -1364,9 +1486,9 @@ function DisciplineTab() {
               <div className="absolute top-3 left-3 pointer-events-none">
                 <span
                   className="text-xs font-bold px-2 py-1 rounded-full bg-black/60"
-                  style={{ color: PITCH_CONFIGS[currentPitch.type].color }}
+                  style={{ color: PITCH_DISPLAY[currentPitch.type].color }}
                 >
-                  {PITCH_CONFIGS[currentPitch.type].label}
+                  {PITCH_DISPLAY[currentPitch.type].label}
                 </span>
               </div>
             )}
@@ -1437,7 +1559,7 @@ function DisciplineTab() {
             <div className="text-center">
               <CheckCircle2 className="w-10 h-10 text-primary mx-auto mb-2" />
               <h2 className="text-xl font-bold font-display uppercase">Session Complete</h2>
-              <p className="text-sm text-muted-foreground">{TOTAL_PITCHES} pitches</p>
+              <p className="text-sm text-muted-foreground">{TOTAL_PITCHES} pitches · {DISCIPLINE_LEVELS[level].label} ({DISCIPLINE_LEVELS[level].sublabel})</p>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">

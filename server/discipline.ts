@@ -31,7 +31,7 @@ export function setupDisciplineRoutes(app: Express) {
       const {
         totalPitches, swings, goodSwings, chases,
         calledStrikes, goodTakes, disciplinePct,
-        chaseRate, calledStrikeRate, avgReactionMs,
+        chaseRate, calledStrikeRate, avgReactionMs, level,
       } = req.body;
 
       if (typeof totalPitches !== "number" || totalPitches < 1) {
@@ -50,6 +50,7 @@ export function setupDisciplineRoutes(app: Express) {
         chaseRate: chaseRate ?? 0,
         calledStrikeRate: calledStrikeRate ?? 0,
         avgReactionMs: avgReactionMs ?? null,
+        level: level ?? "rookie",
       }).returning();
 
       res.status(201).json(row);

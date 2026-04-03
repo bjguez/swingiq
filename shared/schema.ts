@@ -344,6 +344,7 @@ export const disciplineSessions = pgTable("discipline_sessions", {
   chaseRate: real("chase_rate").notNull(),        // chases / balls
   calledStrikeRate: real("called_strike_rate").notNull(), // calledStrikes / strikes
   avgReactionMs: real("avg_reaction_ms"),        // avg ms from decision window open to swing
+  level: text("level").default("rookie"),         // "rookie" | "high_school" | "college" | "mlb"
 }, (t) => ({
   userIdIdx: index("discipline_sessions_user_id_idx").on(t.userId),
 }));
