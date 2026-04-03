@@ -941,6 +941,7 @@ type PitchLocation = "strike" | "ball";
 type PitchResult = "good_swing" | "good_eye" | "chase" | "called_strike";
 type PitchType = "fastball" | "curveball" | "slider" | "sweeper" | "changeup";
 type DisciplineLevel = "rookie" | "high_school" | "college" | "mlb";
+type PitcherHand = "RHP" | "LHP";
 
 // ─── Pitch visual config (color + label only) ───────────────────────────────
 const PITCH_DISPLAY: Record<PitchType, { label: string; color: string }> = {
@@ -953,13 +954,14 @@ const PITCH_DISPLAY: Record<PitchType, { label: string; color: string }> = {
 
 // ─── Statcast-calibrated base movement at 1.0× (College level) ─────────────
 // 1 scene unit ≈ 21 inches (60.5 ft / 34.5 units)
-// Values are glove-side RHB perspective: positive X = arm-side, negative Y = drop
+// Boosted ~30% over league avg — represents plus-grade stuff, not league average
+// Positive X = arm-side (right for RHP), negative Y = drop
 const BASE_BREAK: Record<PitchType, { breakX: number; breakY: number }> = {
-  fastball:  { breakX: +0.33, breakY: +0.67 }, // +7" arm-side,   +14" rise vs gravity
-  curveball: { breakX: -0.24, breakY: -2.48 }, // -5" glove-side, -52" drop
-  slider:    { breakX: -0.38, breakY: -1.43 }, // -8" glove-side, -30" drop
-  sweeper:   { breakX: -0.71, breakY: -0.67 }, // -15" glove-side,-14" drop (lateral sweep)
-  changeup:  { breakX: +0.38, breakY: -1.10 }, // +8" arm-side,   -23" drop
+  fastball:  { breakX: +0.43, breakY: +0.87 }, // +9" arm-side,   +18" rise vs gravity
+  curveball: { breakX: -0.31, breakY: -3.22 }, // -7" glove-side, -68" drop
+  slider:    { breakX: -0.50, breakY: -1.86 }, // -10" glove-side,-39" drop
+  sweeper:   { breakX: -0.95, breakY: -0.86 }, // -20" glove-side,-18" drop
+  changeup:  { breakX: +0.50, breakY: -1.43 }, // +10" arm-side,  -30" drop
 };
 
 // ─── Level configs ──────────────────────────────────────────────────────────
@@ -1034,13 +1036,15 @@ interface PitchData {
   speed: number;
 }
 
-function generatePitchData(location: PitchLocation, level: DisciplineLevel): PitchData {
+function generatePitchData(location: PitchLocation, level: DisciplineLevel, hand: PitcherHand): PitchData {
   const lvl = DISCIPLINE_LEVELS[level];
   const pool = lvl.pitchPool;
   const type = pool[Math.floor(Math.random() * pool.length)];
   const base = BASE_BREAK[type];
 
-  const breakX = base.breakX * lvl.breakMult;
+  // LHP mirrors horizontal break (arm-side becomes the other side)
+  const handMult = hand === "LHP" ? -1 : 1;
+  const breakX = base.breakX * lvl.breakMult * handMult;
   const breakY = base.breakY * lvl.breakMult;
   const speed = lvl.speeds[type];
 
@@ -1130,10 +1134,12 @@ function PitchBallScene({
   const cfg = PITCH_DISPLAY[pitchData.type];
 
   // Store path endpoints in refs so re-renders don't change them
+  // endX/endY are the straight-line targets (pre-compensated: target - break)
+  // break is added on top as a late-accelerating term so ball looks straight, then dives
   const startX = useRef(pitchData.startX);
   const startY = useRef(pitchData.startY);
-  const endX   = useRef(pitchData.endX + pitchData.breakX);
-  const endY   = useRef(pitchData.endY + pitchData.breakY);
+  const endX   = useRef(pitchData.endX);   // = zone target - breakX
+  const endY   = useRef(pitchData.endY);   // = zone target - breakY
   const bX     = useRef(pitchData.breakX);
   const bY     = useRef(pitchData.breakY);
 
@@ -1151,10 +1157,11 @@ function PitchBallScene({
     // t: 0 (release) → 1 (plate)
     const t = Math.max(0, Math.min(1, (zRef.current - START_Z) / totalDist));
 
-    // Linear travel for x/y base, then add break which accelerates in the back half (t^2)
-    const breakT = t * t;
-    const x = startX.current + (endX.current - startX.current) * t - bX.current * (1 - breakT);
-    const y = startY.current + (endY.current - startY.current) * t - bY.current * (1 - t);
+    // Break accumulates late: t^2.5 means ~25% applied at midpoint, ~80% at 90% of flight
+    // Ball looks like it's heading one place, then breaks hard in the final third
+    const lateT = Math.pow(t, 2.5);
+    const x = startX.current + (endX.current - startX.current) * t + bX.current * lateT;
+    const y = startY.current + (endY.current - startY.current) * t + bY.current * lateT;
 
     meshRef.current.position.set(x, y, zRef.current);
     // Ball grows naturally via perspective; add slight size ramp for readability
@@ -1182,6 +1189,7 @@ function DisciplineTab() {
 
   const [phase, setPhase] = useState<DisciplinePhase>("intro");
   const [level, setLevel] = useState<DisciplineLevel>("rookie");
+  const [hand, setHand] = useState<PitcherHand>("RHP");
   const [pitches, setPitches] = useState<Pitch[]>([]);
   const [currentPitch, setCurrentPitch] = useState<PitchData | null>(null);
   const [ballRunning, setBallRunning] = useState(false);
@@ -1191,12 +1199,14 @@ function DisciplineTab() {
   const [waitingNextPitch, setWaitingNextPitch] = useState(false);
 
   const levelRef = useRef<DisciplineLevel>("rookie");
+  const handRef = useRef<PitcherHand>("RHP");
   const decisionOpenTimeRef = useRef<number | null>(null);
   const swungRef = useRef(false);
   const currentPitchRef = useRef<PitchData | null>(null);
   const pitchesRef = useRef<Pitch[]>([]);
 
   useEffect(() => { levelRef.current = level; }, [level]);
+  useEffect(() => { handRef.current = hand; }, [hand]);
 
   const { data: history = [] } = useQuery<DisciplineSession[]>({
     queryKey: ["/api/discipline/sessions"],
@@ -1216,7 +1226,7 @@ function DisciplineTab() {
   function launchNextPitch() {
     if (pitchesRef.current.length >= TOTAL_PITCHES) return;
     const loc: PitchLocation = Math.random() < 0.55 ? "strike" : "ball";
-    const data = generatePitchData(loc, levelRef.current);
+    const data = generatePitchData(loc, levelRef.current, handRef.current);
     swungRef.current = false;
     currentPitchRef.current = data;
     setCurrentPitch(data);
@@ -1418,13 +1428,30 @@ function DisciplineTab() {
             </div>
           </div>
 
-          <div className="bg-card border border-border rounded-xl p-4 space-y-2">
+          <div className="bg-card border border-border rounded-xl p-4 space-y-3">
+            {/* Pitcher handedness toggle */}
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold">Pitcher</p>
+              <div className="flex rounded-lg border border-border overflow-hidden">
+                {(["RHP", "LHP"] as PitcherHand[]).map(h => (
+                  <button
+                    key={h}
+                    onClick={() => setHand(h)}
+                    className={`px-4 py-1.5 text-sm font-semibold transition-colors ${
+                      hand === h ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {h}
+                  </button>
+                ))}
+              </div>
+            </div>
             <ul className="space-y-1 text-sm text-muted-foreground">
               <li>• Pitch travels toward you — strike or ball</li>
               <li>• Press <kbd className="px-1.5 py-0.5 rounded border border-border text-xs font-mono">Space</kbd> or tap <span className="text-foreground font-medium">SWING</span> to swing — do nothing to take</li>
               <li>• Decision window tightens each pitch</li>
             </ul>
-            <Button onClick={startSession} className="w-full gap-2 mt-2"><Play className="w-4 h-4" /> Start ({TOTAL_PITCHES} pitches)</Button>
+            <Button onClick={startSession} className="w-full gap-2"><Play className="w-4 h-4" /> Start ({TOTAL_PITCHES} pitches)</Button>
           </div>
 
           {history.length > 1 && (
@@ -1453,7 +1480,7 @@ function DisciplineTab() {
         <div className="space-y-3">
           {/* Progress */}
           <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground font-mono">{pitchNum} / {TOTAL_PITCHES} · <span className="text-foreground font-semibold">{DISCIPLINE_LEVELS[level].label}</span> {DISCIPLINE_LEVELS[level].sublabel}</span>
+            <span className="text-muted-foreground font-mono">{pitchNum} / {TOTAL_PITCHES} · <span className="text-foreground font-semibold">{DISCIPLINE_LEVELS[level].label}</span> {DISCIPLINE_LEVELS[level].sublabel} · {hand}</span>
             <div className="flex gap-1">
               {Array.from({ length: TOTAL_PITCHES }).map((_, i) => {
                 const p = pitches[i];
