@@ -931,14 +931,93 @@ function AcuityTab({ isPaid, isFree }: { isPaid: boolean; isFree: boolean }) {
 // ═══════════════════════════════════════════════════════════════
 
 const TOTAL_PITCHES = 20;
+const START_Z = -32;
+const PLATE_Z = 2.5;
+const DECISION_Z = -9;
 
 type PitchLocation = "strike" | "ball";
 type PitchResult = "good_swing" | "good_eye" | "chase" | "called_strike";
+type PitchType = "fastball" | "curveball" | "slider" | "changeup";
+
+interface PitchData {
+  location: PitchLocation;
+  type: PitchType;
+  // Start position (near center, slight mound drift)
+  startX: number;
+  startY: number;
+  // Plate-arrival position
+  endX: number;
+  endY: number;
+  // For curved pitches — the break axis and amount
+  breakX: number; // accumulated horizontal break (applied late via t^2)
+  breakY: number; // accumulated vertical break
+  speed: number;  // units/sec
+}
+
+const PITCH_CONFIGS: Record<PitchType, {
+  label: string;
+  color: string;
+  speed: number;
+  breakX: number;
+  breakY: number;
+}> = {
+  fastball:  { label: "Fastball",  color: "#f5f0e8", speed: 28, breakX: 0,    breakY: 0.15  },
+  curveball: { label: "Curveball", color: "#facc15", speed: 19, breakX: 0.25, breakY: -2.0  },
+  slider:    { label: "Slider",    color: "#38bdf8", speed: 23, breakX: -1.4, breakY: -0.7  },
+  changeup:  { label: "Changeup",  color: "#fb923c", speed: 20, breakX: 0.15, breakY: -0.4  },
+};
+
+// Strike zone bounds (x: ±0.85, y: −1.0 to +1.0)
+const SZ_X = 0.85;
+const SZ_Y_LO = -1.0;
+const SZ_Y_HI = 1.0;
+
+function generatePitchData(location: PitchLocation): PitchData {
+  const types: PitchType[] = ["fastball", "fastball", "fastball", "curveball", "slider", "changeup"];
+  const type = types[Math.floor(Math.random() * types.length)];
+  const cfg = PITCH_CONFIGS[type];
+
+  // Slight start drift so the ball doesn't always emerge from dead center
+  const startX = (Math.random() - 0.5) * 0.3;
+  const startY = 0.8 + (Math.random() - 0.5) * 0.3;
+
+  let endX: number;
+  let endY: number;
+
+  if (location === "strike") {
+    // Land inside zone, accounting for pitch break so the ARRIVAL is in zone
+    endX = (Math.random() - 0.5) * SZ_X * 1.6 - cfg.breakX;
+    endY = SZ_Y_LO + Math.random() * (SZ_Y_HI - SZ_Y_LO) - cfg.breakY;
+  } else {
+    // Land clearly outside — pick a side
+    const side = Math.random();
+    if (side < 0.35) {
+      // high
+      endX = (Math.random() - 0.5) * SZ_X * 1.4 - cfg.breakX;
+      endY = SZ_Y_HI + 0.5 + Math.random() * 0.6 - cfg.breakY;
+    } else if (side < 0.7) {
+      // low
+      endX = (Math.random() - 0.5) * SZ_X * 1.4 - cfg.breakX;
+      endY = SZ_Y_LO - 0.5 - Math.random() * 0.6 - cfg.breakY;
+    } else if (side < 0.85) {
+      // inside
+      endX = (Math.random() > 0.5 ? 1 : -1) * (SZ_X + 0.45 + Math.random() * 0.4) - cfg.breakX;
+      endY = SZ_Y_LO + Math.random() * (SZ_Y_HI - SZ_Y_LO) - cfg.breakY;
+    } else {
+      // way outside + low — classic dirt ball
+      endX = (Math.random() - 0.5) * SZ_X - cfg.breakX;
+      endY = SZ_Y_LO - 1.0 - Math.random() * 0.5 - cfg.breakY;
+    }
+  }
+
+  return { location, type, startX, startY, endX, endY, breakX: cfg.breakX, breakY: cfg.breakY, speed: cfg.speed };
+}
 
 interface Pitch {
   location: PitchLocation;
+  type: PitchType;
   swung: boolean;
-  reactionMs: number | null; // null = took
+  reactionMs: number | null;
   result: PitchResult;
 }
 
@@ -956,60 +1035,79 @@ const RESULT_LABELS: Record<PitchResult, { text: string; color: string }> = {
   called_strike: { text: "Called strike", color: "#f97316" },
 };
 
-// 3D scene — ball travels toward camera on z-axis
-function PitchBallScene({
-  running,
-  location,
-  onDecisionWindowOpen,
-}: {
-  running: boolean;
-  location: PitchLocation;
-  onDecisionWindowOpen: () => void;
-}) {
-  const meshRef = useRef<THREE.Mesh>(null);
-  const z = useRef(-28);
-  const notified = useRef(false);
-  const DECISION_Z = -8; // when decision window opens
-  const PLATE_Z = 3;
-
-  useFrame((_, delta) => {
-    if (!running || !meshRef.current) return;
-    z.current += delta * 22; // ~22 units/s travel
-    if (!notified.current && z.current >= DECISION_Z) {
-      notified.current = true;
-      onDecisionWindowOpen();
-    }
-    const scale = 1 + Math.max(0, (z.current + 28) / 28) * 1.4;
-    meshRef.current.position.z = z.current;
-    meshRef.current.scale.setScalar(scale);
-    if (z.current > PLATE_Z + 1) meshRef.current.visible = false;
-  });
-
-  // Horizontal offset based on location
-  const xOffset = location === "ball" ? (Math.random() > 0.5 ? 1.2 : -1.2) : (Math.random() - 0.5) * 0.6;
-  const yOffset = location === "strike" ? (Math.random() - 0.5) * 0.8 : (Math.random() > 0.5 ? 1.1 : -0.8);
-
+// StrikeZone — static mesh, rendered separately so it never re-mounts
+function StrikeZone() {
   return (
     <>
-      {/* Strike zone rectangle */}
-      <mesh position={[0, 0, -2]}>
-        <planeGeometry args={[1.7, 2.0]} />
-        <meshBasicMaterial color="#ffffff" transparent opacity={0.06} side={THREE.DoubleSide} />
+      <mesh position={[0, 0, -1.5]}>
+        <planeGeometry args={[SZ_X * 2, SZ_Y_HI - SZ_Y_LO]} />
+        <meshBasicMaterial color="#ffffff" transparent opacity={0.04} side={THREE.DoubleSide} />
       </mesh>
-      <lineSegments position={[0, 0, -2]}>
-        <edgesGeometry args={[new THREE.PlaneGeometry(1.7, 2.0)]} />
-        <lineBasicMaterial color="#ffffff" transparent opacity={0.25} />
+      <lineSegments position={[0, 0, -1.5]}>
+        <edgesGeometry args={[new THREE.PlaneGeometry(SZ_X * 2, SZ_Y_HI - SZ_Y_LO)]} />
+        <lineBasicMaterial color="#ffffff" transparent opacity={0.3} />
       </lineSegments>
-      {/* Ball */}
-      <mesh ref={meshRef} position={[xOffset, yOffset, -28]}>
-        <sphereGeometry args={[0.12, 20, 20]} />
-        <meshStandardMaterial color="#f5f0e8" roughness={0.6} />
-      </mesh>
     </>
   );
 }
 
-type DisciplinePhase = "intro" | "pitching" | "feedback" | "complete";
+// 3D scene — ball travels toward camera on z-axis along a pre-computed smooth path
+function PitchBallScene({
+  pitchData,
+  onDecisionWindowOpen,
+}: {
+  pitchData: PitchData;
+  onDecisionWindowOpen: () => void;
+}) {
+  const meshRef = useRef<THREE.Mesh>(null);
+  const zRef = useRef(START_Z);
+  const notified = useRef(false);
+  const cfg = PITCH_CONFIGS[pitchData.type];
+
+  // Store path endpoints in refs so re-renders don't change them
+  const startX = useRef(pitchData.startX);
+  const startY = useRef(pitchData.startY);
+  const endX   = useRef(pitchData.endX + pitchData.breakX);
+  const endY   = useRef(pitchData.endY + pitchData.breakY);
+  const bX     = useRef(pitchData.breakX);
+  const bY     = useRef(pitchData.breakY);
+
+  const totalDist = PLATE_Z - START_Z;
+
+  useFrame((_, delta) => {
+    if (!meshRef.current) return;
+    zRef.current += delta * pitchData.speed;
+
+    if (!notified.current && zRef.current >= DECISION_Z) {
+      notified.current = true;
+      onDecisionWindowOpen();
+    }
+
+    // t: 0 (release) → 1 (plate)
+    const t = Math.max(0, Math.min(1, (zRef.current - START_Z) / totalDist));
+
+    // Linear travel for x/y base, then add break which accelerates in the back half (t^2)
+    const breakT = t * t;
+    const x = startX.current + (endX.current - startX.current) * t - bX.current * (1 - breakT);
+    const y = startY.current + (endY.current - startY.current) * t - bY.current * (1 - t);
+
+    meshRef.current.position.set(x, y, zRef.current);
+    // Ball grows naturally via perspective; add slight size ramp for readability
+    const sz = 0.11 + t * 0.07;
+    meshRef.current.scale.setScalar(sz / 0.11);
+
+    if (zRef.current > PLATE_Z + 1.5) meshRef.current.visible = false;
+  });
+
+  return (
+    <mesh ref={meshRef} position={[startX.current, startY.current, START_Z]}>
+      <sphereGeometry args={[0.11, 20, 20]} />
+      <meshStandardMaterial color={cfg.color} roughness={0.55} emissive={cfg.color} emissiveIntensity={0.15} />
+    </mesh>
+  );
+}
+
+type DisciplinePhase = "intro" | "pitching" | "complete";
 
 function DisciplineTab() {
   const { user } = useAuth();
@@ -1017,7 +1115,7 @@ function DisciplineTab() {
 
   const [phase, setPhase] = useState<DisciplinePhase>("intro");
   const [pitches, setPitches] = useState<Pitch[]>([]);
-  const [currentLocation, setCurrentLocation] = useState<PitchLocation>("strike");
+  const [currentPitch, setCurrentPitch] = useState<PitchData | null>(null);
   const [ballRunning, setBallRunning] = useState(false);
   const [decisionOpen, setDecisionOpen] = useState(false);
   const [lastResult, setLastResult] = useState<PitchResult | null>(null);
@@ -1026,7 +1124,7 @@ function DisciplineTab() {
 
   const decisionOpenTimeRef = useRef<number | null>(null);
   const swungRef = useRef(false);
-  const currentLocationRef = useRef<PitchLocation>("strike");
+  const currentPitchRef = useRef<PitchData | null>(null);
   const pitchesRef = useRef<Pitch[]>([]);
 
   const { data: history = [] } = useQuery<DisciplineSession[]>({
@@ -1041,14 +1139,16 @@ function DisciplineTab() {
   });
 
   // Keep refs in sync
-  useEffect(() => { currentLocationRef.current = currentLocation; }, [currentLocation]);
+  useEffect(() => { currentPitchRef.current = currentPitch; }, [currentPitch]);
   useEffect(() => { pitchesRef.current = pitches; }, [pitches]);
 
   function launchNextPitch() {
     if (pitchesRef.current.length >= TOTAL_PITCHES) return;
-    const loc: PitchLocation = Math.random() < 0.55 ? "strike" : "ball"; // slight strike bias
+    const loc: PitchLocation = Math.random() < 0.55 ? "strike" : "ball";
+    const data = generatePitchData(loc);
     swungRef.current = false;
-    setCurrentLocation(loc);
+    currentPitchRef.current = data;
+    setCurrentPitch(data);
     setDecisionOpen(false);
     setShowResult(false);
     setWaitingNextPitch(false);
@@ -1058,7 +1158,6 @@ function DisciplineTab() {
   function handleDecisionWindowOpen() {
     decisionOpenTimeRef.current = Date.now();
     setDecisionOpen(true);
-    // Auto-resolve as "take" after window closes
     const windowMs = Math.max(350, 700 - pitchesRef.current.length * 17);
     setTimeout(() => {
       if (!swungRef.current) resolvePitch(false);
@@ -1066,17 +1165,18 @@ function DisciplineTab() {
   }
 
   function resolvePitch(swung: boolean) {
-    if (swungRef.current && !swung) return; // already resolved
+    if (swungRef.current && !swung) return;
     swungRef.current = true;
     setBallRunning(false);
     setDecisionOpen(false);
 
-    const loc = currentLocationRef.current;
+    const pd = currentPitchRef.current;
+    if (!pd) return;
     const reactionMs = swung && decisionOpenTimeRef.current != null
       ? Date.now() - decisionOpenTimeRef.current
       : null;
-    const result = getPitchResult(loc, swung);
-    const pitch: Pitch = { location: loc, swung, reactionMs, result };
+    const result = getPitchResult(pd.location, swung);
+    const pitch: Pitch = { location: pd.location, type: pd.type, swung, reactionMs, result };
 
     setPitches(prev => {
       const updated = [...prev, pitch];
@@ -1247,28 +1347,27 @@ function DisciplineTab() {
               <PerspectiveCamera makeDefault position={[0, 0, 6]} fov={55} />
               <ambientLight intensity={0.4} />
               <pointLight position={[3, 3, 3]} intensity={0.8} />
-              {ballRunning && (
+              <StrikeZone />
+              {ballRunning && currentPitch && (
                 <PitchBallScene
                   key={pitchNum}
-                  running={ballRunning}
-                  location={currentLocation}
+                  pitchData={currentPitch}
                   onDecisionWindowOpen={handleDecisionWindowOpen}
                 />
               )}
-              {!ballRunning && !waitingNextPitch && pitchNum === 0 && (
-                // Placeholder strike zone before first pitch
-                <>
-                  <mesh position={[0, 0, -2]}>
-                    <planeGeometry args={[1.7, 2.0]} />
-                    <meshBasicMaterial color="#ffffff" transparent opacity={0.04} side={THREE.DoubleSide} />
-                  </mesh>
-                  <lineSegments position={[0, 0, -2]}>
-                    <edgesGeometry args={[new THREE.PlaneGeometry(1.7, 2.0)]} />
-                    <lineBasicMaterial color="#ffffff" transparent opacity={0.18} />
-                  </lineSegments>
-                </>
-              )}
             </Canvas>
+
+            {/* Pitch type label — shown while ball is in flight */}
+            {ballRunning && currentPitch && (
+              <div className="absolute top-3 left-3 pointer-events-none">
+                <span
+                  className="text-xs font-bold px-2 py-1 rounded-full bg-black/60"
+                  style={{ color: PITCH_CONFIGS[currentPitch.type].color }}
+                >
+                  {PITCH_CONFIGS[currentPitch.type].label}
+                </span>
+              </div>
+            )}
 
             {/* Result flash */}
             <AnimatePresence>
