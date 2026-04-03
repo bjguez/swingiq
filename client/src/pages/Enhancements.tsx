@@ -826,7 +826,9 @@ function AcuityTab({ isPaid, isFree }: { isPaid: boolean; isFree: boolean }) {
   const FREE_LIMIT = 3;
   const freeAtLimit = isFree && freeCompletionCount >= FREE_LIMIT;
 
-  const countByExercise = (id: string) => completions.filter(c => c.exerciseId === id).length;
+  const todayStr = new Date().toDateString();
+  // Badge only counts today's reps so the slate feels fresh each day
+  const countByExerciseToday = (id: string) => completions.filter(c => c.exerciseId === id && new Date(c.completedAt!).toDateString() === todayStr).length;
   const lastByExercise = (id: string) => { const m = completions.filter(c => c.exerciseId === id); return m.length > 0 ? m[0].completedAt : null; };
 
   const saveCompletion = useMutation({
@@ -870,7 +872,7 @@ function AcuityTab({ isPaid, isFree }: { isPaid: boolean; isFree: boolean }) {
           {EXERCISES.map((ex, i) => {
             const locked = isFree && !ex.free;
             const atFreeLimit = isFree && ex.free && freeAtLimit;
-            const count = countByExercise(ex.id);
+            const count = countByExerciseToday(ex.id);
             const last = lastByExercise(ex.id);
             return (
               <motion.div key={ex.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}

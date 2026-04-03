@@ -8,12 +8,12 @@ import { VideoLibraryModal } from "@/components/VideoLibraryModal";
 import { UserVideoCard } from "@/components/UserVideoCard";
 import {
   Trash2, Upload, Film, Search, Brain, BookOpen, Dna, Users,
-  ChevronRight, Trophy, Lock, Star, MapPin, Eye,
+  ChevronRight, Trophy, Lock, Star, MapPin, Eye, Target,
 } from "lucide-react";
 import {
   LineChart, Line, XAxis, YAxis, Tooltip as ChartTooltip, ResponsiveContainer,
 } from "recharts";
-import type { Video, CognitionSession } from "@shared/schema";
+import type { Video, CognitionSession, DisciplineSession } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
 import { usePageMeta } from "@/hooks/use-page-meta";
 
@@ -175,6 +175,22 @@ export default function MySwings() {
     { id: "ghost_ball",       label: "Ghost Ball",        free: false },
     { id: "color_filter",     label: "Color Filter",      free: false },
   ];
+
+  const { data: disciplineHistory = [] } = useQuery<DisciplineSession[]>({
+    queryKey: ["/api/discipline/sessions"],
+    queryFn: () => fetch("/api/discipline/sessions", { credentials: "include" }).then(r => r.json()),
+    enabled: !!user,
+  });
+  const latestDiscipline = disciplineHistory[0] ?? null;
+
+  const disciplineChartData = useMemo(
+    () => [...disciplineHistory].reverse().slice(-10).map((s, i) => ({
+      session: i + 1,
+      discipline: s.disciplinePct,
+      chase: s.chaseRate,
+    })),
+    [disciplineHistory]
+  );
 
   const { data: coachSessions = [] } = useQuery<CoachSession[]>({
     queryKey: ["/api/coaching/sessions/received"],
@@ -503,6 +519,65 @@ export default function MySwings() {
                 : <Button size="sm" onClick={() => navigate("/pricing")}>Upgrade</Button>
               }
             </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── Discipline ── */}
+      <div className="border-t border-border pt-6 space-y-4">
+        <SectionDivider
+          icon={<Target className="w-3.5 h-3.5" />}
+          title="Discipline"
+          href="/enhance?tab=discipline"
+          onNavigate={navigate}
+        />
+        {latestDiscipline ? (
+          <div className="bg-card border border-border rounded-xl p-5 space-y-4">
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <p className="text-xs text-muted-foreground mb-0.5">Latest</p>
+                <p className="text-xl font-bold text-primary">{latestDiscipline.disciplinePct}%</p>
+                <p className="text-[10px] text-muted-foreground">discipline</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground mb-0.5">Chase Rate</p>
+                <p className="text-xl font-bold text-red-400">{latestDiscipline.chaseRate}%</p>
+                <p className="text-[10px] text-muted-foreground">balls swung at</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground mb-0.5">Called Strikes</p>
+                <p className="text-xl font-bold text-orange-400">{latestDiscipline.calledStrikeRate}%</p>
+                <p className="text-[10px] text-muted-foreground">strikes taken</p>
+              </div>
+            </div>
+            {disciplineChartData.length > 1 && (
+              <ResponsiveContainer width="100%" height={80}>
+                <LineChart data={disciplineChartData}>
+                  <XAxis dataKey="session" tick={false} axisLine={false} tickLine={false} />
+                  <YAxis domain={[0, 100]} hide />
+                  <ChartTooltip
+                    contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
+                    formatter={(v: any, name: string) => [`${v}%`, name === "discipline" ? "Discipline" : "Chase Rate"]}
+                    labelFormatter={(l) => `Session ${l}`}
+                  />
+                  <Line type="monotone" dataKey="discipline" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+                  <Line type="monotone" dataKey="chase" stroke="#ef4444" strokeWidth={1.5} dot={false} strokeDasharray="3 3" activeDot={{ r: 3 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
+            <div className="flex items-center gap-4 text-[10px] text-muted-foreground">
+              <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-primary inline-block rounded" /> Discipline</span>
+              <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-red-500 inline-block rounded" style={{ borderTop: "1.5px dashed #ef4444", height: 0 }} /> Chase Rate</span>
+              <span className="ml-auto">{disciplineHistory.length} session{disciplineHistory.length !== 1 ? "s" : ""}</span>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-card border border-border rounded-xl p-5 flex items-center justify-between gap-4">
+            <div>
+              <p className="font-semibold text-sm mb-1">Pitch recognition trainer</p>
+              <p className="text-xs text-muted-foreground">See fastballs, curveballs, sliders. Swing or take. Train your zone discipline.</p>
+            </div>
+            <Button size="sm" onClick={() => navigate("/enhance?tab=discipline")}>Play Now</Button>
           </div>
         )}
       </div>
