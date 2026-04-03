@@ -533,11 +533,11 @@ export default function MySwings() {
         />
         {latestDiscipline ? (
           <div className="bg-card border border-border rounded-xl p-5 space-y-4">
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <div>
-                <p className="text-xs text-muted-foreground mb-0.5">Latest</p>
+                <p className="text-xs text-muted-foreground mb-0.5">Discipline</p>
                 <p className="text-xl font-bold text-primary">{latestDiscipline.disciplinePct}%</p>
-                <p className="text-[10px] text-muted-foreground">discipline</p>
+                <p className="text-[10px] text-muted-foreground">good decisions</p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground mb-0.5">Chase Rate</p>
@@ -549,6 +549,13 @@ export default function MySwings() {
                 <p className="text-xl font-bold text-orange-400">{latestDiscipline.calledStrikeRate}%</p>
                 <p className="text-[10px] text-muted-foreground">strikes taken</p>
               </div>
+              {latestDiscipline.avgReactionMs != null && (
+                <div>
+                  <p className="text-xs text-muted-foreground mb-0.5">Reaction Time</p>
+                  <p className="text-xl font-bold text-foreground">{Math.round(latestDiscipline.avgReactionMs)}ms</p>
+                  <p className="text-[10px] text-muted-foreground">avg on swings</p>
+                </div>
+              )}
             </div>
             {disciplineChartData.length > 1 && (
               <ResponsiveContainer width="100%" height={80}>
