@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Video, BarChart2, Bell, Menu, X, User, Upload, Library, Film, Lock, Dna, Tag, Users } from "lucide-react";
+import { Video, BarChart2, Bell, Menu, X, User, Upload, Library, Film, Lock, Dna, Tag, Users, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { VideoLibraryModal } from "@/components/VideoLibraryModal";
 import { Link, useLocation } from "wouter";
@@ -59,6 +59,7 @@ export default function Layout({ children, showScoreTicker = false }: { children
     { href: "/my-studio", icon: <Film className="w-4 h-4 mr-2" />, label: "My Studio" },
     { href: "/biometrics", icon: <Dna className="w-4 h-4 mr-2" />, label: "Biometrics", badge: (!isPaid && !isAdmin) ? <Lock className="w-3 h-3 ml-1.5 text-yellow-500" /> : undefined },
     { href: "/development", icon: <BarChart2 className="w-4 h-4 mr-2" />, label: "Development", badge: (!isPaid && !isAdmin) ? <Lock className="w-3 h-3 ml-1.5 text-yellow-500" /> : undefined },
+    { href: "/enhance", icon: <Zap className="w-4 h-4 mr-2" />, label: "Enhance" },
     ...(!isPaid && !isAdmin ? [{ href: "/pricing", icon: <Tag className="w-4 h-4 mr-2" />, label: "Pricing" }] : []),
   ];
 
@@ -72,9 +73,8 @@ export default function Layout({ children, showScoreTicker = false }: { children
       { href: "/biometrics", label: "Biometrics", locked: !isPaid && !isAdmin },
       { href: "/development", label: "Development", locked: !isPaid && !isAdmin },
     ]},
-    { section: "Enhancements", links: [
-      { href: "/cognition", label: "Cognition" },
-      { href: "/acuity", label: "Visual Acuity" },
+    { section: "Enhance", links: [
+      { href: "/enhance", label: "Enhance" },
     ]},
     { section: "Games", links: [
       { href: "/statdle", label: "StudioStatdle" },

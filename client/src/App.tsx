@@ -27,6 +27,7 @@ import TermsPage from "@/pages/TermsPage";
 import StudioStatdle from "@/pages/StudioStatdle";
 import VisionTraining from "@/pages/VisionTraining";
 import Acuity from "@/pages/Acuity";
+import Enhancements from "@/pages/Enhancements";
 import Dashboard from "@/pages/Dashboard";
 import LandingPage from "@/pages/LandingPage";
 import { useAuth } from "@/hooks/use-auth";
@@ -83,6 +84,7 @@ function Router() {
       <Route path="/statdle" component={StudioStatdle} />
       <Route path="/cognition" component={VisionTraining} />
       <Route path="/acuity" component={Acuity} />
+      <Route path="/enhance" component={Enhancements} />
       <Route path="/invite/accept" component={AcceptInvitePage} />
       <Route path="/pricing" component={PricingPage} />
       <Route path="/">

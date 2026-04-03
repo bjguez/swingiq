@@ -370,7 +370,7 @@ export default function MySwings() {
         <SectionDivider
           icon={<Brain className="w-3.5 h-3.5" />}
           title="Cognition"
-          href="/cognition"
+          href="/enhance?tab=cognition"
           onNavigate={navigate}
         />
 
@@ -423,7 +423,7 @@ export default function MySwings() {
                 </p>
               </div>
               {freeSessionCount < FREE_COGNITION_LIMIT
-                ? <Button size="sm" onClick={() => navigate("/cognition")}>Try it free</Button>
+                ? <Button size="sm" onClick={() => navigate("/enhance?tab=cognition")}>Try it free</Button>
                 : <Button size="sm" onClick={() => navigate("/pricing")}>Upgrade</Button>
               }
             </div>
@@ -442,7 +442,7 @@ export default function MySwings() {
               <p className="font-semibold text-sm mb-1">3D Multiple Object Tracking</p>
               <p className="text-xs text-muted-foreground max-w-sm">Train your visual attention and processing speed the way elite hitters do.</p>
             </div>
-            <Button size="sm" onClick={() => navigate("/cognition")}>Play Now</Button>
+            <Button size="sm" onClick={() => navigate("/enhance?tab=cognition")}>Play Now</Button>
           </div>
         )}
       </div>
@@ -452,7 +452,7 @@ export default function MySwings() {
         <SectionDivider
           icon={<Eye className="w-3.5 h-3.5" />}
           title="Visual Acuity"
-          href="/acuity"
+          href="/enhance?tab=acuity"
           onNavigate={navigate}
         />
         {isPaid ? (
@@ -464,7 +464,7 @@ export default function MySwings() {
                 return (
                   <div
                     key={ex.id}
-                    onClick={() => navigate("/acuity")}
+                    onClick={() => navigate("/enhance?tab=acuity")}
                     className="bg-card border border-border rounded-xl p-4 flex flex-col gap-1 cursor-pointer hover:border-primary/40 transition-colors"
                   >
                     <p className="text-xs font-semibold truncate">{ex.label}</p>
@@ -484,7 +484,7 @@ export default function MySwings() {
                 <p className="font-semibold text-sm mb-1">5 eye training exercises</p>
                 <p className="text-xs text-muted-foreground">Train ball tracking, peripheral vision, and reaction speed.</p>
               </div>
-              <Button size="sm" onClick={() => navigate("/acuity")}>Start Training</Button>
+              <Button size="sm" onClick={() => navigate("/enhance?tab=acuity")}>Start Training</Button>
             </div>
           )
         ) : (
@@ -499,7 +499,7 @@ export default function MySwings() {
                 </p>
               </div>
               {acuityFreeCount < ACUITY_FREE_LIMIT
-                ? <Button size="sm" onClick={() => navigate("/acuity")}>Try it free</Button>
+                ? <Button size="sm" onClick={() => navigate("/enhance?tab=acuity")}>Try it free</Button>
                 : <Button size="sm" onClick={() => navigate("/pricing")}>Upgrade</Button>
               }
             </div>
