@@ -1159,7 +1159,7 @@ function BlueprintAdminTab() {
 
   const { data: content = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/blueprint/content"],
-    queryFn: () => fetch("/api/blueprint/content").then(r => r.json()),
+    queryFn: () => fetch("/api/blueprint/content", { credentials: "include" }).then(r => r.json()),
   });
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {

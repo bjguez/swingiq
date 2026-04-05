@@ -193,19 +193,19 @@ export default function Development() {
 
   const { data: blueprintContent = [] } = useQuery<BlueprintItem[]>({
     queryKey: ["/api/blueprint/content"],
-    queryFn: () => fetch("/api/blueprint/content").then(r => r.json()),
+    queryFn: () => fetch("/api/blueprint/content", { credentials: "include" }).then(r => r.json()),
     enabled: !!user,
   });
 
   const { data: focusPhases = [] } = useQuery<string[]>({
     queryKey: ["/api/blueprint/focus"],
-    queryFn: () => fetch("/api/blueprint/focus").then(r => r.json()),
+    queryFn: () => fetch("/api/blueprint/focus", { credentials: "include" }).then(r => r.json()),
     enabled: !!user,
   });
 
   const toggleFocus = useMutation({
     mutationFn: (phase: string) =>
-      fetch(`/api/blueprint/focus/${phase}`, { method: "POST" }).then(r => r.json()),
+      fetch(`/api/blueprint/focus/${phase}`, { method: "POST", credentials: "include" }).then(r => r.json()),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/blueprint/focus"] }),
   });
 
