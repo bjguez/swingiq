@@ -22,7 +22,8 @@ export function setupBlueprintRoutes(app: Express) {
     try {
       const user = req.user as User | undefined;
       const tier = (user as any)?.subscriptionTier ?? "free";
-      const isFree = user && !["player", "pro", "coach"].includes(tier) && !(user as any).isAdmin;
+      const isAdmin = !!process.env.ADMIN_USERNAME && (user as any)?.username === process.env.ADMIN_USERNAME;
+      const isFree = user && !["player", "pro", "coach"].includes(tier) && !isAdmin;
       const { phase } = req.query;
 
       // Free tier: restrict to foundation only
