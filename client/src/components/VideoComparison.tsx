@@ -123,15 +123,15 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel, ex
   const toggleFullscreen = useCallback(() => {
     if (!containerRef.current) return;
     const el = containerRef.current as any;
-    const isFs = !!(document.fullscreenElement || (document as any).webkitFullscreenElement);
+    const nativeFs = !!(document.fullscreenElement || (document as any).webkitFullscreenElement);
 
     if (!el.requestFullscreen && !el.webkitRequestFullscreen) {
-      // iOS Safari: no arbitrary element fullscreen — use CSS overlay instead
+      // iOS Safari: no native fullscreen API — toggle CSS overlay by state
       setIsFullscreen(prev => !prev);
       return;
     }
 
-    if (isFs) {
+    if (nativeFs) {
       if (document.exitFullscreen) document.exitFullscreen();
       else if ((document as any).webkitExitFullscreen) (document as any).webkitExitFullscreen();
     } else {
@@ -829,14 +829,14 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel, ex
         </div>
       </div>
 
-      {/* Fullscreen: always-visible exit button when controls are hidden */}
+      {/* Fullscreen: always-visible exit button — tapping directly exits */}
       {isFullscreen && !controlsVisible && (
         <button
-          onClick={showControls}
+          onClick={toggleFullscreen}
           className="absolute top-3 right-3 z-50 bg-black/50 rounded-full p-2 text-white/60 hover:text-white transition-colors"
-          title="Show controls"
+          title="Exit fullscreen"
         >
-          <Maximize className="w-4 h-4" />
+          <Minimize className="w-4 h-4" />
         </button>
       )}
     </div>
