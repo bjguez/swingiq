@@ -2111,6 +2111,9 @@ export default function Enhancements() {
       <div className="space-y-6">
         {/* Header */}
         <div>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="px-2 py-0.5 rounded text-xs font-semibold bg-primary/20 text-primary uppercase tracking-wider">Enhance Your Skills</span>
+          </div>
           <h1 className="text-3xl md:text-4xl font-bold font-display uppercase">Enhance</h1>
           <p className="text-muted-foreground mt-1">Cognitive, visual, and mental performance training for hitters.</p>
         </div>
