@@ -8,12 +8,12 @@ import { VideoLibraryModal } from "@/components/VideoLibraryModal";
 import { UserVideoCard } from "@/components/UserVideoCard";
 import {
   Trash2, Upload, Film, Search, Brain, BookOpen, Dna, Users,
-  ChevronRight, Trophy, Lock, Star, MapPin, Eye, Target,
+  ChevronRight, Trophy, Lock, Star, MapPin, Eye, Target, Sparkles,
 } from "lucide-react";
 import {
   LineChart, Line, XAxis, YAxis, Tooltip as ChartTooltip, ResponsiveContainer,
 } from "recharts";
-import type { Video, CognitionSession, DisciplineSession } from "@shared/schema";
+import type { Video, CognitionSession, DisciplineSession, ConfidenceSession } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
 import { usePageMeta } from "@/hooks/use-page-meta";
 
@@ -211,6 +211,29 @@ export default function MySwings() {
       !best || Number(s.threshold) > Number(best.threshold) ? s : best, null),
     [cognitionSessions]
   );
+
+  const { data: confidenceData } = useQuery({
+    queryKey: ["/api/confidence/sessions"],
+    queryFn: () => fetch("/api/confidence/sessions").then(r => r.json()),
+    enabled: !!user,
+  });
+  const confidenceSessions: ConfidenceSession[] = Array.isArray(confidenceData) ? confidenceData : [];
+  const freeConfidenceCount: number = (!Array.isArray(confidenceData) && (confidenceData as any)?.freeSessionCount) ?? 0;
+  const FREE_CONFIDENCE_LIMIT = 3;
+
+  const confidenceStreak = useMemo(() => {
+    if (!confidenceSessions.length) return 0;
+    const days = new Set(confidenceSessions.map(s => new Date(s.completedAt!).toDateString()));
+    let streak = 0;
+    const today = new Date();
+    for (let i = 0; i < 365; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() - i);
+      if (days.has(d.toDateString())) streak++;
+      else if (i > 0) break;
+    }
+    return streak;
+  }, [confidenceSessions]);
 
   const latestCognition = cognitionSessions[0] ?? null;
   const autoComps = comps.filter(c => c.compType === "auto").sort((a, b) => (a.rank ?? 99) - (b.rank ?? 99));
@@ -585,6 +608,63 @@ export default function MySwings() {
               <p className="text-xs text-muted-foreground">See fastballs, curveballs, sliders. Swing or take. Train your zone discipline.</p>
             </div>
             <Button size="sm" onClick={() => navigate("/enhance?tab=discipline")}>Play Now</Button>
+          </div>
+        )}
+      </div>
+
+      {/* ── Confidence ── */}
+      <div className="border-t border-border pt-6 space-y-4">
+        <SectionDivider
+          icon={<Sparkles className="w-3.5 h-3.5" />}
+          title="Confidence"
+          href="/enhance?tab=confidence"
+          onNavigate={navigate}
+        />
+        {confidenceSessions.length > 0 ? (
+          <div className="bg-card border border-border rounded-xl p-5 space-y-4">
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <p className="text-xs text-muted-foreground mb-0.5">Streak</p>
+                <p className="text-xl font-bold text-primary">{confidenceStreak}</p>
+                <p className="text-[10px] text-muted-foreground">day{confidenceStreak !== 1 ? "s" : ""} in a row</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground mb-0.5">Total Sessions</p>
+                <p className="text-xl font-bold text-foreground">{confidenceSessions.length}</p>
+                <p className="text-[10px] text-muted-foreground">completed</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground mb-0.5">Last Session</p>
+                <p className="text-xl font-bold text-foreground">{confidenceSessions[0]?.durationMinutes}m</p>
+                <p className="text-[10px] text-muted-foreground">{confidenceSessions[0]?.cyclesCompleted} cycles</p>
+              </div>
+            </div>
+          </div>
+        ) : isFree ? (
+          <div className="bg-card border border-border rounded-xl p-5 space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-semibold text-sm mb-1">Breathing &amp; Affirmations</p>
+                <p className="text-xs text-muted-foreground max-w-sm">
+                  Box breathing + positive self-talk to build mental confidence at the plate. Free plan includes {FREE_CONFIDENCE_LIMIT} sessions.
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Sessions used: <span className="font-semibold text-foreground">{freeConfidenceCount} / {FREE_CONFIDENCE_LIMIT}</span>
+                </p>
+              </div>
+              {freeConfidenceCount < FREE_CONFIDENCE_LIMIT
+                ? <Button size="sm" onClick={() => navigate("/enhance?tab=confidence")}>Try it free</Button>
+                : <Button size="sm" onClick={() => navigate("/pricing")}>Upgrade</Button>
+              }
+            </div>
+          </div>
+        ) : (
+          <div className="bg-card border border-border rounded-xl p-5 flex items-center justify-between gap-4">
+            <div>
+              <p className="font-semibold text-sm mb-1">Breathing &amp; Affirmations</p>
+              <p className="text-xs text-muted-foreground">Build your mental confidence with guided box breathing and positive self-talk.</p>
+            </div>
+            <Button size="sm" onClick={() => navigate("/enhance?tab=confidence")}>Begin</Button>
           </div>
         )}
       </div>
