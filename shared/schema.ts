@@ -351,3 +351,28 @@ export const disciplineSessions = pgTable("discipline_sessions", {
 
 export type DisciplineSession = typeof disciplineSessions.$inferSelect;
 export type InsertDisciplineSession = typeof disciplineSessions.$inferInsert;
+
+export const confidenceSessions = pgTable("confidence_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }),
+  completedAt: timestamp("completed_at").defaultNow(),
+  durationMinutes: integer("duration_minutes").notNull(), // 1 or 3
+  cyclesCompleted: integer("cycles_completed").notNull(),
+}, (t) => ({
+  userIdIdx: index("confidence_sessions_user_id_idx").on(t.userId),
+}));
+
+export type ConfidenceSession = typeof confidenceSessions.$inferSelect;
+export type InsertConfidenceSession = typeof confidenceSessions.$inferInsert;
+
+export const userAffirmations = pgTable("user_affirmations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  text: text("text").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => ({
+  userIdIdx: index("user_affirmations_user_id_idx").on(t.userId),
+}));
+
+export type UserAffirmation = typeof userAffirmations.$inferSelect;
+export type InsertUserAffirmation = typeof userAffirmations.$inferInsert;

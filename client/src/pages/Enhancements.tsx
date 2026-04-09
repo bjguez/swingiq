@@ -6,7 +6,7 @@ import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import {
   Eye, Brain, Lock, Play, RotateCcw, CheckCircle2, ChevronRight,
-  Trophy, Share2, Minus, Plus, Target,
+  Trophy, Share2, Minus, Plus, Target, Sparkles,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/hooks/use-auth";
@@ -14,9 +14,9 @@ import { useLocation, useSearch } from "wouter";
 import { usePageMeta } from "@/hooks/use-page-meta";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import type { AcuityCompletion, CognitionSession, DisciplineSession } from "@shared/schema";
+import type { AcuityCompletion, CognitionSession, DisciplineSession, ConfidenceSession } from "@shared/schema";
 
-type Tab = "cognition" | "acuity" | "discipline";
+type Tab = "cognition" | "acuity" | "discipline" | "confidence";
 
 // ═══════════════════════════════════════════════════════════════
 // COGNITION — 3D Multiple Object Tracking
@@ -1648,6 +1648,426 @@ function DisciplineTab() {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// CONFIDENCE — Breathing & Affirmations
+// ═══════════════════════════════════════════════════════════════
+
+const DEFAULT_AFFIRMATIONS = [
+  "I am prepared and capable",
+  "I belong in this box",
+  "I am a competitor",
+  "I am exactly where I am supposed to be",
+  "I deserve to be here",
+  "I am built for this moment",
+  "I am dangerous at the plate",
+  "I am mentally tough",
+  "I smile at adversity",
+  "Pressure is a privilege",
+  "I thrive under pressure",
+  "Fear has no place in this box",
+  "I play free",
+  "I stay present, pitch by pitch",
+  "One pitch at a time",
+  "I stay in the process",
+  "I control what I can control",
+  "I release the last at-bat and focus now",
+  "My mind is clear, my swing is ready",
+  "I trust my training",
+  "I trust my hands",
+  "I have done the work",
+  "My preparation is my confidence",
+  "Hard work prepared me for this",
+  "My confidence grows with every rep",
+  "I have been here before",
+  "I attack the zone with confidence",
+  "I swing with purpose",
+  "I commit to every swing",
+  "Good things happen to aggressive hitters",
+  "I see it early and I trust my eyes",
+  "I see the ball, I hit the ball",
+  "I stay short, stay quick, stay aggressive",
+  "This moment was made for me",
+  "I show up for my team",
+  "Failure fuels me",
+  "I bounce back stronger",
+  "Adversity makes me sharper",
+  "Every pitch is a new opportunity",
+  "My best swings are always ahead of me",
+  "I breathe, I reset, I compete",
+  "I am calm, focused, and ready to compete",
+  "I am locked in and ready",
+  "My approach is my weapon",
+  "I embrace the challenge",
+  "I love competing",
+];
+
+type BreathPhase = "inhale" | "hold" | "exhale";
+type ConfidenceScreen = "idle" | "countdown" | "breathing" | "affirmation" | "complete";
+
+function ConfidenceTab({ isPaid, isFree }: { isPaid: boolean; isFree: boolean }) {
+  const [, navigate] = useLocation();
+  const queryClient = useQueryClient();
+
+  const { data: sessionsData } = useQuery({ queryKey: ["/api/confidence/sessions"] });
+  const { data: customAffirmations = [] } = useQuery({ queryKey: ["/api/confidence/affirmations"] });
+
+  const pastSessions: ConfidenceSession[] | null = Array.isArray(sessionsData) ? sessionsData : null;
+  const freeSessionCount: number = (!Array.isArray(sessionsData) && (sessionsData as any)?.freeSessionCount) ?? 0;
+  const FREE_LIMIT = 3;
+  const freeAtLimit = isFree && freeSessionCount >= FREE_LIMIT;
+
+  const [durationMinutes, setDurationMinutes] = useState<1 | 3>(1);
+  const totalCycles = durationMinutes * 5;
+
+  const [screen, setScreen] = useState<ConfidenceScreen>("idle");
+  const [countdown, setCountdown] = useState(3);
+  const [currentCycle, setCurrentCycle] = useState(0);
+  const [breathPhase, setBreathPhase] = useState<BreathPhase>("inhale");
+  const [phaseMs, setPhaseMs] = useState(0);
+  const [currentAffirmation, setCurrentAffirmation] = useState("");
+  const usedAffirmationsRef = useRef<Set<string>>(new Set());
+  const [newAffText, setNewAffText] = useState("");
+
+  const saveSession = useMutation({
+    mutationFn: (data: { durationMinutes: number; cyclesCompleted: number }) =>
+      apiRequest("POST", "/api/confidence/sessions", data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/confidence/sessions"] }),
+  });
+
+  const addAffirmation = useMutation({
+    mutationFn: (text: string) => apiRequest("POST", "/api/confidence/affirmations", { text }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/confidence/affirmations"] });
+      setNewAffText("");
+    },
+  });
+
+  const deleteAffirmation = useMutation({
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/confidence/affirmations/${id}`, undefined),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/confidence/affirmations"] }),
+  });
+
+  // Keep a stable ref for picking affirmations so it always sees latest custom list
+  const pickAffirmationRef = useRef<() => string>(() => "");
+  pickAffirmationRef.current = () => {
+    const pool = [
+      ...DEFAULT_AFFIRMATIONS,
+      ...(Array.isArray(customAffirmations) ? (customAffirmations as any[]).map(a => a.text) : []),
+    ];
+    const unused = pool.filter(a => !usedAffirmationsRef.current.has(a));
+    const source = unused.length > 0 ? unused : pool;
+    if (source.length === 0) return "I am ready to compete.";
+    if (unused.length === 0) usedAffirmationsRef.current.clear();
+    const picked = source[Math.floor(Math.random() * source.length)];
+    usedAffirmationsRef.current.add(picked);
+    return picked;
+  };
+
+  // Countdown
+  useEffect(() => {
+    if (screen !== "countdown") return;
+    if (countdown <= 0) {
+      setScreen("breathing");
+      setBreathPhase("inhale");
+      setPhaseMs(0);
+      return;
+    }
+    const t = setTimeout(() => setCountdown(c => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [screen, countdown]);
+
+  // Breathing tick (100ms)
+  useEffect(() => {
+    if (screen !== "breathing") return;
+    const interval = setInterval(() => {
+      setPhaseMs(prev => Math.min(prev + 100, 4000));
+    }, 100);
+    return () => clearInterval(interval);
+  }, [screen]);
+
+  // Phase advancement when phaseMs hits 4000
+  const totalCyclesRef = useRef(totalCycles);
+  const durationMinutesRef = useRef(durationMinutes);
+  totalCyclesRef.current = totalCycles;
+  durationMinutesRef.current = durationMinutes;
+
+  useEffect(() => {
+    if (screen !== "breathing" || phaseMs < 4000) return;
+    if (breathPhase === "inhale") {
+      setBreathPhase("hold");
+      setPhaseMs(0);
+    } else if (breathPhase === "hold") {
+      setBreathPhase("exhale");
+      setPhaseMs(0);
+    } else {
+      const nextCycle = currentCycle + 1;
+      setCurrentCycle(nextCycle);
+      setPhaseMs(0);
+      if (nextCycle >= totalCyclesRef.current) {
+        saveSession.mutate({ durationMinutes: durationMinutesRef.current, cyclesCompleted: nextCycle });
+        setScreen("complete");
+      } else {
+        setScreen("affirmation");
+      }
+    }
+  }, [phaseMs, screen, breathPhase, currentCycle]);
+
+  // Pick affirmation when entering affirmation screen
+  useEffect(() => {
+    if (screen !== "affirmation") return;
+    setCurrentAffirmation(pickAffirmationRef.current());
+  }, [screen]);
+
+  function startSession() {
+    setCountdown(3);
+    setCurrentCycle(0);
+    setBreathPhase("inhale");
+    setPhaseMs(0);
+    usedAffirmationsRef.current.clear();
+    setScreen("countdown");
+  }
+
+  function startNextCycle() {
+    setBreathPhase("inhale");
+    setPhaseMs(0);
+    setScreen("breathing");
+  }
+
+  function reset() {
+    setScreen("idle");
+    setCurrentCycle(0);
+    setBreathPhase("inhale");
+    setPhaseMs(0);
+  }
+
+  const orbColor = breathPhase === "inhale" ? "#4A90D9" : breathPhase === "hold" ? "#F5A623" : "#50C878";
+  const phaseFraction = phaseMs / 4000;
+  const orbScale = breathPhase === "inhale"
+    ? 0.55 + phaseFraction * 0.45
+    : breathPhase === "hold"
+    ? 1.0
+    : 1.0 - phaseFraction * 0.45;
+  const phaseLabel = breathPhase === "inhale" ? "Inhale" : breathPhase === "hold" ? "Hold" : "Exhale";
+  const secondsLeft = Math.max(1, Math.ceil((4000 - phaseMs) / 1000));
+
+  function computeStreak(sessions: ConfidenceSession[]): number {
+    if (!sessions.length) return 0;
+    const days = new Set(sessions.map(s => new Date(s.completedAt!).toDateString()));
+    let streak = 0;
+    const today = new Date();
+    for (let i = 0; i < 365; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() - i);
+      if (days.has(d.toDateString())) streak++;
+      else if (i > 0) break;
+    }
+    return streak;
+  }
+
+  // ── Upgrade wall ──────────────────────────────────────────────
+  if (freeAtLimit) {
+    return (
+      <div className="max-w-lg mx-auto py-16 text-center space-y-6">
+        <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
+          <Sparkles className="w-8 h-8 text-primary/60" />
+        </div>
+        <div>
+          <h2 className="text-2xl font-bold mb-2">You've used your {FREE_LIMIT} free sessions</h2>
+          <p className="text-muted-foreground">Upgrade to unlock unlimited breathing sessions, session history, and custom affirmations.</p>
+        </div>
+        <ul className="text-sm text-left max-w-xs mx-auto space-y-1.5">
+          <li className="flex items-center gap-2"><span className="text-primary">✓</span> Unlimited confidence sessions</li>
+          <li className="flex items-center gap-2"><span className="text-primary">✓</span> Full session history &amp; streak tracking</li>
+          <li className="flex items-center gap-2"><span className="text-primary">✓</span> Create your own custom affirmations</li>
+          <li className="flex items-center gap-2"><span className="text-primary">✓</span> All Enhance modules unlocked</li>
+        </ul>
+        <Button onClick={() => navigate("/pricing")} size="lg">Upgrade Plan</Button>
+      </div>
+    );
+  }
+
+  // ── Complete ──────────────────────────────────────────────────
+  if (screen === "complete") {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="max-w-sm mx-auto py-12 text-center space-y-6"
+      >
+        <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
+          <Sparkles className="w-8 h-8 text-primary" />
+        </div>
+        <div>
+          <h2 className="text-2xl font-bold mb-1">Session Complete</h2>
+          <p className="text-muted-foreground">{currentCycle} cycle{currentCycle !== 1 ? "s" : ""} · {durationMinutes} minute session</p>
+        </div>
+        <Button onClick={reset} size="lg" className="w-full">Done</Button>
+      </motion.div>
+    );
+  }
+
+  // ── Countdown ─────────────────────────────────────────────────
+  if (screen === "countdown") {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 gap-4">
+        <p className="text-muted-foreground text-sm uppercase tracking-widest">Get ready</p>
+        <motion.div
+          key={countdown}
+          initial={{ scale: 1.4, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="text-8xl font-bold tabular-nums"
+        >
+          {countdown === 0 ? "Go" : countdown}
+        </motion.div>
+      </div>
+    );
+  }
+
+  // ── Affirmation ───────────────────────────────────────────────
+  if (screen === "affirmation") {
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="flex flex-col items-center justify-center py-16 gap-8 max-w-md mx-auto text-center"
+      >
+        <p className="text-xs uppercase tracking-widest text-muted-foreground">Say it out loud</p>
+        <blockquote className="text-2xl font-semibold leading-snug">
+          &ldquo;{currentAffirmation}&rdquo;
+        </blockquote>
+        <p className="text-xs text-muted-foreground">Cycle {currentCycle} of {totalCycles} complete</p>
+        <Button onClick={startNextCycle} size="lg" className="gap-2">
+          <Play className="w-4 h-4" /> Start Next Cycle
+        </Button>
+      </motion.div>
+    );
+  }
+
+  // ── Breathing ─────────────────────────────────────────────────
+  if (screen === "breathing") {
+    return (
+      <div className="flex flex-col items-center justify-center py-10 gap-8">
+        <p className="text-xs uppercase tracking-widest text-muted-foreground">
+          Cycle {currentCycle + 1} of {totalCycles}
+        </p>
+        <div className="relative flex items-center justify-center" style={{ width: 240, height: 240 }}>
+          <div
+            style={{
+              width: 200,
+              height: 200,
+              borderRadius: "50%",
+              backgroundColor: orbColor,
+              transform: `scale(${orbScale})`,
+              transition: "background-color 0.6s ease, transform 0.1s linear",
+              boxShadow: `0 0 60px 20px ${orbColor}55`,
+            }}
+          />
+        </div>
+        <div className="text-center space-y-1">
+          <p className="text-3xl font-bold">{phaseLabel}</p>
+          <p className="text-5xl font-bold tabular-nums text-muted-foreground">{secondsLeft}</p>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Idle ──────────────────────────────────────────────────────
+  const streak = pastSessions ? computeStreak(pastSessions) : 0;
+
+  return (
+    <div className="space-y-8 max-w-xl">
+      {isPaid && pastSessions && (
+        <div className="flex gap-4">
+          <div className="flex-1 rounded-xl border border-border bg-card p-4 text-center">
+            <p className="text-3xl font-bold">{streak}</p>
+            <p className="text-xs text-muted-foreground mt-1">Day streak</p>
+          </div>
+          <div className="flex-1 rounded-xl border border-border bg-card p-4 text-center">
+            <p className="text-3xl font-bold">{pastSessions.length}</p>
+            <p className="text-xs text-muted-foreground mt-1">Total sessions</p>
+          </div>
+        </div>
+      )}
+
+      {isFree && (
+        <div className="bg-yellow-500/10 border border-yellow-500/25 rounded-lg px-3 py-2 text-xs text-yellow-400 space-y-0.5">
+          <p className="font-semibold">Free plan — {FREE_LIMIT - freeSessionCount} session{FREE_LIMIT - freeSessionCount !== 1 ? "s" : ""} remaining</p>
+          <p className="text-yellow-400/70">Session results won't be saved. <button onClick={() => navigate("/pricing")} className="underline hover:text-yellow-300">Upgrade</button> to track your history.</p>
+        </div>
+      )}
+
+      <div className="space-y-3">
+        <p className="text-sm font-medium text-muted-foreground uppercase tracking-widest">Session length</p>
+        <div className="flex gap-3">
+          {([1, 3] as const).map(d => (
+            <button
+              key={d}
+              onClick={() => setDurationMinutes(d)}
+              className={`flex-1 rounded-xl border py-4 text-sm font-semibold transition-colors ${
+                durationMinutes === d
+                  ? "border-primary bg-primary/10 text-foreground"
+                  : "border-border text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {d} minute{d !== 1 ? "s" : ""}
+              <span className="block text-xs font-normal mt-0.5 opacity-60">{d * 5} cycles</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <Button onClick={startSession} size="lg" className="w-full gap-2">
+        <Play className="w-4 h-4" /> Begin Session
+      </Button>
+
+      {isPaid && (
+        <div className="space-y-3">
+          <p className="text-sm font-medium text-muted-foreground uppercase tracking-widest">Your Affirmations</p>
+          <p className="text-xs text-muted-foreground">Added to the session pool alongside the defaults.</p>
+          <div className="flex gap-2">
+            <input
+              value={newAffText}
+              onChange={e => setNewAffText(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter" && newAffText.trim()) addAffirmation.mutate(newAffText); }}
+              placeholder="Add your own affirmation..."
+              maxLength={200}
+              className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+            <Button
+              size="sm"
+              disabled={!newAffText.trim() || addAffirmation.isPending}
+              onClick={() => addAffirmation.mutate(newAffText)}
+            >
+              Add
+            </Button>
+          </div>
+          {Array.isArray(customAffirmations) && (customAffirmations as any[]).length > 0 && (
+            <ul className="space-y-1.5">
+              {(customAffirmations as any[]).map(a => (
+                <li key={a.id} className="flex items-center justify-between gap-2 text-sm py-1.5 px-3 rounded-lg bg-card border border-border">
+                  <span>&ldquo;{a.text}&rdquo;</span>
+                  <button
+                    onClick={() => deleteAffirmation.mutate(a.id)}
+                    className="text-muted-foreground hover:text-destructive transition-colors shrink-0"
+                  >
+                    <Minus className="w-3.5 h-3.5" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      <div className="rounded-xl border border-border bg-card p-4 space-y-2 text-sm text-muted-foreground">
+        <p className="font-semibold text-foreground text-xs uppercase tracking-widest">How it works</p>
+        <p>Box breathing activates the parasympathetic nervous system — lowering heart rate and cortisol — so you step into the box with a clear, focused mind. Paired with positive self-talk, it trains your brain to associate competition with calm confidence rather than anxiety.</p>
+        <p>Say each affirmation out loud. Verbalization reinforces the neural pathway more effectively than reading silently.</p>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
 // MAIN PAGE
 // ═══════════════════════════════════════════════════════════════
 
@@ -1658,7 +2078,7 @@ export default function Enhancements() {
   const search = useSearch();
   const params = new URLSearchParams(search);
   const rawTab = params.get("tab");
-  const initialTab: Tab = rawTab === "acuity" ? "acuity" : rawTab === "discipline" ? "discipline" : "cognition";
+  const initialTab: Tab = rawTab === "acuity" ? "acuity" : rawTab === "discipline" ? "discipline" : rawTab === "confidence" ? "confidence" : "cognition";
   const [tab, setTab] = useState<Tab>(initialTab);
 
   const isPaid = !!(user?.isAdmin) || ["player", "pro", "coach"].includes(user?.subscriptionTier ?? "");
@@ -1683,6 +2103,7 @@ export default function Enhancements() {
     { id: "cognition",  label: "Cognition",     icon: <Brain className="w-4 h-4" /> },
     { id: "acuity",     label: "Visual Acuity", icon: <Eye className="w-4 h-4" /> },
     { id: "discipline", label: "Discipline",    icon: <Target className="w-4 h-4" /> },
+    { id: "confidence", label: "Confidence",    icon: <Sparkles className="w-4 h-4" /> },
   ];
 
   return (
@@ -1718,6 +2139,7 @@ export default function Enhancements() {
         {tab === "cognition"  && <CognitionTab  isPaid={isPaid} isFree={isFree} />}
         {tab === "acuity"     && <AcuityTab     isPaid={isPaid} isFree={isFree} />}
         {tab === "discipline" && <DisciplineTab />}
+        {tab === "confidence" && <ConfidenceTab isPaid={isPaid} isFree={isFree} />}
       </div>
     </Layout>
   );

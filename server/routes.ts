@@ -20,6 +20,7 @@ import { setupBiometricsRoutes } from "./biometrics";
 import { setupBlueprintRoutes } from "./blueprint";
 import { setupAcuityRoutes } from "./acuity";
 import { setupDisciplineRoutes } from "./discipline";
+import { setupConfidenceRoutes } from "./confidence";
 import { setupStatdleRoutes } from "./statdle";
 import { setupAthleteRoutes } from "./athletes";
 
@@ -1261,6 +1262,7 @@ export async function registerRoutes(
   setupBlueprintRoutes(app);
   setupAcuityRoutes(app);
   setupDisciplineRoutes(app);
+  setupConfidenceRoutes(app);
   setupStatdleRoutes(app);
   setupAthleteRoutes(app);
 
