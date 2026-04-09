@@ -3,6 +3,8 @@ import { db } from "./db";
 import { confidenceSessions, userAffirmations } from "../shared/schema";
 import { eq, desc, count as drizzleCount } from "drizzle-orm";
 import type { User } from "../shared/schema";
+import { checkAndAwardBadges } from "./badges";
+import { sendMilestoneEmailIfNeeded } from "./cron";
 
 const FREE_CONFIDENCE_LIMIT = 3;
 
@@ -60,6 +62,12 @@ export function setupConfidenceRoutes(app: Express) {
         cyclesCompleted,
       }).returning();
       res.status(201).json(session);
+      checkAndAwardBadges(user.id).then(async (newBadges) => {
+        if (newBadges.length > 0) {
+          const u = req.user as any;
+          if (u?.email) await sendMilestoneEmailIfNeeded(user.id, u.email, u.firstName || "Hitter", newBadges);
+        }
+      }).catch(() => {});
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }

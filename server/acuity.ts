@@ -3,6 +3,8 @@ import { db } from "./db";
 import { acuityCompletions } from "../shared/schema";
 import { eq, desc, count as drizzleCount, and } from "drizzle-orm";
 import type { User } from "../shared/schema";
+import { checkAndAwardBadges } from "./badges";
+import { sendMilestoneEmailIfNeeded } from "./cron";
 
 const FREE_EXERCISES = ["pursuit"];
 const ALL_EXERCISES = ["pursuit", "peripheral_lock", "peripheral_flash", "ghost_ball", "color_filter"];
@@ -81,6 +83,12 @@ export function setupAcuityRoutes(app: Express) {
       }).returning();
 
       res.status(201).json(row);
+      checkAndAwardBadges(user.id).then(async (newBadges) => {
+        if (newBadges.length > 0) {
+          const u = req.user as any;
+          if (u?.email) await sendMilestoneEmailIfNeeded(user.id, u.email, u.firstName || "Hitter", newBadges);
+        }
+      }).catch(() => {});
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }

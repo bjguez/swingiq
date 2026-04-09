@@ -23,6 +23,9 @@ import { setupDisciplineRoutes } from "./discipline";
 import { setupConfidenceRoutes } from "./confidence";
 import { setupStatdleRoutes } from "./statdle";
 import { setupAthleteRoutes } from "./athletes";
+import { checkAndAwardBadges, computeStreak, BADGE_DEFINITIONS } from "./badges";
+import { userBadges } from "@shared/schema";
+import { runDailyJob, sendMilestoneEmailIfNeeded } from "./cron";
 
 const uploadDir = path.resolve("uploads");
 if (!fs.existsSync(uploadDir)) {
@@ -257,6 +260,15 @@ export async function registerRoutes(
         userId,
       });
       res.status(201).json({ sourceUrl: key, presignedUrl, videoId: video.id });
+      // Award badges async (non-blocking)
+      if (userId) {
+        checkAndAwardBadges(userId).then(async (newBadges) => {
+          if (newBadges.length > 0) {
+            const u = req.user as any;
+            if (u?.email) await sendMilestoneEmailIfNeeded(userId, u.email, u.firstName || "Hitter", newBadges);
+          }
+        }).catch(() => {});
+      }
     } catch (err: any) {
       console.error("Upload error:", err);
       res.status(500).json({ message: "Failed to upload video" });
@@ -1225,6 +1237,13 @@ export async function registerRoutes(
         speedHistory: speedHistory ?? [],
       }).returning();
       res.status(201).json(session);
+      // Award badges async (non-blocking)
+      checkAndAwardBadges(userId).then(async (newBadges) => {
+        if (newBadges.length > 0) {
+          const u = req.user as any;
+          if (u?.email) await sendMilestoneEmailIfNeeded(userId, u.email, u.firstName || "Hitter", newBadges);
+        }
+      }).catch(() => {});
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
@@ -1251,6 +1270,48 @@ export async function registerRoutes(
         .orderBy(desc(cognitionSessions.completedAt))
         .limit(20);
       res.json(sessions);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── Badges ──────────────────────────────────────────────────────────────────
+  app.get("/api/badges", async (req, res) => {
+    if (!req.user) return res.status(401).json({ message: "Not authenticated" });
+    const userId = (req.user as any).id as string;
+    try {
+      const earned = await db
+        .select({ badgeId: userBadges.badgeId, earnedAt: userBadges.earnedAt })
+        .from(userBadges)
+        .where(eq(userBadges.userId, userId));
+      res.json({ earned, definitions: BADGE_DEFINITIONS });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── Streak ──────────────────────────────────────────────────────────────────
+  app.get("/api/streak", async (req, res) => {
+    if (!req.user) return res.status(401).json({ message: "Not authenticated" });
+    const userId = (req.user as any).id as string;
+    try {
+      const result = await computeStreak(userId);
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── Cron ────────────────────────────────────────────────────────────────────
+  app.post("/api/cron/daily", async (req, res) => {
+    const secret = process.env.CRON_SECRET;
+    const auth = req.headers.authorization;
+    if (!secret || auth !== `Bearer ${secret}`) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const result = await runDailyJob();
+      res.json(result);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }

@@ -4,6 +4,8 @@ import { blueprintContent, playerPhaseFocus } from "../shared/schema";
 import { eq, and, asc } from "drizzle-orm";
 import { getVideoUrl, isR2Key } from "./r2";
 import type { User } from "../shared/schema";
+import { checkAndAwardBadges } from "./badges";
+import { sendMilestoneEmailIfNeeded } from "./cron";
 
 const VALID_PHASES = ["foundation", "gather", "lag", "on_plane", "contact", "finish"] as const;
 
@@ -153,6 +155,12 @@ export function setupBlueprintRoutes(app: Express) {
       } else {
         await db.insert(playerPhaseFocus).values({ userId: user.id, phase });
         res.json({ active: true });
+        checkAndAwardBadges(user.id).then(async (newBadges) => {
+          if (newBadges.length > 0) {
+            const u = req.user as any;
+            if (u?.email) await sendMilestoneEmailIfNeeded(user.id, u.email, u.firstName || "Hitter", newBadges);
+          }
+        }).catch(() => {});
       }
     } catch (err) {
       res.status(500).json({ message: "Failed to update focus" });

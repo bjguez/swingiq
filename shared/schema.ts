@@ -376,3 +376,25 @@ export const userAffirmations = pgTable("user_affirmations", {
 
 export type UserAffirmation = typeof userAffirmations.$inferSelect;
 export type InsertUserAffirmation = typeof userAffirmations.$inferInsert;
+
+export const userBadges = pgTable("user_badges", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  badgeId: varchar("badge_id").notNull(),
+  earnedAt: timestamp("earned_at").defaultNow(),
+}, (t) => ({
+  userIdIdx: index("user_badges_user_id_idx").on(t.userId),
+}));
+
+export type UserBadge = typeof userBadges.$inferSelect;
+
+export const emailLog = pgTable("email_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  emailType: varchar("email_type").notNull(),
+  sentAt: timestamp("sent_at").defaultNow(),
+}, (t) => ({
+  userIdTypeIdx: index("email_log_user_id_type_idx").on(t.userId, t.emailType),
+}));
+
+export type EmailLog = typeof emailLog.$inferSelect;

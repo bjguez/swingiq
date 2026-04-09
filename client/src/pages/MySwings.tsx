@@ -357,6 +357,22 @@ export default function MySwings() {
     return streak;
   }, [confidenceSessions]);
 
+  const { data: badgesData } = useQuery({
+    queryKey: ["/api/badges"],
+    queryFn: () => fetch("/api/badges").then(r => r.json()),
+    enabled: !!user,
+  });
+  const earnedBadgeIds = new Set<string>((badgesData?.earned ?? []).map((b: any) => b.badgeId));
+  const badgeEarnedAt = new Map<string, string>((badgesData?.earned ?? []).map((b: any) => [b.badgeId, b.earnedAt]));
+  const allBadgeDefs: { id: string; name: string; description: string; category: string }[] = badgesData?.definitions ?? [];
+
+  const { data: streakData } = useQuery({
+    queryKey: ["/api/streak"],
+    queryFn: () => fetch("/api/streak").then(r => r.json()),
+    enabled: !!user,
+  });
+  const combinedStreak: number = streakData?.streak ?? 0;
+
   const latestCognition = cognitionSessions[0] ?? null;
   const autoComps = comps.filter(c => c.compType === "auto").sort((a, b) => (a.rank ?? 99) - (b.rank ?? 99));
 
@@ -380,6 +396,11 @@ export default function MySwings() {
             {user.skillLevel && <span className="capitalize">{user.skillLevel.replace(/_/g, " ")}</span>}
             {user.bats && <span>Bats {user.bats}</span>}
             {location && <span className="flex items-center gap-0.5"><MapPin className="w-3 h-3" />{location}</span>}
+            {combinedStreak > 0 && (
+              <span className="flex items-center gap-0.5 text-orange-400 font-semibold">
+                <Sparkles className="w-3 h-3" />{combinedStreak}-day streak
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -806,6 +827,53 @@ export default function MySwings() {
           </div>
         )}
       </div>
+
+      {/* ── Badges ── */}
+      {allBadgeDefs.length > 0 && (
+        <div className="border-t border-border pt-6 space-y-4">
+          <SectionDivider
+            icon={<Trophy className="w-3.5 h-3.5" />}
+            title="Badges"
+          />
+          {(["milestone", "streak", "volume"] as const).map(category => {
+            const defs = allBadgeDefs.filter(b => b.category === category);
+            if (!defs.length) return null;
+            const labels: Record<string, string> = { milestone: "Milestones", streak: "Streaks", volume: "Volume" };
+            return (
+              <div key={category} className="space-y-2">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest">{labels[category]}</p>
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
+                  {defs.map(badge => {
+                    const earned = earnedBadgeIds.has(badge.id);
+                    const earnedDate = badgeEarnedAt.get(badge.id);
+                    return (
+                      <div
+                        key={badge.id}
+                        title={earned ? `${badge.description}${earnedDate ? ` · ${new Date(earnedDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}` : ""}` : badge.description}
+                        className={`rounded-xl border p-3 flex flex-col items-center gap-1.5 text-center transition-colors ${
+                          earned
+                            ? "border-primary/30 bg-primary/5"
+                            : "border-border bg-card opacity-40"
+                        }`}
+                      >
+                        <div className={`w-7 h-7 rounded-full flex items-center justify-center ${earned ? "bg-primary/15" : "bg-muted"}`}>
+                          {earned
+                            ? <Trophy className="w-3.5 h-3.5 text-primary" />
+                            : <Lock className="w-3 h-3 text-muted-foreground" />
+                          }
+                        </div>
+                        <p className={`text-[10px] font-semibold leading-tight ${earned ? "text-foreground" : "text-muted-foreground"}`}>
+                          {badge.name}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* ── MLB Comps ── */}
       {isPaid && (
