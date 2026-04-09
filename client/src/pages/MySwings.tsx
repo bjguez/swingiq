@@ -74,6 +74,128 @@ function SectionDivider({ icon, title, href, onNavigate }: {
   );
 }
 
+function ActivityCalendar({
+  cognitionDates,
+  acuityDates,
+  disciplineDates,
+  confidenceDates,
+}: {
+  cognitionDates: string[];
+  acuityDates: string[];
+  disciplineDates: string[];
+  confidenceDates: string[];
+}) {
+  const WEEKS = 14;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const activityMap = new Map<string, { cognition: boolean; acuity: boolean; discipline: boolean; confidence: boolean }>();
+  function mark(raw: string, module: "cognition" | "acuity" | "discipline" | "confidence") {
+    const key = new Date(raw).toDateString();
+    const prev = activityMap.get(key) ?? { cognition: false, acuity: false, discipline: false, confidence: false };
+    activityMap.set(key, { ...prev, [module]: true });
+  }
+  cognitionDates.forEach(d => mark(d, "cognition"));
+  acuityDates.forEach(d => mark(d, "acuity"));
+  disciplineDates.forEach(d => mark(d, "discipline"));
+  confidenceDates.forEach(d => mark(d, "confidence"));
+
+  // Build weeks grid (Mon → Sun, oldest → newest)
+  const startDate = new Date(today);
+  startDate.setDate(today.getDate() - WEEKS * 7 + 1);
+  const dow = startDate.getDay();
+  startDate.setDate(startDate.getDate() - (dow === 0 ? 6 : dow - 1));
+
+  const weeks: Date[][] = [];
+  const cursor = new Date(startDate);
+  while (weeks.length < WEEKS) {
+    const week: Date[] = [];
+    for (let d = 0; d < 7; d++) {
+      week.push(new Date(cursor));
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    weeks.push(week);
+  }
+
+  const monthLabels = weeks.map((week, i) =>
+    i === 0 || week[0].getMonth() !== weeks[i - 1][0].getMonth()
+      ? week[0].toLocaleDateString("en-US", { month: "short" })
+      : null
+  );
+
+  const DAY_LABELS = ["M", "", "W", "", "F", "", ""];
+
+  return (
+    <div className="space-y-2 overflow-x-auto pb-1">
+      {/* Month labels */}
+      <div className="flex gap-1 pl-5">
+        {weeks.map((_, i) => (
+          <div key={i} className="w-3 shrink-0 text-[9px] text-muted-foreground text-center">
+            {monthLabels[i] ?? ""}
+          </div>
+        ))}
+      </div>
+      <div className="flex gap-1">
+        {/* Day labels */}
+        <div className="flex flex-col gap-1 mr-0.5">
+          {DAY_LABELS.map((label, i) => (
+            <div key={i} className="w-4 h-3 text-[9px] text-muted-foreground flex items-center justify-end pr-0.5">
+              {label}
+            </div>
+          ))}
+        </div>
+        {/* Cells */}
+        {weeks.map((week, wi) => (
+          <div key={wi} className="flex flex-col gap-1">
+            {week.map((day, di) => {
+              const isFuture = day > today;
+              const activity = activityMap.get(day.toDateString());
+              const modules = activity
+                ? (["cognition", "acuity", "discipline", "confidence"] as const).filter(m => activity[m])
+                : [];
+              const count = modules.length;
+              const MODULE_LABELS: Record<string, string> = {
+                cognition: "Cognition", acuity: "Visual Acuity",
+                discipline: "Discipline", confidence: "Confidence",
+              };
+              const tooltip = isFuture ? "" : [
+                day.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+                count > 0 ? modules.map(m => MODULE_LABELS[m]).join(", ") : "No activity",
+              ].join(" · ");
+
+              return (
+                <div
+                  key={di}
+                  title={tooltip}
+                  className={`w-3 h-3 shrink-0 rounded-sm ${
+                    isFuture ? "opacity-0" :
+                    count === 0 ? "bg-muted/40" :
+                    count === 1 ? "bg-primary/30" :
+                    count === 2 ? "bg-primary/55" :
+                    count === 3 ? "bg-primary/80" :
+                    "bg-primary"
+                  }`}
+                />
+              );
+            })}
+          </div>
+        ))}
+      </div>
+      {/* Legend */}
+      <div className="flex items-center gap-1.5 pl-5 text-[9px] text-muted-foreground">
+        <span>Less</span>
+        {[0, 1, 2, 3, 4].map(n => (
+          <div key={n} className={`w-3 h-3 rounded-sm shrink-0 ${
+            n === 0 ? "bg-muted/40" : n === 1 ? "bg-primary/30" : n === 2 ? "bg-primary/55" : n === 3 ? "bg-primary/80" : "bg-primary"
+          }`} />
+        ))}
+        <span>More</span>
+        <span className="ml-3 text-muted-foreground/50">· modules completed per day</span>
+      </div>
+    </div>
+  );
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 export default function MySwings() {
@@ -403,6 +525,22 @@ export default function MySwings() {
           </div>
         )}
       </div>
+
+      {/* ── Training Activity Calendar ── */}
+      {isPaid && (cognitionSessions.length > 0 || disciplineHistory.length > 0 || acuityCompletions.length > 0 || confidenceSessions.length > 0) && (
+        <div className="border-t border-border pt-6 space-y-4">
+          <SectionDivider
+            icon={<Sparkles className="w-3.5 h-3.5" />}
+            title="Training Activity"
+          />
+          <ActivityCalendar
+            cognitionDates={cognitionSessions.map(s => s.completedAt as unknown as string)}
+            acuityDates={acuityCompletions.map((s: any) => s.completedAt)}
+            disciplineDates={disciplineHistory.map(s => s.completedAt as unknown as string)}
+            confidenceDates={confidenceSessions.map(s => s.completedAt as unknown as string)}
+          />
+        </div>
+      )}
 
       {/* ── Cognition ── */}
       <div className="border-t border-border pt-6 space-y-4">
