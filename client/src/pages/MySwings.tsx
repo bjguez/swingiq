@@ -123,30 +123,30 @@ function ActivityCalendar({
       : null
   );
 
-  const DAY_LABELS = ["M", "", "W", "", "F", "", ""];
+  const DAY_LABELS = ["M", "T", "W", "T", "F", "S", "S"];
 
   return (
     <div className="space-y-2 overflow-x-auto pb-1">
       {/* Month labels */}
-      <div className="flex gap-1 pl-5">
+      <div className="flex gap-1.5 pl-7">
         {weeks.map((_, i) => (
-          <div key={i} className="w-3 shrink-0 text-[9px] text-muted-foreground text-center">
+          <div key={i} className="w-4 shrink-0 text-[10px] text-muted-foreground text-center">
             {monthLabels[i] ?? ""}
           </div>
         ))}
       </div>
-      <div className="flex gap-1">
+      <div className="flex gap-1.5">
         {/* Day labels */}
-        <div className="flex flex-col gap-1 mr-0.5">
+        <div className="flex flex-col gap-1.5">
           {DAY_LABELS.map((label, i) => (
-            <div key={i} className="w-4 h-3 text-[9px] text-muted-foreground flex items-center justify-end pr-0.5">
+            <div key={i} className="w-5 h-4 text-[10px] text-muted-foreground flex items-center justify-end pr-1">
               {label}
             </div>
           ))}
         </div>
         {/* Cells */}
         {weeks.map((week, wi) => (
-          <div key={wi} className="flex flex-col gap-1">
+          <div key={wi} className="flex flex-col gap-1.5">
             {week.map((day, di) => {
               const isFuture = day > today;
               const activity = activityMap.get(day.toDateString());
@@ -167,7 +167,7 @@ function ActivityCalendar({
                 <div
                   key={di}
                   title={tooltip}
-                  className={`w-3 h-3 shrink-0 rounded-sm ${
+                  className={`w-4 h-4 shrink-0 rounded-sm ${
                     isFuture ? "opacity-0" :
                     count === 0 ? "bg-muted/40" :
                     count === 1 ? "bg-primary/30" :
@@ -182,10 +182,10 @@ function ActivityCalendar({
         ))}
       </div>
       {/* Legend */}
-      <div className="flex items-center gap-1.5 pl-5 text-[9px] text-muted-foreground">
+      <div className="flex items-center gap-1.5 pl-7 text-[10px] text-muted-foreground">
         <span>Less</span>
         {[0, 1, 2, 3, 4].map(n => (
-          <div key={n} className={`w-3 h-3 rounded-sm shrink-0 ${
+          <div key={n} className={`w-4 h-4 rounded-sm shrink-0 ${
             n === 0 ? "bg-muted/40" : n === 1 ? "bg-primary/30" : n === 2 ? "bg-primary/55" : n === 3 ? "bg-primary/80" : "bg-primary"
           }`} />
         ))}
