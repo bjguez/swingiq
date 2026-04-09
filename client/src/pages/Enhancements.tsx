@@ -1974,7 +1974,7 @@ function ConfidenceTab({ isPaid, isFree }: { isPaid: boolean; isFree: boolean })
   const streak = pastSessions ? computeStreak(pastSessions) : 0;
 
   return (
-    <div className="space-y-8 max-w-xl">
+    <div className="space-y-8 max-w-xl mx-auto">
       {isPaid && pastSessions && (
         <div className="flex gap-4">
           <div className="flex-1 rounded-xl border border-border bg-card p-4 text-center">
