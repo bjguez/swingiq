@@ -2111,28 +2111,27 @@ export default function Enhancements() {
       <div className="space-y-6">
         {/* Header */}
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="px-2 py-0.5 rounded text-xs font-semibold bg-primary/20 text-primary uppercase tracking-wider">Enhance</span>
-          </div>
           <h1 className="text-3xl md:text-4xl font-bold font-display uppercase">Enhance</h1>
-          <p className="text-muted-foreground mt-1">Cognitive and visual training designed for hitters.</p>
+          <p className="text-muted-foreground mt-1">Cognitive, visual, and mental performance training for hitters.</p>
         </div>
 
         {/* Tab bar */}
-        <div className="flex gap-1 border-b border-border">
-          {TABS.map(t => (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-                tab === t.id
-                  ? "border-primary text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {t.icon}{t.label}
-            </button>
-          ))}
+        <div className="border-b border-border overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+          <div className="flex gap-1 min-w-max">
+            {TABS.map(t => (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap shrink-0 ${
+                  tab === t.id
+                    ? "border-primary text-foreground"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {t.icon}{t.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Tab content */}
