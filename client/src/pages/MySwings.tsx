@@ -126,71 +126,73 @@ function ActivityCalendar({
   const DAY_LABELS = ["M", "T", "W", "T", "F", "S", "S"];
 
   return (
-    <div className="space-y-2 overflow-x-auto pb-1">
-      {/* Month labels */}
-      <div className="flex gap-1.5 pl-7">
-        {weeks.map((_, i) => (
-          <div key={i} className="w-4 shrink-0 text-[10px] text-muted-foreground text-center">
-            {monthLabels[i] ?? ""}
-          </div>
-        ))}
-      </div>
-      <div className="flex gap-1.5">
-        {/* Day labels */}
-        <div className="flex flex-col gap-1.5">
-          {DAY_LABELS.map((label, i) => (
-            <div key={i} className="w-5 h-4 text-[10px] text-muted-foreground flex items-center justify-end pr-1">
-              {label}
+    <div className="overflow-x-auto pb-1">
+      <div className="space-y-2 w-fit mx-auto">
+        {/* Month labels */}
+        <div className="flex gap-2 pl-8">
+          {weeks.map((_, i) => (
+            <div key={i} className="w-5 shrink-0 text-xs text-muted-foreground text-center">
+              {monthLabels[i] ?? ""}
             </div>
           ))}
         </div>
-        {/* Cells */}
-        {weeks.map((week, wi) => (
-          <div key={wi} className="flex flex-col gap-1.5">
-            {week.map((day, di) => {
-              const isFuture = day > today;
-              const activity = activityMap.get(day.toDateString());
-              const modules = activity
-                ? (["cognition", "acuity", "discipline", "confidence"] as const).filter(m => activity[m])
-                : [];
-              const count = modules.length;
-              const MODULE_LABELS: Record<string, string> = {
-                cognition: "Cognition", acuity: "Visual Acuity",
-                discipline: "Discipline", confidence: "Confidence",
-              };
-              const tooltip = isFuture ? "" : [
-                day.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-                count > 0 ? modules.map(m => MODULE_LABELS[m]).join(", ") : "No activity",
-              ].join(" · ");
-
-              return (
-                <div
-                  key={di}
-                  title={tooltip}
-                  className={`w-4 h-4 shrink-0 rounded-sm ${
-                    isFuture ? "opacity-0" :
-                    count === 0 ? "bg-muted/40" :
-                    count === 1 ? "bg-primary/30" :
-                    count === 2 ? "bg-primary/55" :
-                    count === 3 ? "bg-primary/80" :
-                    "bg-primary"
-                  }`}
-                />
-              );
-            })}
+        <div className="flex gap-2">
+          {/* Day labels */}
+          <div className="flex flex-col gap-2">
+            {DAY_LABELS.map((label, i) => (
+              <div key={i} className="w-6 h-5 text-xs text-muted-foreground flex items-center justify-end pr-1">
+                {label}
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
-      {/* Legend */}
-      <div className="flex items-center gap-1.5 pl-7 text-[10px] text-muted-foreground">
-        <span>Less</span>
-        {[0, 1, 2, 3, 4].map(n => (
-          <div key={n} className={`w-4 h-4 rounded-sm shrink-0 ${
-            n === 0 ? "bg-muted/40" : n === 1 ? "bg-primary/30" : n === 2 ? "bg-primary/55" : n === 3 ? "bg-primary/80" : "bg-primary"
-          }`} />
-        ))}
-        <span>More</span>
-        <span className="ml-3 text-muted-foreground/50">· modules completed per day</span>
+          {/* Cells */}
+          {weeks.map((week, wi) => (
+            <div key={wi} className="flex flex-col gap-2">
+              {week.map((day, di) => {
+                const isFuture = day > today;
+                const activity = activityMap.get(day.toDateString());
+                const modules = activity
+                  ? (["cognition", "acuity", "discipline", "confidence"] as const).filter(m => activity[m])
+                  : [];
+                const count = modules.length;
+                const MODULE_LABELS: Record<string, string> = {
+                  cognition: "Cognition", acuity: "Visual Acuity",
+                  discipline: "Discipline", confidence: "Confidence",
+                };
+                const tooltip = isFuture ? "" : [
+                  day.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+                  count > 0 ? modules.map(m => MODULE_LABELS[m]).join(", ") : "No activity",
+                ].join(" · ");
+
+                return (
+                  <div
+                    key={di}
+                    title={tooltip}
+                    className={`w-5 h-5 shrink-0 rounded-sm ${
+                      isFuture ? "opacity-0" :
+                      count === 0 ? "bg-muted/40" :
+                      count === 1 ? "bg-primary/30" :
+                      count === 2 ? "bg-primary/55" :
+                      count === 3 ? "bg-primary/80" :
+                      "bg-primary"
+                    }`}
+                  />
+                );
+              })}
+            </div>
+          ))}
+        </div>
+        {/* Legend */}
+        <div className="flex items-center gap-1.5 pl-8 text-xs text-muted-foreground">
+          <span>Less</span>
+          {[0, 1, 2, 3, 4].map(n => (
+            <div key={n} className={`w-5 h-5 rounded-sm shrink-0 ${
+              n === 0 ? "bg-muted/40" : n === 1 ? "bg-primary/30" : n === 2 ? "bg-primary/55" : n === 3 ? "bg-primary/80" : "bg-primary"
+            }`} />
+          ))}
+          <span>More</span>
+          <span className="ml-3 text-muted-foreground/50">· modules completed per day</span>
+        </div>
       </div>
     </div>
   );
