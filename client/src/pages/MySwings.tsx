@@ -129,25 +129,25 @@ function ActivityCalendar({
     <div className="overflow-x-auto pb-1">
       <div className="space-y-2 w-fit mx-auto">
         {/* Month labels */}
-        <div className="flex gap-2 pl-8">
+        <div className="flex gap-1.5 sm:gap-2 md:gap-2.5 pl-7 sm:pl-8 md:pl-10">
           {weeks.map((_, i) => (
-            <div key={i} className="w-5 shrink-0 text-xs text-muted-foreground text-center">
+            <div key={i} className="w-3.5 sm:w-5 md:w-6 shrink-0 text-[10px] sm:text-xs text-muted-foreground text-center">
               {monthLabels[i] ?? ""}
             </div>
           ))}
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-1.5 sm:gap-2 md:gap-2.5">
           {/* Day labels */}
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-1.5 sm:gap-2 md:gap-2.5">
             {DAY_LABELS.map((label, i) => (
-              <div key={i} className="w-6 h-5 text-xs text-muted-foreground flex items-center justify-end pr-1">
+              <div key={i} className="w-5 sm:w-6 md:w-8 h-3.5 sm:h-5 md:h-6 text-[10px] sm:text-xs text-muted-foreground flex items-center justify-end pr-1">
                 {label}
               </div>
             ))}
           </div>
           {/* Cells */}
           {weeks.map((week, wi) => (
-            <div key={wi} className="flex flex-col gap-2">
+            <div key={wi} className="flex flex-col gap-1.5 sm:gap-2 md:gap-2.5">
               {week.map((day, di) => {
                 const isFuture = day > today;
                 const activity = activityMap.get(day.toDateString());
@@ -168,7 +168,7 @@ function ActivityCalendar({
                   <div
                     key={di}
                     title={tooltip}
-                    className={`w-5 h-5 shrink-0 rounded-sm ${
+                    className={`w-3.5 h-3.5 sm:w-5 sm:h-5 md:w-6 md:h-6 shrink-0 rounded-sm ${
                       isFuture ? "opacity-0" :
                       count === 0 ? "bg-muted/40" :
                       count === 1 ? "bg-primary/30" :
@@ -183,10 +183,10 @@ function ActivityCalendar({
           ))}
         </div>
         {/* Legend */}
-        <div className="flex items-center gap-1.5 pl-8 text-xs text-muted-foreground">
+        <div className="flex items-center gap-1.5 pl-7 sm:pl-8 md:pl-10 text-[10px] sm:text-xs text-muted-foreground">
           <span>Less</span>
           {[0, 1, 2, 3, 4].map(n => (
-            <div key={n} className={`w-5 h-5 rounded-sm shrink-0 ${
+            <div key={n} className={`w-3.5 h-3.5 sm:w-5 sm:h-5 md:w-6 md:h-6 rounded-sm shrink-0 ${
               n === 0 ? "bg-muted/40" : n === 1 ? "bg-primary/30" : n === 2 ? "bg-primary/55" : n === 3 ? "bg-primary/80" : "bg-primary"
             }`} />
           ))}
