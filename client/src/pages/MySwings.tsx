@@ -117,11 +117,11 @@ function ActivityCalendar({
     weeks.push(week);
   }
 
-  const monthLabels = weeks.map((week, i) =>
-    i === 0 || week[0].getMonth() !== weeks[i - 1][0].getMonth()
-      ? week[0].toLocaleDateString("en-US", { month: "short" })
-      : null
-  );
+  const monthLabels = weeks.map((week, i) => {
+    if (i === 0) return week[0].toLocaleDateString("en-US", { month: "short" });
+    const firstOfMonth = week.find(d => d.getDate() === 1);
+    return firstOfMonth ? firstOfMonth.toLocaleDateString("en-US", { month: "short" }) : null;
+  });
 
   const DAY_LABELS = ["M", "T", "W", "T", "F", "S", "S"];
 
