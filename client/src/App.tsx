@@ -30,6 +30,7 @@ import Acuity from "@/pages/Acuity";
 import Enhancements from "@/pages/Enhancements";
 import Dashboard from "@/pages/Dashboard";
 import LandingPage from "@/pages/LandingPage";
+import GamedayPage from "@/pages/Gameday";
 import { useAuth } from "@/hooks/use-auth";
 import { AthleteProvider } from "@/hooks/use-athletes";
 
@@ -82,6 +83,7 @@ function Router() {
       <Route path="/about" component={AboutPage} />
       <Route path="/terms" component={TermsPage} />
       <Route path="/statdle" component={StudioStatdle} />
+      <Route path="/gameday" component={GamedayPage} />
       <Route path="/cognition" component={VisionTraining} />
       <Route path="/acuity" component={Acuity} />
       <Route path="/enhance" component={Enhancements} />

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Video, BarChart2, Bell, Menu, X, User, Upload, Library, Film, Lock, Dna, Tag, Users, Zap, Sparkles } from "lucide-react";
+import { Video, BarChart2, Bell, Menu, X, User, Upload, Library, Film, Lock, Dna, Tag, Users, Zap, Sparkles, Tv2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { VideoLibraryModal } from "@/components/VideoLibraryModal";
 import { Link, useLocation } from "wouter";
@@ -62,6 +62,7 @@ export default function Layout({ children, showScoreTicker = false }: { children
     { href: "/biometrics", icon: <Dna className="w-4 h-4 mr-2" />, label: "Biometrics", badge: (!isPaid && !isAdmin) ? <Lock className="w-3 h-3 ml-1.5 text-yellow-500" /> : undefined },
     { href: "/development", icon: <BarChart2 className="w-4 h-4 mr-2" />, label: "Development", badge: (!isPaid && !isAdmin) ? <Lock className="w-3 h-3 ml-1.5 text-yellow-500" /> : undefined },
     { href: "/enhance", icon: <Zap className="w-4 h-4 mr-2" />, label: "Enhance" },
+    { href: "/gameday", icon: <Tv2 className="w-4 h-4 mr-2" />, label: "Gameday" },
     ...(!isPaid && !isAdmin ? [{ href: "/pricing", icon: <Tag className="w-4 h-4 mr-2" />, label: "Pricing" }] : []),
   ];
 
@@ -82,6 +83,7 @@ export default function Layout({ children, showScoreTicker = false }: { children
       { href: "/enhance?tab=confidence", label: "Confidence" },
     ]},
     { section: "Games", links: [
+      { href: "/gameday", label: "Gameday" },
       { href: "/statdle", label: "StudioStatdle" },
     ]},
     { section: "Company", links: [

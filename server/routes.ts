@@ -23,6 +23,7 @@ import { setupDisciplineRoutes } from "./discipline";
 import { setupConfidenceRoutes } from "./confidence";
 import { setupStatdleRoutes } from "./statdle";
 import { setupAthleteRoutes } from "./athletes";
+import { setupMlbRoutes } from "./mlb";
 import { checkAndAwardBadges, computeStreak, BADGE_DEFINITIONS } from "./badges";
 import { userBadges, referrals, users as usersTable } from "@shared/schema";
 import { runDailyJob, sendMilestoneEmailIfNeeded } from "./cron";
@@ -1326,6 +1327,7 @@ export async function registerRoutes(
   setupConfidenceRoutes(app);
   setupStatdleRoutes(app);
   setupAthleteRoutes(app);
+  setupMlbRoutes(app);
 
   // ── Coach recording upload ─────────────────────────────────────────────────
   // Accept webm blobs from the canvas recorder, store in R2 under recordings/
