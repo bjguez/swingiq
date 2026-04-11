@@ -85,6 +85,7 @@ export default function Layout({ children, showScoreTicker = false }: { children
     { section: "Gameday", links: [
       { href: "/gameday", label: "Scoreboard" },
       { href: "/gameday?tab=hitters", label: "Hot Hitters" },
+      { href: "/gameday?tab=leaders", label: "Season Leaders" },
     ]},
     { section: "Company", links: [
       { href: "/about", label: "About" },

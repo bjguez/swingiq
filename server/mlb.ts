@@ -136,6 +136,86 @@ export function setupMlbRoutes(app: Express) {
     }
   });
 
+  // ── Today's top performers — aggregate box scores for live/final games ──────
+  app.get("/api/mlb/performers/today", async (req, res) => {
+    try {
+      const now = new Date();
+      const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+      const schedule = await mlbFetch(`/v1/schedule?sportId=1&date=${date}&hydrate=linescore`);
+      const games: any[] = schedule.dates?.[0]?.games ?? [];
+
+      // Only pull box scores for games that have started
+      const active = games.filter(g => g.status?.abstractGameState !== "Preview");
+      if (active.length === 0) return res.json({ date, performers: [] });
+
+      const feeds = await Promise.all(
+        active.map(g => mlbFetch(`/v1.1/game/${g.gamePk}/feed/live`).catch(() => null))
+      );
+
+      const performers: any[] = [];
+
+      for (let i = 0; i < feeds.length; i++) {
+        const feed = feeds[i];
+        if (!feed) continue;
+        const box = feed.liveData?.boxscore;
+        if (!box) continue;
+        const gameData = feed.gameData;
+        const gameStatus = gameData?.status?.abstractGameState;
+        const inning = feed.liveData?.linescore?.currentInningOrdinal ?? null;
+        const inningState = feed.liveData?.linescore?.inningState ?? null;
+
+        for (const side of ["away", "home"] as const) {
+          const teamInfo = gameData?.teams?.[side];
+          const teamName = teamInfo?.name ?? "";
+          const teamAbbrev = teamInfo?.abbreviation ?? "";
+          const teamId = teamInfo?.id ?? 0;
+          const opponent = gameData?.teams?.[side === "away" ? "home" : "away"];
+          const opponentAbbrev = opponent?.abbreviation ?? "";
+
+          (box.teams[side].batters ?? []).forEach((id: number) => {
+            const p = box.teams[side].players?.[`ID${id}`];
+            if (!p) return;
+            const s = p.stats?.batting ?? {};
+            const hits = s.hits ?? 0;
+            const hr = s.homeRuns ?? 0;
+            const rbi = s.rbi ?? 0;
+            const ab = s.atBats ?? 0;
+            // Skip players with nothing to show
+            if (hits === 0 && hr === 0 && rbi === 0) return;
+            performers.push({
+              id,
+              name: p.person?.fullName,
+              position: p.position?.abbreviation,
+              teamId,
+              team: teamName,
+              teamAbbrev,
+              opponentAbbrev,
+              hits, hr, rbi, ab,
+              runs: s.runs ?? 0,
+              bb: s.baseOnBalls ?? 0,
+              k: s.strikeOuts ?? 0,
+              avg: p.seasonStats?.batting?.avg ?? ".---",
+              gameStatus,
+              inning,
+              inningState,
+              // composite sort score
+              score: hits * 2 + hr * 5 + rbi * 1.5,
+            });
+          });
+        }
+      }
+
+      // Dedupe by player id (can appear if somehow in two feeds), sort best first
+      const seen = new Set<number>();
+      const unique = performers.filter(p => { if (seen.has(p.id)) return false; seen.add(p.id); return true; });
+      unique.sort((a, b) => b.score - a.score);
+
+      res.json({ date, performers: unique.slice(0, 20) });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   // ── Season leaders — rate stats with qualified pool ───────────────────────
   app.get("/api/mlb/leaders/season", async (req, res) => {
     try {

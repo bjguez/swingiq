@@ -50,6 +50,14 @@ type BoxScore = {
 
 type Leader = { rank: number; value: string; name: string; team: string; teamAbbrev: string };
 
+type Performer = {
+  id: number; name: string; position: string;
+  teamId: number; team: string; teamAbbrev: string; opponentAbbrev: string;
+  hits: number; hr: number; rbi: number; ab: number;
+  runs: number; bb: number; k: number; avg: string;
+  gameStatus: string; inning: string | null; inningState: string | null;
+};
+
 // ── ESPN logo CDN — maps MLB team ID to ESPN slug ─────────────────────────────
 
 const ESPN_SLUG: Record<number, string> = {
@@ -324,7 +332,94 @@ function BoxScoreView({ box, loading, onBack }: { box?: BoxScore; loading: boole
   );
 }
 
-// ── Hot Hitters ───────────────────────────────────────────────────────────────
+// ── Hot Hitters — today's top performers ─────────────────────────────────────
+
+function PerformerCard({ p }: { p: Performer }) {
+  const logoUrl = teamLogo(p.teamId);
+  const isLive = p.gameStatus === "Live";
+  const statLine = [
+    `${p.hits}-${p.ab}`,
+    p.hr > 0 && `${p.hr} HR`,
+    p.rbi > 0 && `${p.rbi} RBI`,
+    p.runs > 0 && `${p.runs} R`,
+    p.bb > 0 && `${p.bb} BB`,
+  ].filter(Boolean).join(", ");
+
+  // Headline: pick the flashiest stat
+  const headline = p.hr >= 2 ? `${p.hr} HR` : p.hr === 1 ? "HR" : p.hits >= 3 ? `${p.hits}-${p.ab}` : p.rbi >= 3 ? `${p.rbi} RBI` : `${p.hits}-${p.ab}`;
+
+  return (
+    <div className="bg-card border border-border rounded-xl overflow-hidden flex flex-col">
+      {/* Team color bar + live indicator */}
+      <div className="flex items-center justify-between px-3 pt-2.5 pb-1">
+        <div className="flex items-center gap-1.5">
+          {logoUrl
+            ? <img src={logoUrl} alt={p.teamAbbrev} className="w-5 h-5 object-contain" />
+            : <span className="text-[10px] font-bold text-muted-foreground">{p.teamAbbrev}</span>
+          }
+          <span className="text-[10px] font-semibold text-muted-foreground">{p.teamAbbrev} vs {p.opponentAbbrev}</span>
+        </div>
+        {isLive ? (
+          <div className="flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+            <span className="text-[10px] font-bold text-green-400">
+              {p.inningState === "Top" ? "▲" : "▼"} {p.inning}
+            </span>
+          </div>
+        ) : (
+          <span className="text-[10px] text-muted-foreground">Final</span>
+        )}
+      </div>
+
+      {/* Player info + headline stat */}
+      <div className="px-3 pb-3 flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-sm font-bold leading-tight truncate">{p.name}</p>
+          <p className="text-[10px] text-muted-foreground">{p.position} · {p.avg} AVG</p>
+          <p className="text-xs text-muted-foreground mt-1.5">{statLine}</p>
+        </div>
+        <div className="shrink-0 text-right">
+          <p className="text-2xl font-black text-primary leading-none">{headline}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HotHittersTab() {
+  const { data, isLoading } = useQuery<{ date: string; performers: Performer[] }>({
+    queryKey: ["/api/mlb/performers/today"],
+    queryFn: () => fetch("/api/mlb/performers/today").then(r => r.json()),
+    refetchInterval: 60000,
+  });
+
+  const performers = data?.performers ?? [];
+
+  if (isLoading) return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      {[...Array(6)].map((_, i) => <div key={i} className="h-28 bg-card border border-border rounded-xl animate-pulse" />)}
+    </div>
+  );
+
+  if (performers.length === 0) return (
+    <div className="text-center py-16 space-y-2">
+      <TrendingUp className="w-8 h-8 text-muted-foreground/40 mx-auto" />
+      <p className="text-sm font-semibold text-muted-foreground">No games in progress yet</p>
+      <p className="text-xs text-muted-foreground">Top performers will appear here once today's games begin.</p>
+    </div>
+  );
+
+  return (
+    <div className="space-y-4">
+      <p className="text-xs text-muted-foreground">Top performers from today's games</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {performers.map(p => <PerformerCard key={p.id} p={p} />)}
+      </div>
+    </div>
+  );
+}
+
+// ── Season Leaders ────────────────────────────────────────────────────────────
 
 const STAT_LABELS: Record<string, string> = {
   battingAverage: "AVG",
@@ -358,7 +453,7 @@ function LeaderList({ leaders, isLoading }: { leaders: Leader[]; isLoading: bool
   );
 }
 
-function HotHittersTab() {
+function SeasonLeadersTab() {
   const [activeStat, setActiveStat] = useState("battingAverage");
 
   const { data, isLoading } = useQuery<Record<string, Leader[]>>({
@@ -385,13 +480,17 @@ function HotHittersTab() {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
-type Tab = "scoreboard" | "hitters";
+type Tab = "scoreboard" | "hitters" | "leaders";
 
 export default function GamedayPage() {
   usePageMeta({ title: "Gameday" });
   const search = useSearch();
-  const initialTab = new URLSearchParams(search).get("tab") === "hitters" ? "hitters" : "scoreboard";
+  const qTab = new URLSearchParams(search).get("tab");
+  const initialTab: Tab = qTab === "hitters" ? "hitters" : qTab === "leaders" ? "leaders" : "scoreboard";
   const [tab, setTab] = useState<Tab>(initialTab);
+
+  const tabClass = (t: Tab) =>
+    `pb-2 text-sm font-semibold transition-colors border-b-2 -mb-px flex items-center gap-1.5 ${tab === t ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`;
 
   return (
     <Layout>
@@ -403,24 +502,22 @@ export default function GamedayPage() {
         </div>
 
         {/* Tab bar */}
-        <div className="flex gap-2 border-b border-border">
-          <button
-            onClick={() => setTab("scoreboard")}
-            className={`pb-2 text-sm font-semibold transition-colors border-b-2 -mb-px ${tab === "scoreboard" ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
-          >
+        <div className="flex gap-4 border-b border-border">
+          <button onClick={() => setTab("scoreboard")} className={tabClass("scoreboard")}>
             Scoreboard
           </button>
-          <button
-            onClick={() => setTab("hitters")}
-            className={`pb-2 text-sm font-semibold transition-colors border-b-2 -mb-px flex items-center gap-1.5 ${tab === "hitters" ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
-          >
+          <button onClick={() => setTab("hitters")} className={tabClass("hitters")}>
             <TrendingUp className="w-3.5 h-3.5" />
             Hot Hitters
+          </button>
+          <button onClick={() => setTab("leaders")} className={tabClass("leaders")}>
+            Season Leaders
           </button>
         </div>
 
         {tab === "scoreboard" && <ScoreboardTab />}
         {tab === "hitters" && <HotHittersTab />}
+        {tab === "leaders" && <SeasonLeadersTab />}
       </div>
     </Layout>
   );
