@@ -332,7 +332,6 @@ const STAT_LABELS: Record<string, string> = {
   onBasePlusSlugging: "OPS",
   hits: "H",
   runsBattedIn: "RBI",
-  stolenBases: "SB",
 };
 
 function LeaderList({ leaders, isLoading }: { leaders: Leader[]; isLoading: boolean }) {
