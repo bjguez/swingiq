@@ -146,6 +146,7 @@ export function setupMlbRoutes(app: Express) {
       );
       const result: Record<string, any[]> = {};
       for (const cat of (data.leagueLeaders ?? [])) {
+        if (cat.statGroup !== "hitting") continue;
         result[cat.leaderCategory] = (cat.leaders ?? []).slice(0, 10).map((l: any) => ({
           rank: l.rank, value: l.value,
           name: l.person?.fullName, team: l.team?.name, teamAbbrev: l.team?.abbreviation,
