@@ -384,15 +384,14 @@ export default function MySwings() {
   const latestCognition = cognitionSessions[0] ?? null;
   const autoComps = comps.filter(c => c.compType === "auto").sort((a, b) => (a.rank ?? 99) - (b.rank ?? 99));
 
-  // Scroll to hash anchor after page renders
+  // Scroll to hash anchor — wait until referral data is loaded so page is full height
   useEffect(() => {
     const hash = window.location.hash;
     if (!hash) return;
+    if (hash === "#referral" && !referralData) return; // wait for data
     const el = document.querySelector(hash);
-    if (el) {
-      setTimeout(() => el.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
-    }
-  }, []);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [referralData]);
 
   if (!user) return null;
 
