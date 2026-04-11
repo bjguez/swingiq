@@ -337,6 +337,9 @@ function BoxScoreView({ box, loading, onBack }: { box?: BoxScore; loading: boole
 function PerformerCard({ p }: { p: Performer }) {
   const logoUrl = teamLogo(p.teamId);
   const isLive = p.gameStatus === "Live";
+  const [photoError, setPhotoError] = useState(false);
+  const photoUrl = `https://img.mlb.com/headshots/current/60x60/${p.id}@2x.jpg`;
+
   const statLine = [
     `${p.hits}-${p.ab}`,
     p.hr > 0 && `${p.hr} HR`,
@@ -350,7 +353,7 @@ function PerformerCard({ p }: { p: Performer }) {
 
   return (
     <div className="bg-card border border-border rounded-xl overflow-hidden flex flex-col">
-      {/* Team color bar + live indicator */}
+      {/* Team bar + live indicator */}
       <div className="flex items-center justify-between px-3 pt-2.5 pb-1">
         <div className="flex items-center gap-1.5">
           {logoUrl
@@ -371,13 +374,32 @@ function PerformerCard({ p }: { p: Performer }) {
         )}
       </div>
 
-      {/* Player info + headline stat */}
-      <div className="px-3 pb-3 flex items-start justify-between gap-2">
-        <div className="min-w-0">
+      {/* Player row: photo + info + headline stat */}
+      <div className="px-3 pb-3 flex items-center gap-3">
+        {/* Headshot */}
+        <div className="w-14 h-14 rounded-lg bg-secondary border border-border overflow-hidden shrink-0 flex items-center justify-center">
+          {!photoError ? (
+            <img
+              src={photoUrl}
+              alt={p.name}
+              className="w-full h-full object-cover object-top"
+              onError={() => setPhotoError(true)}
+            />
+          ) : (
+            <span className="text-lg font-black text-muted-foreground/50">
+              {p.name?.split(" ").map((n: string) => n[0]).join("").slice(0, 2)}
+            </span>
+          )}
+        </div>
+
+        {/* Name + stats */}
+        <div className="flex-1 min-w-0">
           <p className="text-sm font-bold leading-tight truncate">{p.name}</p>
           <p className="text-[10px] text-muted-foreground">{p.position} · {p.avg} AVG</p>
-          <p className="text-xs text-muted-foreground mt-1.5">{statLine}</p>
+          <p className="text-xs text-muted-foreground mt-1">{statLine}</p>
         </div>
+
+        {/* Headline */}
         <div className="shrink-0 text-right">
           <p className="text-2xl font-black text-primary leading-none">{headline}</p>
         </div>
