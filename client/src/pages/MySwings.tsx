@@ -972,8 +972,8 @@ export default function MySwings() {
       )}
 
       {/* ── Referral ── */}
-      {referralData?.referralCode && (
-        <div className="border-t border-border pt-6 space-y-4">
+      {!!user && (
+        <div id="referral" className="border-t border-border pt-6 space-y-4">
           <SectionDivider
             icon={<Gift className="w-3.5 h-3.5" />}
             title="Refer a Friend"
@@ -982,7 +982,10 @@ export default function MySwings() {
             <p className="text-sm text-muted-foreground leading-relaxed">
               Share your link. When a friend signs up and subscribes, you get <span className="text-foreground font-semibold">1 free month</span> automatically applied to your next invoice.
             </p>
-            <ReferralLinkCopy code={referralData.referralCode} />
+            {referralData?.referralCode
+              ? <ReferralLinkCopy code={referralData.referralCode} />
+              : <div className="h-9 bg-secondary rounded-lg animate-pulse" />
+            }
             {referralData.referrals?.length > 0 && (
               <div className="space-y-2 pt-2 border-t border-border">
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Your Referrals</p>

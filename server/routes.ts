@@ -1354,6 +1354,14 @@ export async function registerRoutes(
     const user = req.user as any;
     if (!user) return res.status(401).json({ message: "Unauthorized" });
     try {
+      // Lazily generate referral code for existing users who predate signup flow
+      let referralCode = user.referralCode;
+      if (!referralCode) {
+        const { randomBytes } = await import("crypto");
+        referralCode = randomBytes(4).toString("hex").toUpperCase();
+        await db.update(usersTable).set({ referralCode }).where(eq(usersTable.id, user.id));
+      }
+
       const rows = await db.select({
         id: referrals.id,
         subscribedAt: referrals.subscribedAt,
@@ -1364,7 +1372,7 @@ export async function registerRoutes(
         .from(referrals)
         .leftJoin(usersTable, eq(referrals.referredUserId, usersTable.id))
         .where(eq(referrals.referrerId, user.id));
-      res.json({ referralCode: user.referralCode, referrals: rows });
+      res.json({ referralCode, referrals: rows });
     } catch (err) {
       res.status(500).json({ message: "Failed to fetch referrals" });
     }
