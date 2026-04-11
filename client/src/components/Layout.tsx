@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Video, BarChart2, Bell, Menu, X, User, Upload, Library, Film, Lock, Dna, Tag, Users, Zap } from "lucide-react";
+import { Video, BarChart2, Bell, Menu, X, User, Upload, Library, Film, Lock, Dna, Tag, Users, Zap, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { VideoLibraryModal } from "@/components/VideoLibraryModal";
 import { Link, useLocation } from "wouter";
@@ -46,6 +46,8 @@ export default function Layout({ children, showScoreTicker = false }: { children
   const isParent = user?.accountType === "parent";
   const isPaid = user && ["player", "pro", "coach"].includes(user.subscriptionTier ?? "");
   const isAdmin = user?.isAdmin;
+  const trialDaysRemaining = (user as any)?.trialDaysRemaining ?? null;
+  const showTrialBanner = !!user && !isPaid && !isAdmin && trialDaysRemaining !== null && trialDaysRemaining > 0;
 
   const { athletes, activeAthlete, setActiveAthleteId } = useAthletes();
 
@@ -230,6 +232,26 @@ export default function Layout({ children, showScoreTicker = false }: { children
 
         {showScoreTicker && <ScoreTicker />}
       </header>
+
+      {/* Trial banner */}
+      {showTrialBanner && (
+        <div className="bg-primary/10 border-b border-primary/20 px-4 py-2">
+          <div className="container mx-auto flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-sm">
+              <Sparkles className="w-4 h-4 text-primary shrink-0" />
+              <span className="text-foreground font-medium">
+                {trialDaysRemaining === 1 ? "Last day of your free trial" : `${trialDaysRemaining} days left in your free trial`}
+              </span>
+              <span className="text-muted-foreground hidden sm:inline">— full access to all features</span>
+            </div>
+            <Link href="/pricing">
+              <Button size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold shrink-0 h-7 text-xs px-3">
+                Upgrade Now
+              </Button>
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* Main Content */}
       <AnimatePresence mode="wait">

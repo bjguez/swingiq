@@ -24,7 +24,7 @@ import { setupConfidenceRoutes } from "./confidence";
 import { setupStatdleRoutes } from "./statdle";
 import { setupAthleteRoutes } from "./athletes";
 import { checkAndAwardBadges, computeStreak, BADGE_DEFINITIONS } from "./badges";
-import { userBadges } from "@shared/schema";
+import { userBadges, referrals, users as usersTable } from "@shared/schema";
 import { runDailyJob, sendMilestoneEmailIfNeeded } from "./cron";
 
 const uploadDir = path.resolve("uploads");
@@ -1347,6 +1347,32 @@ export async function registerRoutes(
       const url = await getVideoUrl(key);
       res.json({ key, url });
     } catch (err) { next(err); }
+  });
+
+  // ── Referral ──────────────────────────────────────────────────────────────
+  app.get("/api/referral", async (req, res) => {
+    const user = req.user as any;
+    if (!user) return res.status(401).json({ message: "Unauthorized" });
+    try {
+      const rows = await db.select({
+        id: referrals.id,
+        subscribedAt: referrals.subscribedAt,
+        referrerCreditedAt: referrals.referrerCreditedAt,
+        createdAt: referrals.createdAt,
+        referredEmail: usersTable.email,
+      })
+        .from(referrals)
+        .leftJoin(usersTable, eq(referrals.referredUserId, usersTable.id))
+        .where(eq(referrals.referrerId, user.id));
+      res.json({ referralCode: user.referralCode, referrals: rows });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch referrals" });
+    }
+  });
+
+  // /ref/:code — redirect to signup with ref param pre-filled
+  app.get("/ref/:code", (req, res) => {
+    res.redirect(`/auth?ref=${encodeURIComponent(req.params.code)}`);
   });
 
   return httpServer;

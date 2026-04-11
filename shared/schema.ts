@@ -30,6 +30,11 @@ export const users = pgTable("users", {
   coachingLevel: text("coaching_level"), // "youth" | "high_school" | "college" | "pro"
   // Coach trial
   coachTrialStartedAt: timestamp("coach_trial_started_at"),
+  // Free trial
+  trialStartedAt: timestamp("trial_started_at"),
+  // Referral
+  referralCode: text("referral_code").unique(),
+  referredBy: varchar("referred_by").references((): any => users.id, { onDelete: "set null" }),
   // Subscription — tiers: "free" | "player" | "pro" | "coach"
   subscriptionTier: text("subscription_tier").default("free").notNull(),
   stripeCustomerId: text("stripe_customer_id"),
@@ -398,3 +403,16 @@ export const emailLog = pgTable("email_log", {
 }));
 
 export type EmailLog = typeof emailLog.$inferSelect;
+
+export const referrals = pgTable("referrals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  referrerId: varchar("referrer_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  referredUserId: varchar("referred_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  subscribedAt: timestamp("subscribed_at"),
+  referrerCreditedAt: timestamp("referrer_credited_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => ({
+  referrerIdx: index("referrals_referrer_id_idx").on(t.referrerId),
+}));
+
+export type Referral = typeof referrals.$inferSelect;

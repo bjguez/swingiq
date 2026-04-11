@@ -11,6 +11,9 @@ export default function AuthPage() {
   const [, navigate] = useLocation();
   const search = useSearch();
 
+  const searchParams = new URLSearchParams(search);
+  const refCode = searchParams.get("ref") ?? "";
+
   // Store pending invite token from URL so it survives login/registration
   useEffect(() => {
     const params = new URLSearchParams(search);
@@ -70,7 +73,7 @@ export default function AuthPage() {
       return;
     }
     try {
-      await register({ email: registerForm.email, password: registerForm.password });
+      await register({ email: registerForm.email, password: registerForm.password, ...(refCode ? { refCode } : {}) });
       sessionStorage.setItem("pendingVerificationEmail", registerForm.email);
       navigate("/check-email");
     } catch {
@@ -88,7 +91,7 @@ export default function AuthPage() {
 
         {/* Google sign-in */}
         <a
-          href="/api/auth/google"
+          href={`/api/auth/google${refCode ? `?ref=${encodeURIComponent(refCode)}` : ""}`}
           className="flex items-center justify-center gap-3 w-full rounded-lg border border-border bg-card hover:bg-secondary/50 transition-colors px-4 py-2.5 text-sm font-semibold text-foreground"
         >
           <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">

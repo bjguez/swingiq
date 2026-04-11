@@ -8,13 +8,37 @@ import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { storage } from "./storage";
 import { pool, db } from "./db";
-import { insertUserSchema, emailVerifications } from "@shared/schema";
+import { insertUserSchema, emailVerifications, users, referrals } from "@shared/schema";
 import type { User } from "@shared/schema";
 import { sendVerificationEmail } from "./email";
 import { eq, and, gt } from "drizzle-orm";
 import { coachTrialDaysRemaining, ensureCoachTrialStarted } from "./coachAccess";
 
 const scryptAsync = promisify(scrypt);
+
+export const TRIAL_DAYS = 14;
+
+function generateReferralCode(): string {
+  return randomBytes(4).toString("hex").toUpperCase(); // e.g. "A3F2B1C4"
+}
+
+async function applyNewUserBonus(userId: string, refCode?: string | null) {
+  const now = new Date();
+  const updates: Record<string, any> = {
+    trialStartedAt: now,
+    referralCode: generateReferralCode(),
+  };
+
+  if (refCode) {
+    const [referrer] = await db.select().from(users).where(eq(users.referralCode, refCode));
+    if (referrer && referrer.id !== userId) {
+      updates.referredBy = referrer.id;
+      await db.insert(referrals).values({ referrerId: referrer.id, referredUserId: userId });
+    }
+  }
+
+  await db.update(users).set(updates).where(eq(users.id, userId));
+}
 
 async function hashPassword(password: string): Promise<string> {
   const salt = randomBytes(16).toString("hex");
@@ -69,6 +93,15 @@ function serializeUser(user: User) {
     coachingLevel: user.coachingLevel,
     coachTrialStartedAt: user.coachTrialStartedAt ?? null,
     coachTrialDaysRemaining: user.accountType === "coach" ? coachTrialDaysRemaining(user) : null,
+    trialStartedAt: user.trialStartedAt ?? null,
+    trialDaysRemaining: (() => {
+      if (!user.trialStartedAt) return null;
+      const end = new Date(user.trialStartedAt);
+      end.setDate(end.getDate() + TRIAL_DAYS);
+      const days = Math.ceil((end.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+      return days > 0 ? days : 0;
+    })(),
+    referralCode: user.referralCode ?? null,
   };
 }
 
@@ -159,6 +192,8 @@ export function setupAuth(app: Express) {
             emailVerified: !!email,
             password: null,
           }) ?? created;
+          // Mark as new so the callback can apply trial + referral bonus
+          (user as any).__isNewGoogleUser = true;
           return done(null, user);
         } catch (err) {
           return done(err as Error);
@@ -180,7 +215,9 @@ export function setupAuth(app: Express) {
 
   // Google OAuth routes
   app.get("/api/auth/google", (req, res, next) => {
-    const state = (req.query.invite as string) ?? "";
+    const invite = (req.query.invite as string) ?? "";
+    const ref = (req.query.ref as string) ?? "";
+    const state = JSON.stringify({ invite, ref });
     passport.authenticate("google", {
       scope: ["profile", "email"],
       state,
@@ -190,11 +227,14 @@ export function setupAuth(app: Express) {
   app.get("/api/auth/google/callback", (req, res, next) => {
     passport.authenticate("google", { failureRedirect: "/auth?error=google" }, (err, user) => {
       if (err || !user) return res.redirect("/auth?error=google");
-      req.login(user, (loginErr) => {
+      req.login(user, async (loginErr) => {
         if (loginErr) return next(loginErr);
-        // If a pending invite token was passed via state, store it for the client to pick up
-        const state = req.query.state as string;
-        if (state) res.cookie("pendingInviteToken", state, { httpOnly: false, maxAge: 5 * 60 * 1000 });
+        let stateData: { invite?: string; ref?: string } = {};
+        try { stateData = JSON.parse(req.query.state as string); } catch {}
+        if (stateData.invite) res.cookie("pendingInviteToken", stateData.invite, { httpOnly: false, maxAge: 5 * 60 * 1000 });
+        if ((user as any).__isNewGoogleUser) {
+          await applyNewUserBonus(user.id, stateData.ref || null);
+        }
         // New users (no profile) go to onboarding; returning users go home
         const destination = user.profileComplete ? "/" : "/onboarding?google=1";
         res.redirect(destination);
@@ -219,6 +259,7 @@ export function setupAuth(app: Express) {
       if (!parsed.success) return res.status(400).json({ message: "Invalid registration data" });
 
       const { password, email } = parsed.data;
+      const refCode = typeof req.body.refCode === "string" ? req.body.refCode.trim().toUpperCase() : null;
 
       if (!email) return res.status(400).json({ message: "Email is required" });
       if (!password) return res.status(400).json({ message: "Password is required" });
@@ -239,6 +280,8 @@ export function setupAuth(app: Express) {
         password: await hashPassword(password),
         email: email.toLowerCase(),
       });
+
+      await applyNewUserBonus(user.id, refCode);
 
       // Send verification email (non-blocking — don't fail registration if email fails)
       try {

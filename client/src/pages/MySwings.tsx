@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -8,7 +8,7 @@ import { VideoLibraryModal } from "@/components/VideoLibraryModal";
 import { UserVideoCard } from "@/components/UserVideoCard";
 import {
   Trash2, Upload, Film, Search, Brain, BookOpen, Dna, Users,
-  ChevronRight, Trophy, Lock, Star, MapPin, Eye, Target, Sparkles,
+  ChevronRight, Trophy, Lock, Star, MapPin, Eye, Target, Sparkles, Copy, Gift, Check,
 } from "lucide-react";
 import {
   LineChart, Line, XAxis, YAxis, Tooltip as ChartTooltip, ResponsiveContainer,
@@ -374,6 +374,12 @@ export default function MySwings() {
     enabled: !!user,
   });
   const combinedStreak: number = streakData?.streak ?? 0;
+
+  const { data: referralData } = useQuery({
+    queryKey: ["/api/referral"],
+    queryFn: () => fetch("/api/referral").then(r => r.json()),
+    enabled: !!user,
+  });
 
   const latestCognition = cognitionSessions[0] ?? null;
   const autoComps = comps.filter(c => c.compType === "auto").sort((a, b) => (a.rank ?? 99) - (b.rank ?? 99));
@@ -965,6 +971,59 @@ export default function MySwings() {
         </div>
       )}
 
+      {/* ── Referral ── */}
+      {referralData?.referralCode && (
+        <div className="border-t border-border pt-6 space-y-4">
+          <SectionDivider
+            icon={<Gift className="w-3.5 h-3.5" />}
+            title="Refer a Friend"
+          />
+          <div className="bg-card border border-border rounded-xl p-4 space-y-4">
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Share your link. When a friend signs up and subscribes, you get <span className="text-foreground font-semibold">1 free month</span> automatically applied to your next invoice.
+            </p>
+            <ReferralLinkCopy code={referralData.referralCode} />
+            {referralData.referrals?.length > 0 && (
+              <div className="space-y-2 pt-2 border-t border-border">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Your Referrals</p>
+                <div className="space-y-1">
+                  {referralData.referrals.map((r: any) => (
+                    <div key={r.id} className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground truncate">{r.referredEmail ?? "—"}</span>
+                      <span className={`text-xs font-semibold shrink-0 ml-2 ${r.referrerCreditedAt ? "text-green-400" : r.subscribedAt ? "text-primary" : "text-muted-foreground"}`}>
+                        {r.referrerCreditedAt ? "Credited" : r.subscribedAt ? "Subscribed" : "Pending"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
     </Layout>
+  );
+}
+
+function ReferralLinkCopy({ code }: { code: string }) {
+  const [copied, setCopied] = useState(false);
+  const referralUrl = `${window.location.origin}/ref/${code}`;
+  const copy = useCallback(() => {
+    navigator.clipboard.writeText(referralUrl).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }, [referralUrl]);
+  return (
+    <div className="flex items-center gap-2">
+      <div className="flex-1 min-w-0 bg-secondary rounded-lg px-3 py-2 text-sm font-mono text-muted-foreground truncate">
+        {referralUrl}
+      </div>
+      <Button size="sm" variant="outline" onClick={copy} className="shrink-0 gap-1.5">
+        {copied ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+        {copied ? "Copied" : "Copy"}
+      </Button>
+    </div>
   );
 }

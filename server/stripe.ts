@@ -1,7 +1,8 @@
 import Stripe from "stripe";
 import { db } from "./db";
-import { users } from "../shared/schema";
-import { eq } from "drizzle-orm";
+import { users, referrals } from "../shared/schema";
+import { eq, and, isNull } from "drizzle-orm";
+import { TRIAL_DAYS } from "./auth";
 
 export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
   apiVersion: "2026-02-25.clover",
@@ -42,6 +43,16 @@ export async function createCheckoutSession(
     await db.update(users).set({ stripeCustomerId: customerId }).where(eq(users.id, userId));
   }
 
+  // Apply trial if user is within TRIAL_DAYS of signing up
+  let trialEnd: number | undefined;
+  if (user.trialStartedAt) {
+    const trialEndDate = new Date(user.trialStartedAt);
+    trialEndDate.setDate(trialEndDate.getDate() + TRIAL_DAYS);
+    if (trialEndDate > new Date()) {
+      trialEnd = Math.floor(trialEndDate.getTime() / 1000);
+    }
+  }
+
   const session = await stripe.checkout.sessions.create({
     customer: customerId,
     mode: "subscription",
@@ -49,7 +60,10 @@ export async function createCheckoutSession(
     success_url: `${APP_URL}/?upgraded=1`,
     cancel_url: `${APP_URL}/pricing`,
     metadata: { userId },
-    subscription_data: { metadata: { userId } },
+    subscription_data: {
+      metadata: { userId },
+      ...(trialEnd ? { trial_end: trialEnd } : {}),
+    },
   });
 
   return session.url!;
@@ -94,6 +108,30 @@ export async function handleWebhook(payload: Buffer, sig: string): Promise<void>
         subscriptionTier: tier,
         subscriptionStatus: subscription.status,
       }).where(eq(users.id, userId));
+
+      // Credit referrer with 1 free month if this user was referred
+      try {
+        const [referral] = await db.select().from(referrals)
+          .where(and(eq(referrals.referredUserId, userId), isNull(referrals.referrerCreditedAt)));
+        if (referral) {
+          const [referrer] = await db.select().from(users).where(eq(users.id, referral.referrerId));
+          if (referrer?.stripeCustomerId) {
+            // Get one month's price in cents from the subscription
+            const unitAmount = subscription.items.data[0].price.unit_amount ?? 0;
+            if (unitAmount > 0) {
+              await stripe.customers.update(referrer.stripeCustomerId, {
+                balance: (await stripe.customers.retrieve(referrer.stripeCustomerId) as Stripe.Customer).balance - unitAmount,
+              });
+            }
+          }
+          await db.update(referrals).set({
+            subscribedAt: new Date(),
+            referrerCreditedAt: new Date(),
+          }).where(eq(referrals.id, referral.id));
+        }
+      } catch (refErr) {
+        console.error("Referral credit error:", refErr);
+      }
       break;
     }
 
