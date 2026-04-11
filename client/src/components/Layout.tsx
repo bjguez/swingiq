@@ -92,6 +92,7 @@ export default function Layout({ children, showScoreTicker = false }: { children
     { section: "Account", links: [
       { href: "/onboarding", label: "Edit Profile" },
       { href: "/pricing", label: "Upgrade Plan" },
+      { href: "/my-studio#referral", label: "Refer a Friend" },
     ]},
   ];
 
