@@ -326,19 +326,13 @@ function BoxScoreView({ box, loading, onBack }: { box?: BoxScore; loading: boole
 
 // ── Hot Hitters ───────────────────────────────────────────────────────────────
 
-const RECENT_STAT_LABELS: Record<string, string> = {
-  hits: "Hits",
-  homeRuns: "HR",
-  runsBattedIn: "RBI",
-  stolenBases: "SB",
-};
-
-const SEASON_STAT_LABELS: Record<string, string> = {
+const STAT_LABELS: Record<string, string> = {
   battingAverage: "AVG",
   homeRuns: "HR",
   onBasePlusSlugging: "OPS",
   hits: "H",
   runsBattedIn: "RBI",
+  stolenBases: "SB",
 };
 
 function LeaderList({ leaders, isLoading }: { leaders: Leader[]; isLoading: boolean }) {
@@ -366,18 +360,9 @@ function LeaderList({ leaders, isLoading }: { leaders: Leader[]; isLoading: bool
 }
 
 function HotHittersTab() {
-  const [mode, setMode] = useState<"recent" | "season">("recent");
-  const [days, setDays] = useState(7);
-  const [activeStat, setActiveStat] = useState("hits");
-  const [seasonStat, setSeasonStat] = useState("battingAverage");
+  const [activeStat, setActiveStat] = useState("battingAverage");
 
-  const { data: recentData, isLoading: recentLoading } = useQuery<{ days: number; result: Record<string, Leader[]> }>({
-    queryKey: ["/api/mlb/leaders/recent", days],
-    queryFn: () => fetch(`/api/mlb/leaders/recent?days=${days}`).then(r => r.json()),
-    staleTime: 5 * 60 * 1000,
-  });
-
-  const { data: seasonData, isLoading: seasonLoading } = useQuery<Record<string, Leader[]>>({
+  const { data, isLoading } = useQuery<Record<string, Leader[]>>({
     queryKey: ["/api/mlb/leaders/season"],
     queryFn: () => fetch("/api/mlb/leaders/season").then(r => r.json()),
     staleTime: 10 * 60 * 1000,
@@ -385,61 +370,16 @@ function HotHittersTab() {
 
   return (
     <div className="space-y-4">
-      {/* Mode toggle */}
-      <div className="flex gap-2">
-        <button
-          onClick={() => setMode("recent")}
-          className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-colors ${mode === "recent" ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground hover:text-foreground"}`}
-        >
-          🔥 Hot Right Now
-        </button>
-        <button
-          onClick={() => setMode("season")}
-          className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-colors ${mode === "season" ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground hover:text-foreground"}`}
-        >
-          Season Leaders
-        </button>
+      <p className="text-xs text-muted-foreground">Qualified batters — {new Date().getFullYear()} season</p>
+      <div className="flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none]">
+        {Object.entries(STAT_LABELS).map(([stat, label]) => (
+          <button key={stat} onClick={() => setActiveStat(stat)}
+            className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${activeStat === stat ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground hover:text-foreground"}`}>
+            {label}
+          </button>
+        ))}
       </div>
-
-      {mode === "recent" && (
-        <>
-          {/* Day selector */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">Last</span>
-            {[7, 14, 30].map(d => (
-              <button key={d} onClick={() => setDays(d)}
-                className={`px-2.5 py-1 rounded text-xs font-semibold transition-colors ${days === d ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground hover:text-foreground"}`}>
-                {d}d
-              </button>
-            ))}
-          </div>
-          {/* Stat tabs */}
-          <div className="flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none]">
-            {Object.entries(RECENT_STAT_LABELS).map(([stat, label]) => (
-              <button key={stat} onClick={() => setActiveStat(stat)}
-                className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${activeStat === stat ? "bg-secondary text-foreground border border-border" : "text-muted-foreground hover:text-foreground"}`}>
-                {label}
-              </button>
-            ))}
-          </div>
-          <LeaderList leaders={recentData?.result?.[activeStat] ?? []} isLoading={recentLoading} />
-        </>
-      )}
-
-      {mode === "season" && (
-        <>
-          <p className="text-xs text-muted-foreground">Qualified batters — {new Date().getFullYear()} season</p>
-          <div className="flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none]">
-            {Object.entries(SEASON_STAT_LABELS).map(([stat, label]) => (
-              <button key={stat} onClick={() => setSeasonStat(stat)}
-                className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${seasonStat === stat ? "bg-secondary text-foreground border border-border" : "text-muted-foreground hover:text-foreground"}`}>
-                {label}
-              </button>
-            ))}
-          </div>
-          <LeaderList leaders={(seasonData as any)?.[seasonStat] ?? []} isLoading={seasonLoading} />
-        </>
-      )}
+      <LeaderList leaders={(data as any)?.[activeStat] ?? []} isLoading={isLoading} />
     </div>
   );
 }
