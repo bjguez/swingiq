@@ -82,7 +82,6 @@ function Router() {
       <Route path="/verify" component={VerifyEmailPage} />
       <Route path="/about" component={AboutPage} />
       <Route path="/terms" component={TermsPage} />
-      <Route path="/statdle" component={StudioStatdle} />
       <Route path="/gameday" component={GamedayPage} />
       <Route path="/cognition" component={VisionTraining} />
       <Route path="/acuity" component={Acuity} />

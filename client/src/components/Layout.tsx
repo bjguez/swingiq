@@ -82,9 +82,9 @@ export default function Layout({ children, showScoreTicker = false }: { children
       { href: "/enhance?tab=discipline", label: "Discipline" },
       { href: "/enhance?tab=confidence", label: "Confidence" },
     ]},
-    { section: "Games", links: [
-      { href: "/gameday", label: "Gameday" },
-      { href: "/statdle", label: "StudioStatdle" },
+    { section: "Gameday", links: [
+      { href: "/gameday", label: "Scoreboard" },
+      { href: "/gameday?tab=hitters", label: "Hot Hitters" },
     ]},
     { section: "Company", links: [
       { href: "/about", label: "About" },

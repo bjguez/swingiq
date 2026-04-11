@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, TrendingUp, Tv2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePageMeta } from "@/hooks/use-page-meta";
+import { useSearch } from "wouter";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -449,7 +450,9 @@ type Tab = "scoreboard" | "hitters";
 
 export default function GamedayPage() {
   usePageMeta({ title: "Gameday" });
-  const [tab, setTab] = useState<Tab>("scoreboard");
+  const search = useSearch();
+  const initialTab = new URLSearchParams(search).get("tab") === "hitters" ? "hitters" : "scoreboard";
+  const [tab, setTab] = useState<Tab>(initialTab);
 
   return (
     <Layout>
