@@ -1,11 +1,22 @@
 import { useState } from "react";
 import Layout from "@/components/Layout";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, Trophy, TrendingUp, Tv2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, TrendingUp, Tv2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePageMeta } from "@/hooks/use-page-meta";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
+
+type TeamInfo = {
+  teamId: number;
+  team: string;
+  abbrev: string;
+  score: number;
+  wins: number;
+  losses: number;
+  isWinner: boolean;
+  pitcher: string | null;
+};
 
 type GameSummary = {
   gamePk: number;
@@ -13,8 +24,9 @@ type GameSummary = {
   detailedState: string;
   inning: string | null;
   inningState: string | null;
-  away: { team: string; abbrev: string; score: number; wins: number; losses: number };
-  home: { team: string; abbrev: string; score: number; wins: number; losses: number };
+  isTopInning: boolean | null;
+  away: TeamInfo;
+  home: TeamInfo;
   gameTime: string;
 };
 
@@ -37,6 +49,23 @@ type BoxScore = {
 
 type Leader = { rank: number; value: string; name: string; team: string; teamAbbrev: string };
 
+// ── ESPN logo CDN — maps MLB team ID to ESPN slug ─────────────────────────────
+
+const ESPN_SLUG: Record<number, string> = {
+  108: "laa", 109: "ari", 110: "bal", 111: "bos", 112: "chc",
+  113: "cin", 114: "cle", 115: "col", 116: "det", 117: "hou",
+  118: "kc",  119: "lad", 120: "wsh", 121: "nym", 133: "oak",
+  134: "pit",  135: "sd",  136: "sea", 137: "sf",  138: "stl",
+  139: "tb",  140: "tex", 141: "tor", 142: "min", 143: "phi",
+  144: "atl", 145: "cws", 146: "mia", 147: "nyy", 158: "mil",
+};
+
+function teamLogo(teamId: number) {
+  const slug = ESPN_SLUG[teamId];
+  if (!slug) return null;
+  return `https://a.espncdn.com/i/teamlogos/mlb/500/${slug}.png`;
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function dateStr(d: Date) {
@@ -50,6 +79,82 @@ function formatGameTime(iso: string) {
   try {
     return new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZoneName: "short" });
   } catch { return ""; }
+}
+
+// ── Game Card ─────────────────────────────────────────────────────────────────
+
+function GameCard({ game, onClick }: { game: GameSummary; onClick: () => void }) {
+  const isLive = game.status === "Live";
+  const isFinal = game.status === "Final";
+  const isPreview = game.status === "Preview";
+
+  function TeamRow({ t, opponent, isTop }: { t: TeamInfo; opponent: TeamInfo; isTop: boolean }) {
+    const logoUrl = teamLogo(t.teamId);
+    const winning = isFinal ? t.isWinner : (isLive && t.score > opponent.score);
+    return (
+      <div className={`flex items-center gap-3 py-2.5 px-4 ${isTop ? "border-b border-border/50" : ""}`}>
+        {/* Logo */}
+        <div className="w-8 h-8 shrink-0 flex items-center justify-center">
+          {logoUrl
+            ? <img src={logoUrl} alt={t.abbrev} className="w-8 h-8 object-contain" />
+            : <span className="text-xs font-bold text-muted-foreground">{t.abbrev}</span>
+          }
+        </div>
+        {/* Name + record */}
+        <div className="flex-1 min-w-0">
+          <p className={`text-sm font-bold truncate ${winning ? "text-foreground" : "text-muted-foreground"}`}>
+            {t.abbrev}
+          </p>
+          <p className="text-[10px] text-muted-foreground">{t.wins}-{t.losses}</p>
+        </div>
+        {/* Score */}
+        {!isPreview && (
+          <span className={`text-xl font-bold tabular-nums w-7 text-right ${winning ? "text-foreground" : "text-muted-foreground"}`}>
+            {t.score}
+          </span>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <button
+      onClick={onClick}
+      className="bg-card border border-border rounded-xl overflow-hidden hover:border-primary/40 transition-colors text-left w-full flex flex-col"
+    >
+      {/* Status bar */}
+      <div className="flex items-center justify-between px-4 pt-3 pb-1">
+        {isLive ? (
+          <div className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse shrink-0" />
+            <span className="text-xs font-bold text-green-400">
+              {game.isTopInning ? "▲" : "▼"} {game.inning}
+            </span>
+          </div>
+        ) : isFinal ? (
+          <span className="text-xs font-semibold text-muted-foreground">Final</span>
+        ) : (
+          <span className="text-xs text-muted-foreground">{formatGameTime(game.gameTime)}</span>
+        )}
+        <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/50" />
+      </div>
+
+      {/* Teams */}
+      <div className="flex-1">
+        <TeamRow t={game.away} opponent={game.home} isTop={true} />
+        <TeamRow t={game.home} opponent={game.away} isTop={false} />
+      </div>
+
+      {/* Pitcher line */}
+      {(game.away.pitcher || game.home.pitcher) && (
+        <div className="px-4 py-2 border-t border-border/50 flex gap-3 text-[10px] text-muted-foreground">
+          <span className="truncate">{game.away.abbrev}: {game.away.pitcher ?? "TBD"}</span>
+          <span className="text-border/80">·</span>
+          <span className="truncate">{game.home.abbrev}: {game.home.pitcher ?? "TBD"}</span>
+        </div>
+      )}
+    </button>
+  );
 }
 
 // ── Scoreboard ────────────────────────────────────────────────────────────────
@@ -79,7 +184,7 @@ function ScoreboardTab() {
 
   const displayDate = new Date(date + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
 
-  if (selectedGame && boxScore) {
+  if (selectedGame) {
     return <BoxScoreView box={boxScore} loading={boxLoading} onBack={() => setSelectedGame(null)} />;
   }
 
@@ -93,9 +198,9 @@ function ScoreboardTab() {
       </div>
 
       {isLoading && (
-        <div className="space-y-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {[...Array(6)].map((_, i) => (
-            <div key={i} className="h-16 bg-card border border-border rounded-xl animate-pulse" />
+            <div key={i} className="h-36 bg-card border border-border rounded-xl animate-pulse" />
           ))}
         </div>
       )}
@@ -104,56 +209,9 @@ function ScoreboardTab() {
         <p className="text-center text-muted-foreground py-12 text-sm">No games scheduled for this date.</p>
       )}
 
-      <div className="space-y-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {data?.games.map(game => (
-          <button
-            key={game.gamePk}
-            onClick={() => setSelectedGame(game.gamePk)}
-            className="w-full bg-card border border-border rounded-xl px-4 py-3 flex items-center gap-4 hover:border-primary/40 transition-colors text-left"
-          >
-            {/* Status */}
-            <div className="w-20 shrink-0 text-center">
-              {game.status === "Live" ? (
-                <div className="space-y-0.5">
-                  <span className="text-xs font-bold text-green-400 block">LIVE</span>
-                  <span className="text-[10px] text-muted-foreground">{game.inning} {game.inningState}</span>
-                </div>
-              ) : game.status === "Final" ? (
-                <span className="text-xs font-semibold text-muted-foreground">Final</span>
-              ) : (
-                <span className="text-xs text-muted-foreground">{formatGameTime(game.gameTime)}</span>
-              )}
-            </div>
-
-            {/* Away */}
-            <div className="flex-1 flex items-center justify-between">
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-2">
-                  <span className={`text-sm font-bold w-8 ${game.status === "Final" && game.away.score > game.home.score ? "text-foreground" : "text-muted-foreground"}`}>
-                    {game.away.abbrev}
-                  </span>
-                  <span className="text-[10px] text-muted-foreground">({game.away.wins}-{game.away.losses})</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className={`text-sm font-bold w-8 ${game.status === "Final" && game.home.score > game.away.score ? "text-foreground" : "text-muted-foreground"}`}>
-                    {game.home.abbrev}
-                  </span>
-                  <span className="text-[10px] text-muted-foreground">({game.home.wins}-{game.home.losses})</span>
-                </div>
-              </div>
-              {game.status !== "Preview" && (
-                <div className="space-y-1.5 text-right">
-                  <div className={`text-sm font-bold ${game.status === "Final" && game.away.score > game.home.score ? "text-foreground" : "text-muted-foreground"}`}>
-                    {game.away.score}
-                  </div>
-                  <div className={`text-sm font-bold ${game.status === "Final" && game.home.score > game.away.score ? "text-foreground" : "text-muted-foreground"}`}>
-                    {game.home.score}
-                  </div>
-                </div>
-              )}
-            </div>
-            <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
-          </button>
+          <GameCard key={game.gamePk} game={game} onClick={() => setSelectedGame(game.gamePk)} />
         ))}
       </div>
     </div>
@@ -162,12 +220,20 @@ function ScoreboardTab() {
 
 // ── Box Score ─────────────────────────────────────────────────────────────────
 
-function BoxScoreView({ box, loading, onBack }: { box: BoxScore; loading: boolean; onBack: () => void }) {
+function BoxScoreView({ box, loading, onBack }: { box?: BoxScore; loading: boolean; onBack: () => void }) {
   const [side, setSide] = useState<"away" | "home">("away");
+
+  if (loading || !box) return (
+    <div className="space-y-3">
+      <Button variant="ghost" size="sm" onClick={onBack} className="gap-1 -ml-2 text-muted-foreground">
+        <ChevronLeft className="w-4 h-4" /> Back
+      </Button>
+      <div className="h-40 bg-card border border-border rounded-xl animate-pulse" />
+    </div>
+  );
+
   const team = box[side];
   const ls = box.linescore;
-
-  if (loading) return <div className="h-40 bg-card border border-border rounded-xl animate-pulse" />;
 
   return (
     <div className="space-y-4">
@@ -281,7 +347,6 @@ function HotHittersTab() {
 
   return (
     <div className="space-y-4">
-      {/* Stat tabs */}
       <div className="flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none]">
         {stats.map(stat => (
           <button
@@ -334,7 +399,7 @@ export default function GamedayPage() {
 
   return (
     <Layout>
-      <div className="max-w-2xl mx-auto w-full space-y-4">
+      <div className="max-w-5xl mx-auto w-full space-y-4">
         {/* Header */}
         <div className="flex items-center gap-2">
           <Tv2 className="w-5 h-5 text-primary" />
@@ -342,7 +407,7 @@ export default function GamedayPage() {
         </div>
 
         {/* Tab bar */}
-        <div className="flex gap-2 border-b border-border pb-0">
+        <div className="flex gap-2 border-b border-border">
           <button
             onClick={() => setTab("scoreboard")}
             className={`pb-2 text-sm font-semibold transition-colors border-b-2 -mb-px ${tab === "scoreboard" ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}

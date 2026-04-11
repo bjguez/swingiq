@@ -15,7 +15,7 @@ export function setupMlbRoutes(app: Express) {
     try {
       const date = (req.query.date as string) || new Date().toISOString().split("T")[0];
       const data = await mlbFetch(
-        `/v1/schedule?sportId=1&date=${date}&hydrate=linescore`
+        `/v1/schedule?sportId=1&date=${date}&hydrate=linescore,probablePitcher`
       );
       const games = (data.dates?.[0]?.games ?? []).map((g: any) => ({
         gamePk: g.gamePk,
@@ -23,19 +23,26 @@ export function setupMlbRoutes(app: Express) {
         detailedState: g.status?.detailedState,
         inning: g.linescore?.currentInningOrdinal ?? null,
         inningState: g.linescore?.inningState ?? null,
+        isTopInning: g.linescore?.isTopInning ?? null,
         away: {
+          teamId: g.teams.away.team.id,
           team: g.teams.away.team.name,
           abbrev: g.teams.away.team.abbreviation ?? g.teams.away.team.name.substring(0, 3).toUpperCase(),
           score: g.teams.away.score ?? 0,
           wins: g.teams.away.leagueRecord?.wins,
           losses: g.teams.away.leagueRecord?.losses,
+          isWinner: g.teams.away.isWinner ?? false,
+          pitcher: g.teams.away.probablePitcher?.fullName ?? null,
         },
         home: {
+          teamId: g.teams.home.team.id,
           team: g.teams.home.team.name,
           abbrev: g.teams.home.team.abbreviation ?? g.teams.home.team.name.substring(0, 3).toUpperCase(),
           score: g.teams.home.score ?? 0,
           wins: g.teams.home.leagueRecord?.wins,
           losses: g.teams.home.leagueRecord?.losses,
+          isWinner: g.teams.home.isWinner ?? false,
+          pitcher: g.teams.home.probablePitcher?.fullName ?? null,
         },
         gameTime: g.gameDate,
       }));
