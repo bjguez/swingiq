@@ -1050,7 +1050,7 @@ function ReferralLinkCopy({ code }: { code: string }) {
         </Button>
       </div>
       {canShare && (
-        <Button size="sm" className="w-full gap-2 bg-primary text-primary-foreground hover:bg-primary/90" onClick={share}>
+        <Button size="sm" className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90" onClick={share}>
           <Share2 className="w-3.5 h-3.5" />
           Share Link
         </Button>
