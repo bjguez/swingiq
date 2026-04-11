@@ -139,8 +139,13 @@ export function setupMlbRoutes(app: Express) {
   // ── Today's top performers — aggregate box scores for live/final games ──────
   app.get("/api/mlb/performers/today", async (req, res) => {
     try {
-      const now = new Date();
-      const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+      // Use Eastern time — MLB schedules games by ET
+      const etParts = new Intl.DateTimeFormat("en-US", {
+        timeZone: "America/New_York",
+        year: "numeric", month: "2-digit", day: "2-digit",
+      }).formatToParts(new Date());
+      const et = Object.fromEntries(etParts.filter(p => p.type !== "literal").map(p => [p.type, p.value]));
+      const date = `${et.year}-${et.month}-${et.day}`;
       const schedule = await mlbFetch(`/v1/schedule?sportId=1&date=${date}&hydrate=linescore`);
       const games: any[] = schedule.dates?.[0]?.games ?? [];
 
