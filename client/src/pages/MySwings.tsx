@@ -8,7 +8,7 @@ import { VideoLibraryModal } from "@/components/VideoLibraryModal";
 import { UserVideoCard } from "@/components/UserVideoCard";
 import {
   Trash2, Upload, Film, Search, Brain, BookOpen, Dna, Users,
-  ChevronRight, Trophy, Lock, Star, MapPin, Eye, Target, Sparkles, Copy, Gift, Check,
+  ChevronRight, Trophy, Lock, Star, MapPin, Eye, Target, Sparkles, Copy, Gift, Check, Share2,
 } from "lucide-react";
 import {
   LineChart, Line, XAxis, YAxis, Tooltip as ChartTooltip, ResponsiveContainer,
@@ -1012,21 +1012,40 @@ export default function MySwings() {
 function ReferralLinkCopy({ code }: { code: string }) {
   const [copied, setCopied] = useState(false);
   const referralUrl = `${window.location.origin}/ref/${code}`;
+  const canShare = typeof navigator !== "undefined" && !!navigator.share;
+
   const copy = useCallback(() => {
     navigator.clipboard.writeText(referralUrl).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
   }, [referralUrl]);
+
+  const share = useCallback(() => {
+    navigator.share({
+      title: "Join me on Swing Studio",
+      text: "I've been using Swing Studio to analyze my swing and train smarter. Use my link to get a free 14-day trial:",
+      url: referralUrl,
+    }).catch(() => {});
+  }, [referralUrl]);
+
   return (
-    <div className="flex items-center gap-2">
-      <div className="flex-1 min-w-0 bg-secondary rounded-lg px-3 py-2 text-sm font-mono text-muted-foreground truncate">
-        {referralUrl}
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <div className="flex-1 min-w-0 bg-secondary rounded-lg px-3 py-2 text-sm font-mono text-muted-foreground truncate">
+          {referralUrl}
+        </div>
+        <Button size="sm" variant="outline" onClick={copy} className="shrink-0 gap-1.5">
+          {copied ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+          {copied ? "Copied" : "Copy"}
+        </Button>
       </div>
-      <Button size="sm" variant="outline" onClick={copy} className="shrink-0 gap-1.5">
-        {copied ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
-        {copied ? "Copied" : "Copy"}
-      </Button>
+      {canShare && (
+        <Button size="sm" className="w-full gap-2 bg-primary text-primary-foreground hover:bg-primary/90" onClick={share}>
+          <Share2 className="w-3.5 h-3.5" />
+          Share Link
+        </Button>
+      )}
     </div>
   );
 }
