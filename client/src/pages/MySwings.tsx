@@ -986,7 +986,7 @@ export default function MySwings() {
               ? <ReferralLinkCopy code={referralData.referralCode} />
               : <div className="h-9 bg-secondary rounded-lg animate-pulse" />
             }
-            {referralData.referrals?.length > 0 && (
+            {referralData?.referrals?.length > 0 && (
               <div className="space-y-2 pt-2 border-t border-border">
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Your Referrals</p>
                 <div className="space-y-1">
