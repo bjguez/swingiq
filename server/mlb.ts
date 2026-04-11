@@ -104,22 +104,51 @@ export function setupMlbRoutes(app: Express) {
     }
   });
 
-  // ── Season batting leaders ────────────────────────────────────────────────
-  app.get("/api/mlb/leaders", async (req, res) => {
+  // ── Hot hitters — recent counting stats (no sample-size issues) ──────────
+  app.get("/api/mlb/leaders/recent", async (req, res) => {
     try {
+      const days = Math.min(parseInt((req.query.days as string) || "7", 10), 30);
       const season = new Date().getFullYear();
+      const end = new Date();
+      const start = new Date();
+      start.setDate(end.getDate() - days);
+      const fmt = (d: Date) => {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        return `${y}-${m}-${day}`;
+      };
       const data = await mlbFetch(
-        `/v1/stats/leaders?leaderCategories=battingAverage,homeRuns,onBasePlusSlugging,hits,runsBattedIn&season=${season}&sportId=1&limit=10&playerPool=Qualified`
+        `/v1/stats/leaders?leaderCategories=hits,homeRuns,runsBattedIn,stolenBases` +
+        `&season=${season}&sportId=1&limit=10&playerPool=All&statGroup=hitting` +
+        `&startDate=${fmt(start)}&endDate=${fmt(end)}`
       );
       const result: Record<string, any[]> = {};
       for (const cat of (data.leagueLeaders ?? [])) {
-        result[cat.leaderCategory] = (cat.leaders ?? []).map((l: any) => ({
-          rank: l.rank,
-          value: l.value,
-          name: l.person?.fullName,
-          team: l.team?.name,
-          teamAbbrev: l.team?.abbreviation,
-          personId: l.person?.id,
+        result[cat.leaderCategory] = (cat.leaders ?? []).slice(0, 10).map((l: any) => ({
+          rank: l.rank, value: l.value,
+          name: l.person?.fullName, team: l.team?.name, teamAbbrev: l.team?.abbreviation,
+        }));
+      }
+      res.json({ days, result });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── Season leaders — rate stats with qualified pool ───────────────────────
+  app.get("/api/mlb/leaders/season", async (req, res) => {
+    try {
+      const season = new Date().getFullYear();
+      const data = await mlbFetch(
+        `/v1/stats/leaders?leaderCategories=battingAverage,homeRuns,onBasePlusSlugging,hits,runsBattedIn` +
+        `&season=${season}&sportId=1&limit=10&playerPool=Qualified`
+      );
+      const result: Record<string, any[]> = {};
+      for (const cat of (data.leagueLeaders ?? [])) {
+        result[cat.leaderCategory] = (cat.leaders ?? []).slice(0, 10).map((l: any) => ({
+          rank: l.rank, value: l.value,
+          name: l.person?.fullName, team: l.team?.name, teamAbbrev: l.team?.abbreviation,
         }));
       }
       res.json(result);

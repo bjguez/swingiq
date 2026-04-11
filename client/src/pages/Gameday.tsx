@@ -325,7 +325,14 @@ function BoxScoreView({ box, loading, onBack }: { box?: BoxScore; loading: boole
 
 // ── Hot Hitters ───────────────────────────────────────────────────────────────
 
-const STAT_LABELS: Record<string, string> = {
+const RECENT_STAT_LABELS: Record<string, string> = {
+  hits: "Hits",
+  homeRuns: "HR",
+  runsBattedIn: "RBI",
+  stolenBases: "SB",
+};
+
+const SEASON_STAT_LABELS: Record<string, string> = {
   battingAverage: "AVG",
   homeRuns: "HR",
   onBasePlusSlugging: "OPS",
@@ -333,58 +340,105 @@ const STAT_LABELS: Record<string, string> = {
   runsBattedIn: "RBI",
 };
 
-function HotHittersTab() {
-  const [activeStat, setActiveStat] = useState("battingAverage");
+function LeaderList({ leaders, isLoading }: { leaders: Leader[]; isLoading: boolean }) {
+  if (isLoading) return (
+    <div className="space-y-2">
+      {[...Array(10)].map((_, i) => <div key={i} className="h-14 bg-card border border-border rounded-xl animate-pulse" />)}
+    </div>
+  );
+  return (
+    <div className="space-y-2">
+      {leaders.map((l, i) => (
+        <div key={i} className="bg-card border border-border rounded-xl px-4 py-3 flex items-center gap-3">
+          <span className={`text-sm font-bold w-5 shrink-0 ${i === 0 ? "text-yellow-400" : i === 1 ? "text-slate-400" : i === 2 ? "text-amber-600" : "text-muted-foreground"}`}>
+            {l.rank}
+          </span>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold truncate">{l.name}</p>
+            <p className="text-xs text-muted-foreground">{l.team}</p>
+          </div>
+          <span className="text-lg font-bold text-primary shrink-0">{l.value}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
 
-  const { data, isLoading } = useQuery<Record<string, Leader[]>>({
-    queryKey: ["/api/mlb/leaders"],
-    queryFn: () => fetch("/api/mlb/leaders").then(r => r.json()),
+function HotHittersTab() {
+  const [mode, setMode] = useState<"recent" | "season">("recent");
+  const [days, setDays] = useState(7);
+  const [activeStat, setActiveStat] = useState("hits");
+  const [seasonStat, setSeasonStat] = useState("battingAverage");
+
+  const { data: recentData, isLoading: recentLoading } = useQuery<{ days: number; result: Record<string, Leader[]> }>({
+    queryKey: ["/api/mlb/leaders/recent", days],
+    queryFn: () => fetch(`/api/mlb/leaders/recent?days=${days}`).then(r => r.json()),
     staleTime: 5 * 60 * 1000,
   });
 
-  const stats = Object.keys(STAT_LABELS);
-  const leaders = data?.[activeStat] ?? [];
+  const { data: seasonData, isLoading: seasonLoading } = useQuery<Record<string, Leader[]>>({
+    queryKey: ["/api/mlb/leaders/season"],
+    queryFn: () => fetch("/api/mlb/leaders/season").then(r => r.json()),
+    staleTime: 10 * 60 * 1000,
+  });
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none]">
-        {stats.map(stat => (
-          <button
-            key={stat}
-            onClick={() => setActiveStat(stat)}
-            className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-              activeStat === stat
-                ? "bg-primary text-primary-foreground"
-                : "bg-secondary text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {STAT_LABELS[stat]}
-          </button>
-        ))}
+      {/* Mode toggle */}
+      <div className="flex gap-2">
+        <button
+          onClick={() => setMode("recent")}
+          className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-colors ${mode === "recent" ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground hover:text-foreground"}`}
+        >
+          🔥 Hot Right Now
+        </button>
+        <button
+          onClick={() => setMode("season")}
+          className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-colors ${mode === "season" ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground hover:text-foreground"}`}
+        >
+          Season Leaders
+        </button>
       </div>
 
-      {isLoading && (
-        <div className="space-y-2">
-          {[...Array(10)].map((_, i) => (
-            <div key={i} className="h-14 bg-card border border-border rounded-xl animate-pulse" />
-          ))}
-        </div>
+      {mode === "recent" && (
+        <>
+          {/* Day selector */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">Last</span>
+            {[7, 14, 30].map(d => (
+              <button key={d} onClick={() => setDays(d)}
+                className={`px-2.5 py-1 rounded text-xs font-semibold transition-colors ${days === d ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground hover:text-foreground"}`}>
+                {d}d
+              </button>
+            ))}
+          </div>
+          {/* Stat tabs */}
+          <div className="flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none]">
+            {Object.entries(RECENT_STAT_LABELS).map(([stat, label]) => (
+              <button key={stat} onClick={() => setActiveStat(stat)}
+                className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${activeStat === stat ? "bg-secondary text-foreground border border-border" : "text-muted-foreground hover:text-foreground"}`}>
+                {label}
+              </button>
+            ))}
+          </div>
+          <LeaderList leaders={recentData?.result?.[activeStat] ?? []} isLoading={recentLoading} />
+        </>
       )}
 
-      <div className="space-y-2">
-        {leaders.map((l, i) => (
-          <div key={i} className="bg-card border border-border rounded-xl px-4 py-3 flex items-center gap-3">
-            <span className={`text-sm font-bold w-5 shrink-0 ${i === 0 ? "text-yellow-400" : i === 1 ? "text-slate-400" : i === 2 ? "text-amber-600" : "text-muted-foreground"}`}>
-              {l.rank}
-            </span>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold truncate">{l.name}</p>
-              <p className="text-xs text-muted-foreground">{l.team}</p>
-            </div>
-            <span className="text-lg font-bold text-primary shrink-0">{l.value}</span>
+      {mode === "season" && (
+        <>
+          <p className="text-xs text-muted-foreground">Qualified batters — {new Date().getFullYear()} season</p>
+          <div className="flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none]">
+            {Object.entries(SEASON_STAT_LABELS).map(([stat, label]) => (
+              <button key={stat} onClick={() => setSeasonStat(stat)}
+                className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${seasonStat === stat ? "bg-secondary text-foreground border border-border" : "text-muted-foreground hover:text-foreground"}`}>
+                {label}
+              </button>
+            ))}
           </div>
-        ))}
-      </div>
+          <LeaderList leaders={(seasonData as any)?.[seasonStat] ?? []} isLoading={seasonLoading} />
+        </>
+      )}
     </div>
   );
 }
