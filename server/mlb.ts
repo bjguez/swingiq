@@ -13,7 +13,7 @@ export function setupMlbRoutes(app: Express) {
   // ── Player headshot proxy (avoids CORS on img.mlb.com) ───────────────────
   app.get("/api/mlb/headshot/:playerId", async (req, res) => {
     try {
-      const url = `https://img.mlb.com/headshots/current/60x60/${req.params.playerId}@2x.jpg`;
+      const url = `https://img.mlbstatic.com/mlb-photos/image/upload/w_213,d_people:generic:headshot:silo:current.png,q_auto:best,f_auto/v1/people/${req.params.playerId}/headshot/67/current`;
       const upstream = await fetch(url);
       if (!upstream.ok) return res.status(404).end();
       res.setHeader("Content-Type", upstream.headers.get("content-type") ?? "image/jpeg");
