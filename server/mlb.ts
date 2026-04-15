@@ -10,6 +10,21 @@ async function mlbFetch(path: string) {
 
 export function setupMlbRoutes(app: Express) {
 
+  // ── Player headshot proxy (avoids CORS on img.mlb.com) ───────────────────
+  app.get("/api/mlb/headshot/:playerId", async (req, res) => {
+    try {
+      const url = `https://img.mlb.com/headshots/current/60x60/${req.params.playerId}@2x.jpg`;
+      const upstream = await fetch(url);
+      if (!upstream.ok) return res.status(404).end();
+      res.setHeader("Content-Type", upstream.headers.get("content-type") ?? "image/jpeg");
+      res.setHeader("Cache-Control", "public, max-age=86400");
+      const buf = await upstream.arrayBuffer();
+      res.send(Buffer.from(buf));
+    } catch {
+      res.status(404).end();
+    }
+  });
+
   // ── Today's scoreboard ───────────────────────────────────────────────────
   app.get("/api/mlb/schedule", async (req, res) => {
     try {

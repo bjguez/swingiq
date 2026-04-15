@@ -338,7 +338,7 @@ function PerformerCard({ p }: { p: Performer }) {
   const logoUrl = teamLogo(p.teamId);
   const isLive = p.gameStatus === "Live";
   const [photoError, setPhotoError] = useState(false);
-  const photoUrl = `https://img.mlb.com/headshots/current/60x60/${p.id}@2x.jpg`;
+  const photoUrl = `/api/mlb/headshot/${p.id}`;
 
   const statLine = [
     `${p.hits}-${p.ab}`,
