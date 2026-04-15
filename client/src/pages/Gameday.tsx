@@ -377,12 +377,13 @@ function PerformerCard({ p }: { p: Performer }) {
       {/* Player row: photo + info + headline stat */}
       <div className="px-3 pb-3 flex items-center gap-3">
         {/* Headshot */}
-        <div className="w-14 h-14 rounded-lg bg-secondary border border-border overflow-hidden shrink-0 flex items-center justify-center">
+        <div className="w-14 h-16 rounded-lg bg-secondary border border-border overflow-hidden shrink-0 flex items-center justify-center">
           {!photoError ? (
             <img
               src={photoUrl}
               alt={p.name}
-              className="w-full h-full object-cover object-top"
+              className="w-full h-full object-cover"
+              style={{ objectPosition: "center 15%" }}
               onError={() => setPhotoError(true)}
             />
           ) : (
