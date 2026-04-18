@@ -256,21 +256,23 @@ export default function CoachDashboard() {
     const playerName = [selectedPlayer.firstName, selectedPlayer.lastName].filter(Boolean).join(" ") || selectedPlayer.inviteEmail;
     return (
       <Layout>
-        <div className="max-w-3xl mx-auto w-full py-8 space-y-6">
+        <div className="max-w-3xl mx-auto w-full py-4 sm:py-8 px-4 sm:px-6 space-y-6">
           <div className="flex items-center gap-3">
-            <button onClick={() => { setSelectedPlayer(null); setPlayerTab("swings"); }} className="text-muted-foreground hover:text-foreground transition-colors">
+            <button onClick={() => { setSelectedPlayer(null); setPlayerTab("swings"); }} className="text-muted-foreground hover:text-foreground transition-colors shrink-0">
               <ArrowLeft size={18} />
             </button>
-            <div>
-              <h1 className="font-display text-2xl uppercase tracking-wider">{playerName}</h1>
-              <p className="text-sm text-muted-foreground">{selectedPlayer.email || selectedPlayer.inviteEmail}</p>
+            <div className="min-w-0 flex-1">
+              <h1 className="font-display text-xl sm:text-2xl uppercase tracking-wider truncate">{playerName}</h1>
+              <p className="text-sm text-muted-foreground truncate">{selectedPlayer.email || selectedPlayer.inviteEmail}</p>
             </div>
-            <div className="ml-auto flex gap-2">
+            <div className="flex gap-2 shrink-0">
               <Button size="sm" variant="outline" onClick={() => navigate(`/coach/session?playerId=${selectedPlayer.playerId}`)}>
-                <Video size={14} className="mr-2" /> New Session
+                <Video size={14} className="sm:mr-2" />
+                <span className="hidden sm:inline">New Session</span>
               </Button>
               <Button size="sm" variant="outline" onClick={() => navigate(`/coach/messages?relationshipId=${selectedPlayer.id}`)}>
-                <MessageSquare size={14} className="mr-2" /> Message
+                <MessageSquare size={14} className="sm:mr-2" />
+                <span className="hidden sm:inline">Message</span>
               </Button>
             </div>
           </div>
@@ -423,7 +425,7 @@ export default function CoachDashboard() {
 
   return (
     <Layout>
-      <div className="max-w-3xl mx-auto w-full py-8 space-y-8">
+      <div className="max-w-3xl mx-auto w-full py-4 sm:py-8 px-4 sm:px-6 space-y-8">
 
         {/* Trial banner */}
         {isOnTrial && daysRemaining > 0 && (
@@ -458,10 +460,10 @@ export default function CoachDashboard() {
               }}
               className="space-y-2"
             >
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <Input type="email" placeholder="player@example.com" value={inviteEmail}
                   onChange={(e) => { setInviteEmail(e.target.value); setInviteError(null); }} className="flex-1" required />
-                <Button type="submit" disabled={inviteMutation.isPending}>
+                <Button type="submit" disabled={inviteMutation.isPending} className="w-full sm:w-auto">
                   {inviteMutation.isPending ? "Sending..." : "Send Invite"}
                 </Button>
               </div>
@@ -639,12 +641,12 @@ function PlayerCard({
       </button>
 
       <div className="flex items-center gap-2 shrink-0">
-        {/* Move to team dropdown */}
+        {/* Move to team dropdown — hidden on mobile to keep row clean */}
         {teams.length > 0 && (
           <select
             value={p.teamName ?? "__none__"}
             onChange={e => onMove(e.target.value === "__none__" ? null : e.target.value)}
-            className="text-xs border border-border rounded px-2 py-1 bg-background text-muted-foreground hover:text-foreground focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer"
+            className="hidden sm:block text-xs border border-border rounded px-2 py-1 bg-background text-muted-foreground hover:text-foreground focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer"
             title="Move to team"
           >
             <option value="__none__">Unassigned</option>

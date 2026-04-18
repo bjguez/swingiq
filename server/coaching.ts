@@ -1,7 +1,7 @@
 import { Express } from "express";
 import { db } from "./db";
 import { coachSessions, notifications, messages, coachPlayers, videos, users } from "../shared/schema";
-import { eq, and, desc, or } from "drizzle-orm";
+import { eq, and, desc, or, isNull } from "drizzle-orm";
 import { User } from "../shared/schema";
 import { hasCoachAccess } from "./coachAccess";
 import { Resend } from "resend";
@@ -41,7 +41,7 @@ export function setupCoachingRoutes(app: Express) {
       if (!rel) return res.status(403).json({ message: "No active coaching relationship with this player" });
 
       const playerVideos = await db.select().from(videos)
-        .where(and(eq(videos.userId, req.params.playerId), eq(videos.isProVideo, false)))
+        .where(and(eq(videos.userId, req.params.playerId), or(eq(videos.isProVideo, false), isNull(videos.isProVideo))))
         .orderBy(desc(videos.createdAt));
 
       // Batch-resolve all R2 keys (source + thumbnail) in one pass
