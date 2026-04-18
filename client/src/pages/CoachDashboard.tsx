@@ -162,14 +162,18 @@ export default function CoachDashboard() {
     enabled: !!user,
   });
 
-  const { data: playerVideos = [], isLoading: videosLoading } = useQuery<VideoType[]>({
+  const { data: playerVideos = [], isLoading: videosLoading, error: videosError } = useQuery<VideoType[]>({
     queryKey: ["/api/coaching/players", selectedPlayer?.playerId, "videos"],
     queryFn: async () => {
       const res = await fetch(`/api/coaching/players/${selectedPlayer!.playerId}/videos`);
-      if (!res.ok) throw new Error("Failed to load videos");
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.message || `Error ${res.status}`);
+      }
       return res.json();
     },
     enabled: !!selectedPlayer?.playerId,
+    retry: false,
   });
 
   const { data: coachSessions = [], isLoading: sessionsLoading } = useQuery<CoachSession[]>({
@@ -301,6 +305,11 @@ export default function CoachDashboard() {
             <div>
               {videosLoading ? (
                 <p className="text-sm text-muted-foreground">Loading...</p>
+              ) : videosError ? (
+                <div className="text-center py-12 border border-dashed border-border rounded-xl">
+                  <Video size={32} className="mx-auto mb-2 opacity-30 text-muted-foreground" />
+                  <p className="text-sm text-destructive font-medium">{(videosError as Error).message}</p>
+                </div>
               ) : playerVideos.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground border border-dashed border-border rounded-xl">
                   <Video size={32} className="mx-auto mb-2 opacity-30" />
