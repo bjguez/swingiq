@@ -95,7 +95,7 @@ export function setupCoachRoutes(app: Express) {
     try {
       const coach = req.user as User | undefined;
       if (!coach) return res.status(401).json({ message: "Not authenticated" });
-      if (coach.accountType !== "coach" || !hasCoachAccess(coach)) return res.status(403).json({ message: "Coach subscription required" });
+      if (!coach.isAdmin && (coach.accountType !== "coach" || !hasCoachAccess(coach))) return res.status(403).json({ message: "Coach subscription required" });
 
       const { email, teamName } = req.body;
       if (!email) return res.status(400).json({ message: "Email is required" });
