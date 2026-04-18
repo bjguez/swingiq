@@ -935,7 +935,7 @@ function AcuityTab({ isPaid, isFree }: { isPaid: boolean; isFree: boolean }) {
 const TOTAL_PITCHES = 20;
 const START_Z = -32;
 const PLATE_Z = 2.5;
-const DECISION_Z = -9;
+const DECISION_Z = -14;
 
 type PitchLocation = "strike" | "ball";
 type PitchResult = "good_swing" | "good_eye" | "chase" | "called_strike";
@@ -983,8 +983,8 @@ const DISCIPLINE_LEVELS: Record<DisciplineLevel, LevelConfig> = {
     mph: 85,
     speeds: { fastball: 26, curveball: 17, slider: 22, sweeper: 22, changeup: 20 },
     breakMult: 0.6,
-    windowStart: 550,
-    windowEnd: 400,
+    windowStart: 790,
+    windowEnd: 570,
     pitchPool: ["fastball", "fastball", "fastball", "curveball", "slider", "changeup"],
   },
   high_school: {
@@ -993,8 +993,8 @@ const DISCIPLINE_LEVELS: Record<DisciplineLevel, LevelConfig> = {
     mph: 90,
     speeds: { fastball: 30, curveball: 20, slider: 26, sweeper: 26, changeup: 23 },
     breakMult: 0.8,
-    windowStart: 420,
-    windowEnd: 320,
+    windowStart: 600,
+    windowEnd: 460,
     pitchPool: ["fastball", "fastball", "fastball", "curveball", "slider", "changeup"],
   },
   college: {
@@ -1003,8 +1003,8 @@ const DISCIPLINE_LEVELS: Record<DisciplineLevel, LevelConfig> = {
     mph: 95,
     speeds: { fastball: 34, curveball: 23, slider: 29, sweeper: 29, changeup: 26 },
     breakMult: 1.0,
-    windowStart: 380,
-    windowEnd: 280,
+    windowStart: 550,
+    windowEnd: 400,
     pitchPool: ["fastball", "fastball", "curveball", "slider", "changeup", "sweeper"],
   },
   mlb: {
@@ -1013,8 +1013,8 @@ const DISCIPLINE_LEVELS: Record<DisciplineLevel, LevelConfig> = {
     mph: 100,
     speeds: { fastball: 38, curveball: 26, slider: 32, sweeper: 32, changeup: 29 },
     breakMult: 1.25,
-    windowStart: 350,
-    windowEnd: 220,
+    windowStart: 500,
+    windowEnd: 320,
     pitchPool: ["fastball", "fastball", "curveball", "slider", "changeup", "sweeper", "sweeper"],
   },
 };
