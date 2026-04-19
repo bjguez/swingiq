@@ -5,7 +5,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertMlbPlayerSchema, insertVideoSchema, insertDrillSchema, insertSessionSchema, cognitionSessions, videos } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, sql as sqlFn, count as drizzleCount } from "drizzle-orm";
+import { eq, desc, sql as sqlFn, count as drizzleCount, or, isNull } from "drizzle-orm";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
