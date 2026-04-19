@@ -230,6 +230,23 @@ export async function registerRoutes(
         return res.status(201).json({ sourceUrl: key, presignedUrl });
       }
 
+      // Extract thumbnail from 0.5s into the video (best-effort, non-blocking on failure)
+      let thumbnailKey: string | null = null;
+      try {
+        const tmpThumbIn = path.join(uploadDir, `thumb-in-${Date.now()}.mp4`);
+        const tmpThumbOut = path.join(uploadDir, `thumb-out-${Date.now()}.jpg`);
+        fs.writeFileSync(tmpThumbIn, uploadBuffer);
+        await new Promise<void>((resolve, reject) => {
+          execFile("ffmpeg", [
+            "-i", tmpThumbIn, "-ss", "0.5", "-vframes", "1", "-q:v", "3", "-y", tmpThumbOut,
+          ], { maxBuffer: 10 * 1024 * 1024 }, (err) => { if (err) reject(err); else resolve(); });
+        });
+        const thumbBuffer = fs.readFileSync(tmpThumbOut);
+        thumbnailKey = await uploadToR2(thumbBuffer, "thumbnail.jpg", "image/jpeg", "thumbnails");
+        try { fs.unlinkSync(tmpThumbIn); } catch {}
+        try { fs.unlinkSync(tmpThumbOut); } catch {}
+      } catch { /* thumbnail is best-effort */ }
+
       // Auto-generate title: username_YYYY-MM-DD[_N] when no explicit title is sent
       let title: string;
       if (req.body.title) {
@@ -257,6 +274,7 @@ export async function registerRoutes(
         category,
         source: "User Upload",
         sourceUrl: key,
+        thumbnailUrl: thumbnailKey,
         isProVideo: false,
         userId,
       });
@@ -824,17 +842,20 @@ export async function registerRoutes(
   async function resolveVideoUrls(vids: any[]) {
     return Promise.all(
       vids.map(async (v) => {
-        if (!v.sourceUrl) return v;
-        let key = v.sourceUrl;
-        // Normalize full URLs (CDN or presigned) back to R2 key
-        if (key.startsWith("https://")) {
-          const match = key.match(/videos\/[^?#]+/);
-          if (match) key = match[0];
+        const result: any = { ...v };
+        if (v.sourceUrl) {
+          let key = v.sourceUrl;
+          // Normalize full URLs (CDN or presigned) back to R2 key
+          if (key.startsWith("https://")) {
+            const match = key.match(/(?:videos|recordings|thumbnails)\/[^?#]+/);
+            if (match) key = match[0];
+          }
+          if (isR2Key(key)) result.sourceUrl = await getVideoUrl(key);
         }
-        if (isR2Key(key)) {
-          return { ...v, sourceUrl: await getVideoUrl(key) };
+        if (v.thumbnailUrl && isR2Key(v.thumbnailUrl)) {
+          result.thumbnailUrl = await getVideoUrl(v.thumbnailUrl);
         }
-        return v;
+        return result;
       })
     );
   }

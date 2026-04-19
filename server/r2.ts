@@ -77,7 +77,7 @@ export async function deleteFromR2(key: string): Promise<void> {
 
 /** Returns true if a sourceUrl value is an R2 key (not a legacy /uploads/ path) */
 export function isR2Key(sourceUrl: string): boolean {
-  return sourceUrl.startsWith("videos/") || sourceUrl.startsWith("recordings/");
+  return sourceUrl.startsWith("videos/") || sourceUrl.startsWith("recordings/") || sourceUrl.startsWith("thumbnails/");
 }
 
 /** Configures CORS on the R2 bucket to allow browser video/canvas access from any origin */

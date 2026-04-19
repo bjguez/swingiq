@@ -551,18 +551,25 @@ export default function CoachSessionPage() {
               <>
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Select Player's Swing</p>
                 {playerVideos.length > 0 ? (
-                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-56 overflow-y-auto">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-72 overflow-y-auto">
                     {playerVideos.map(v => (
                       <button key={v.id}
                         onClick={() => { setPlayerVideoId(v.id); setPlayerVideoSrc(v.sourceUrl ?? ""); }}
-                        className="relative aspect-video rounded-md overflow-hidden border border-border hover:border-primary/50 transition-colors bg-secondary"
+                        className="flex flex-col rounded-md overflow-hidden border border-border hover:border-primary/50 transition-colors bg-secondary text-left"
                       >
-                        {v.thumbnailUrl
-                          ? <img src={v.thumbnailUrl} alt={v.title} className="w-full h-full object-cover" />
-                          : <Video size={16} className="absolute inset-0 m-auto text-muted-foreground opacity-40" />
-                        }
-                        <div className="absolute inset-x-0 bottom-0 bg-black/60 p-0.5">
-                          <p className="text-white text-[10px] truncate">{v.title}</p>
+                        <div className="relative aspect-video w-full bg-black">
+                          {v.thumbnailUrl
+                            ? <img src={v.thumbnailUrl} alt={v.title} className="w-full h-full object-cover" />
+                            : <Video size={16} className="absolute inset-0 m-auto text-muted-foreground opacity-40" />
+                          }
+                        </div>
+                        <div className="px-2 py-1.5">
+                          <p className="text-white text-[11px] font-semibold truncate">{v.title}</p>
+                          {v.createdAt && (
+                            <p className="text-muted-foreground text-[10px] mt-0.5">
+                              {new Date(v.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                            </p>
+                          )}
                         </div>
                       </button>
                     ))}

@@ -116,15 +116,19 @@ export function UserVideoCard({
     >
       {/* Thumbnail */}
       <div className="aspect-video bg-black relative flex items-center justify-center overflow-hidden">
-        <video
-          ref={thumbRef}
-          src={thumbSrc}
-          className="w-full h-full object-cover"
-          muted
-          playsInline
-          preload="metadata"
-          onLoadedMetadata={(e) => { e.currentTarget.currentTime = 0.5; }}
-        />
+        {video.thumbnailUrl ? (
+          <img src={video.thumbnailUrl} alt={video.title} className="w-full h-full object-cover" />
+        ) : (
+          <video
+            ref={thumbRef}
+            src={thumbSrc}
+            className="w-full h-full object-cover"
+            muted
+            playsInline
+            preload="metadata"
+            onLoadedMetadata={(e) => { e.currentTarget.currentTime = 0.5; }}
+          />
+        )}
         {!bulkMode && onSelect && (
           <button
             onClick={() => onSelect(video)}

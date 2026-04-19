@@ -14,6 +14,7 @@ export interface VideoPlayerHandle {
 
 interface VideoPlayerProps {
   src: string | null;
+  poster?: string | null;
   onTimeUpdate?: (time: number, duration: number) => void;
   onLoadedMetadata?: (duration: number) => void;
   className?: string;
@@ -26,7 +27,7 @@ interface VideoPlayerProps {
 }
 
 const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
-  ({ src, onTimeUpdate, onLoadedMetadata, className, placeholder, rotation = 0, flipH = false, zoom = 1, panX = 0, panY = 0 }, ref) => {
+  ({ src, poster, onTimeUpdate, onLoadedMetadata, className, placeholder, rotation = 0, flipH = false, zoom = 1, panX = 0, panY = 0 }, ref) => {
     const videoRef = useRef<HTMLVideoElement>(null);
     const [loadError, setLoadError] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
@@ -107,13 +108,14 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
     return (
       <div className={`relative ${className}`}>
         {isLoading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black z-10 pointer-events-none">
+          <div className={`absolute inset-0 flex items-center justify-center z-10 pointer-events-none ${poster ? "bg-black/40" : "bg-black"}`}>
             <div className="w-8 h-8 border-2 border-white/20 border-t-white/70 rounded-full animate-spin" />
           </div>
         )}
         <video
           ref={videoRef}
           src={src}
+          poster={poster ?? undefined}
           className="w-full h-full object-contain"
           style={videoStyle}
           crossOrigin="anonymous"
