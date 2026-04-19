@@ -8,6 +8,26 @@ import { Button } from "./ui/button";
 import type { MlbPlayer, Video } from "@shared/schema";
 import { fetchVideos, fetchPlayersPage, fetchVideoPresignedUrl } from "@/lib/api";
 
+const TEAM_ABBR: Record<string, string> = {
+  "Arizona Diamondbacks": "ARI", "Atlanta Braves": "ATL", "Baltimore Orioles": "BAL",
+  "Boston Red Sox": "BOS", "Chicago Cubs": "CHC", "Chicago White Sox": "CWS",
+  "Cincinnati Reds": "CIN", "Cleveland Guardians": "CLE", "Cleveland Indians": "CLE",
+  "Colorado Rockies": "COL", "Detroit Tigers": "DET", "Houston Astros": "HOU",
+  "Kansas City Royals": "KC", "Los Angeles Angels": "LAA", "Los Angeles Dodgers": "LAD",
+  "Miami Marlins": "MIA", "Florida Marlins": "MIA", "Milwaukee Brewers": "MIL",
+  "Minnesota Twins": "MIN", "New York Mets": "NYM", "New York Yankees": "NYY",
+  "Oakland Athletics": "OAK", "Philadelphia Phillies": "PHI", "Pittsburgh Pirates": "PIT",
+  "San Diego Padres": "SD", "San Francisco Giants": "SF", "Seattle Mariners": "SEA",
+  "St. Louis Cardinals": "STL", "Tampa Bay Rays": "TB", "Tampa Bay Devil Rays": "TB",
+  "Texas Rangers": "TEX", "Toronto Blue Jays": "TOR", "Washington Nationals": "WSH",
+  "Montreal Expos": "MON",
+};
+
+function teamAbbr(name: string | undefined): string {
+  if (!name) return "—";
+  return TEAM_ABBR[name] ?? name.slice(0, 3).toUpperCase();
+}
+
 interface AwardEntry {
   award: { id: string; name: string };
   season: string;
@@ -462,7 +482,7 @@ function PlayerStatsSection({ player, awards = [] }: { player: MlbPlayer; awards
                         <span key={j} className="ml-0.5">{e}</span>
                       ))}
                     </td>
-                    <td className="px-3 py-2 text-muted-foreground truncate max-w-25">{s.team?.name ?? "—"}</td>
+                    <td className="px-3 py-2 text-muted-foreground font-mono">{teamAbbr(s.team?.name)}</td>
                     <td className="px-3 py-2 text-right text-muted-foreground">{s.stat.gamesPlayed ?? "—"}</td>
                     <td className="px-3 py-2 text-right text-muted-foreground">{s.stat.atBats ?? "—"}</td>
                     <td className={`px-3 py-2 text-right font-semibold ${statColor("avg", s.stat.avg) || "text-foreground"}`}>{fmt(s.stat.avg)}</td>
