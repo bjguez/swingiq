@@ -38,6 +38,13 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
         setLoadError(false);
         setIsLoading(true);
         firstFrameSeekDone.current = false;
+        // On mobile, preload="metadata" is ignored for muted videos.
+        // play() without a user gesture is allowed for muted videos on iOS/Android.
+        // Calling play() then pause() forces the browser to decode and show the first frame.
+        const v = videoRef.current;
+        if (v) {
+          v.play().then(() => { v.pause(); setIsLoading(false); }).catch(() => {});
+        }
       }
     }, [src]);
 
