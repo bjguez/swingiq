@@ -104,6 +104,8 @@ export const videos = pgTable("videos", {
   // Visibility
   showInLibrary: boolean("show_in_library").default(true),
   showInDevelopment: boolean("show_in_development").default(true),
+  // YouTube
+  youtubeVideoId: text("youtube_video_id"),
 }, (t) => ({
   userIdIdx: index("videos_user_id_idx").on(t.userId),
   playerIdIdx: index("videos_player_id_idx").on(t.playerId),

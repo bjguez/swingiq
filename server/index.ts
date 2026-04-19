@@ -3,7 +3,7 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { setupAuth } from "./auth";
 import { createServer } from "http";
-import { pool } from "./db";
+import { pool, runStartupMigrations } from "./db";
 import { r2Configured, configureR2Cors } from "./r2";
 
 const app = express();
@@ -278,6 +278,7 @@ app.use((req, res, next) => {
   `);
 
   if (r2Configured()) await configureR2Cors();
+  await runStartupMigrations();
 
   await registerRoutes(httpServer, app);
 

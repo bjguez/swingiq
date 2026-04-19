@@ -23,6 +23,7 @@ import { setupDisciplineRoutes } from "./discipline";
 import { setupConfidenceRoutes } from "./confidence";
 import { setupStatdleRoutes } from "./statdle";
 import { setupAthleteRoutes } from "./athletes";
+import { uploadToYouTube, youtubeConfigured, type YouTubePrivacy } from "./youtube";
 import { setupMlbRoutes } from "./mlb";
 import { checkAndAwardBadges, computeStreak, BADGE_DEFINITIONS } from "./badges";
 import { userBadges, referrals, users as usersTable } from "@shared/schema";
@@ -1431,6 +1432,53 @@ export async function registerRoutes(
   // /ref/:code — redirect to signup with ref param pre-filled
   app.get("/ref/:code", (req, res) => {
     res.redirect(`/auth?ref=${encodeURIComponent(req.params.code)}`);
+  });
+
+  // ── YouTube push (admin only) ─────────────────────────────────────────────
+  app.get("/api/admin/youtube/status", (req, res) => {
+    const user = req.user as any;
+    const adminUsername = process.env.ADMIN_USERNAME;
+    if (!adminUsername || user?.username !== adminUsername) return res.status(403).json({ message: "Admin only" });
+    res.json({ configured: youtubeConfigured() });
+  });
+
+  app.post("/api/admin/videos/:id/push-youtube", async (req, res) => {
+    const user = req.user as any;
+    const adminUsername = process.env.ADMIN_USERNAME;
+    if (!adminUsername || user?.username !== adminUsername) return res.status(403).json({ message: "Admin only" });
+    if (!youtubeConfigured()) return res.status(503).json({ message: "YouTube credentials not configured" });
+
+    const video = await db.select().from(videos).where(eq(videos.id, req.params.id)).then(r => r[0]);
+    if (!video) return res.status(404).json({ message: "Video not found" });
+    if (!video.sourceUrl) return res.status(400).json({ message: "Video has no source file" });
+
+    const { title, description, tags, privacyStatus, categoryId, playlistId } = req.body as {
+      title: string;
+      description: string;
+      tags: string[];
+      privacyStatus: YouTubePrivacy;
+      categoryId?: string;
+      playlistId?: string;
+    };
+
+    // Download from R2
+    const presigned = await getPresignedUrl(video.sourceUrl, 600);
+    const fetchRes = await fetch(presigned);
+    if (!fetchRes.ok) return res.status(502).json({ message: "Failed to download video from storage" });
+    const videoBuffer = Buffer.from(await fetchRes.arrayBuffer());
+
+    const youtubeVideoId = await uploadToYouTube({
+      title,
+      description,
+      tags,
+      privacyStatus,
+      categoryId,
+      playlistId,
+      videoBuffer,
+    });
+
+    await db.update(videos).set({ youtubeVideoId }).where(eq(videos.id, video.id));
+    res.json({ youtubeVideoId, url: `https://youtu.be/${youtubeVideoId}` });
   });
 
   // ── Thumbnail backfill (admin only, one-shot) ──────────────────────────────

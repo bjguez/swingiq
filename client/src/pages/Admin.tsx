@@ -10,7 +10,7 @@ import type { Video, MlbPlayer } from "@shared/schema";
 import {
   Upload, Trash2, Pencil, Save, X, Plus, PlayCircle,
   Film, Loader2, CheckCircle2, AlertCircle, Search,
-  Users, UserPlus, Scissors, BookOpen, Mic,
+  Users, UserPlus, Scissors, BookOpen, Mic, Youtube, ExternalLink,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -1447,7 +1447,9 @@ function VideoRow({ video, onEdit, onTrim, onDelete, onToggle, deleting }: {
   onToggle: (field: "showInLibrary" | "showInDevelopment", val: boolean) => void;
   deleting: boolean;
 }) {
+  const [ytOpen, setYtOpen] = useState(false);
   return (
+    <>
     <div className="p-3 grid grid-cols-12 gap-2 items-center hover:bg-secondary/20 transition-colors text-sm" data-testid={`admin-row-${video.id}`}>
       <div className="col-span-3 font-medium flex items-center gap-2 min-w-0">
         <div className="w-8 h-8 rounded bg-secondary flex items-center justify-center shrink-0">
@@ -1457,7 +1459,19 @@ function VideoRow({ video, onEdit, onTrim, onDelete, onToggle, deleting }: {
             <Film className="w-4 h-4 text-muted-foreground/50" />
           )}
         </div>
-        <span className="truncate">{video.title}</span>
+        <div className="min-w-0">
+          <span className="truncate block">{video.title}</span>
+          {(video as any).youtubeVideoId && (
+            <a
+              href={`https://youtu.be/${(video as any).youtubeVideoId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[10px] text-red-400 hover:text-red-300 flex items-center gap-0.5"
+            >
+              <Youtube className="w-3 h-3" /> YouTube
+            </a>
+          )}
+        </div>
       </div>
       <div className="col-span-2 text-muted-foreground truncate">{video.playerName || "—"}</div>
       <div className="col-span-1">
@@ -1492,11 +1506,167 @@ function VideoRow({ video, onEdit, onTrim, onDelete, onToggle, deleting }: {
             <Scissors className="w-4 h-4" />
           </Button>
         )}
+        {video.sourceUrl && (
+          <Button
+            variant="ghost" size="icon"
+            className={`h-8 w-8 ${(video as any).youtubeVideoId ? "text-red-400 hover:text-red-300" : "text-muted-foreground hover:text-red-400"}`}
+            onClick={() => setYtOpen(true)}
+            title={(video as any).youtubeVideoId ? "Re-push to YouTube" : "Push to YouTube"}
+          >
+            <Youtube className="w-4 h-4" />
+          </Button>
+        )}
         <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-red-500" onClick={onDelete} disabled={deleting} data-testid={`button-delete-${video.id}`}>
           <Trash2 className="w-4 h-4" />
         </Button>
       </div>
     </div>
+    {ytOpen && (
+      <YouTubePublishModal
+        video={video}
+        onClose={() => setYtOpen(false)}
+      />
+    )}
+    </>
+  );
+}
+
+function YouTubePublishModal({ video, onClose }: { video: Video; onClose: () => void }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [form, setForm] = useState({
+    title: video.title,
+    description: "",
+    tags: video.playerName ? video.playerName : "",
+    privacyStatus: "unlisted" as "public" | "unlisted" | "private",
+    categoryId: "17",
+    playlistId: "",
+  });
+  const [pushing, setPushing] = useState(false);
+  const [result, setResult] = useState<{ youtubeVideoId: string; url: string } | null>(null);
+
+  const handlePush = async () => {
+    setPushing(true);
+    try {
+      const res = await fetch(`/api/admin/videos/${video.id}/push-youtube`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...form,
+          tags: form.tags.split(",").map(t => t.trim()).filter(Boolean),
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error((err as any).message || "Upload failed");
+      }
+      const data = await res.json();
+      setResult(data);
+      queryClient.invalidateQueries({ queryKey: ["/api/videos"] });
+      toast({ title: "Pushed to YouTube!" });
+    } catch (err: any) {
+      toast({ title: err.message || "YouTube upload failed", variant: "destructive" });
+    }
+    setPushing(false);
+  };
+
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-lg bg-card border-border text-foreground">
+        <DialogHeader>
+          <DialogTitle className="font-display text-xl uppercase tracking-wider flex items-center gap-2">
+            <Youtube className="w-5 h-5 text-red-500" /> Push to YouTube
+          </DialogTitle>
+        </DialogHeader>
+
+        {result ? (
+          <div className="space-y-4 py-2">
+            <div className="flex items-center gap-2 text-green-400">
+              <CheckCircle2 className="w-5 h-5" />
+              <span className="font-semibold">Successfully uploaded!</span>
+            </div>
+            <a
+              href={result.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 text-primary hover:underline text-sm"
+            >
+              <ExternalLink className="w-4 h-4" />
+              {result.url}
+            </a>
+            <Button className="w-full" onClick={onClose}>Done</Button>
+          </div>
+        ) : (
+          <div className="space-y-3 py-2">
+            <div>
+              <label className="text-xs text-muted-foreground block mb-1">Title</label>
+              <Input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} className="bg-background" />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground block mb-1">Description</label>
+              <textarea
+                value={form.description}
+                onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+                rows={4}
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-ring"
+                placeholder="Describe this swing for YouTube viewers…"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground block mb-1">Tags (comma-separated)</label>
+              <Input
+                value={form.tags}
+                onChange={e => setForm(f => ({ ...f, tags: e.target.value }))}
+                placeholder="baseball, swing mechanics, hitting"
+                className="bg-background"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-muted-foreground block mb-1">Privacy</label>
+                <select
+                  value={form.privacyStatus}
+                  onChange={e => setForm(f => ({ ...f, privacyStatus: e.target.value as any }))}
+                  className="w-full h-9 rounded-md border border-border bg-background px-3 text-sm"
+                >
+                  <option value="unlisted">Unlisted</option>
+                  <option value="public">Public</option>
+                  <option value="private">Private</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground block mb-1">Category ID</label>
+                <Input
+                  value={form.categoryId}
+                  onChange={e => setForm(f => ({ ...f, categoryId: e.target.value }))}
+                  placeholder="17 = Sports"
+                  className="bg-background"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground block mb-1">Playlist ID (optional)</label>
+              <Input
+                value={form.playlistId}
+                onChange={e => setForm(f => ({ ...f, playlistId: e.target.value }))}
+                placeholder="PLxxxxxxxx"
+                className="bg-background"
+              />
+            </div>
+            <div className="flex gap-2 pt-1">
+              <Button variant="outline" className="flex-1" onClick={onClose} disabled={pushing}>Cancel</Button>
+              <Button
+                className="flex-1 bg-red-600 hover:bg-red-500 text-white"
+                onClick={handlePush}
+                disabled={pushing || !form.title}
+              >
+                {pushing ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Uploading…</> : <><Youtube className="w-4 h-4 mr-2" />Publish</>}
+              </Button>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
 

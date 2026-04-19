@@ -11,3 +11,13 @@ export const pool = new pg.Pool({
 });
 
 export const db = drizzle(pool, { schema });
+
+// Safe additive migrations — run on every startup, idempotent
+export async function runStartupMigrations() {
+  const client = await pool.connect();
+  try {
+    await client.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS youtube_video_id text`);
+  } finally {
+    client.release();
+  }
+}
