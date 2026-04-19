@@ -43,7 +43,7 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel, ex
   const [rightVideoSrc, setRightVideoSrc] = useState<string | null>(null);
   const [leftPoster, setLeftPoster] = useState<string | null>(null);
   const [rightPoster, setRightPoster] = useState<string | null>(null);
-  const [leftLabel, setLeftLabel] = useState("Amateur Swing");
+  const [leftLabel, setLeftLabel] = useState("Your Swing");
   const [rightLabel, setRightLabel] = useState("Pro Swing");
   const [leftRotation, setLeftRotation] = useState<0 | 90 | 180 | 270>(0);
   const [rightRotation, setRightRotation] = useState<0 | 90 | 180 | 270>(0);
