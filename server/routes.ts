@@ -1484,7 +1484,8 @@ export async function registerRoutes(
   app.post("/api/admin/blueprint/:id/push-youtube", async (req, res) => {
     const user = req.user as any;
     const adminUsername = process.env.ADMIN_USERNAME;
-    if (!adminUsername || user?.username !== adminUsername) return res.status(403).json({ message: "Admin only" });
+    console.log("[youtube-push] user:", user?.username, "admin:", adminUsername, "match:", user?.username === adminUsername);
+    if (!adminUsername || user?.username !== adminUsername) return res.status(403).json({ message: "Admin only", debug: { user: user?.username, adminUsername } });
     if (!youtubeConfigured()) return res.status(503).json({ message: "YouTube credentials not configured" });
 
     const [item] = await db.select().from(blueprintContent).where(eq(blueprintContent.id, req.params.id));
