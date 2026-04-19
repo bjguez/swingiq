@@ -1455,6 +1455,7 @@ function YouTubeBlueprintModal({ item, onClose, onSuccess }: { item: any; onClos
     try {
       const res = await fetch(`/api/admin/blueprint/${item.id}/push-youtube`, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...form, tags: form.tags.split(",").map((t: string) => t.trim()).filter(Boolean) }),
       });
@@ -1687,6 +1688,7 @@ function YouTubePublishModal({ video, onClose }: { video: Video; onClose: () => 
     try {
       const res = await fetch(`/api/admin/videos/${video.id}/push-youtube`, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
