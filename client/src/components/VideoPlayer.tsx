@@ -107,8 +107,8 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
 
     return (
       <div className={`relative ${className}`}>
-        {isLoading && (
-          <div className={`absolute inset-0 flex items-center justify-center z-10 pointer-events-none ${poster ? "bg-black/40" : "bg-black"}`}>
+        {isLoading && !poster && (
+          <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none bg-black">
             <div className="w-8 h-8 border-2 border-white/20 border-t-white/70 rounded-full animate-spin" />
           </div>
         )}
