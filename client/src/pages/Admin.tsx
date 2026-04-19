@@ -1382,7 +1382,7 @@ function BlueprintContentCard({ item, typeColor, onDelete, onYouTubePushed }: {
   const [ytOpen, setYtOpen] = useState(false);
   return (
     <>
-    <div className="relative shrink-0 w-36 rounded-lg border border-border bg-secondary overflow-hidden group">
+    <div className="relative shrink-0 w-48 rounded-lg border border-border bg-secondary overflow-hidden group">
       <div className="aspect-video bg-black flex items-center justify-center">
         {item.thumbnailUrl ? (
           <img src={item.thumbnailUrl} alt={item.title} className="w-full h-full object-cover" />
@@ -1408,21 +1408,21 @@ function BlueprintContentCard({ item, typeColor, onDelete, onYouTubePushed }: {
         </div>
       </div>
       {/* Hover actions */}
-      <div className="absolute top-1 right-1 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="absolute top-1.5 right-1.5 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
         {item.sourceUrl && (
           <button
             onClick={() => setYtOpen(true)}
-            className={`bg-black/60 rounded-full p-0.5 ${item.youtubeVideoId ? "text-red-400" : "text-white"} hover:bg-red-600`}
+            className={`bg-black/70 rounded-full p-1 ${item.youtubeVideoId ? "text-red-400" : "text-white"} hover:bg-red-600`}
             title="Push to YouTube"
           >
-            <Youtube size={11} />
+            <Youtube size={14} />
           </button>
         )}
         <button
           onClick={onDelete}
-          className="bg-black/60 text-white rounded-full p-0.5 hover:bg-destructive"
+          className="bg-black/70 text-white rounded-full p-1 hover:bg-destructive"
         >
-          <X size={11} />
+          <X size={14} />
         </button>
       </div>
     </div>
