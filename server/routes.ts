@@ -1406,5 +1406,57 @@ export async function registerRoutes(
     res.redirect(`/auth?ref=${encodeURIComponent(req.params.code)}`);
   });
 
+  // ── Thumbnail backfill (admin only, one-shot) ──────────────────────────────
+  app.post("/api/admin/backfill-thumbnails", async (req, res) => {
+    const user = req.user as any;
+    const adminUsername = process.env.ADMIN_USERNAME;
+    if (!adminUsername || user?.username !== adminUsername) {
+      return res.status(403).json({ message: "Admin only" });
+    }
+
+    const { execFile } = await import("child_process");
+    const fs = await import("fs");
+    const os = await import("os");
+    const path = await import("path");
+    const { randomUUID } = await import("crypto");
+    const { GetObjectCommand } = await import("@aws-sdk/client-s3");
+    const { getSignedUrl } = await import("@aws-sdk/s3-request-presigner");
+
+    const rows = await db.select({ id: videos.id, title: videos.title, sourceUrl: videos.sourceUrl })
+      .from(videos)
+      .where(or(isNull(videos.thumbnailUrl), eq(videos.thumbnailUrl, "")));
+
+    const candidates = rows.filter((v: any) => v.sourceUrl && isR2Key(v.sourceUrl));
+    const results: { id: string; title: string; status: string }[] = [];
+
+    for (const video of candidates) {
+      try {
+        const presigned = await getSignedUrl(r2, new GetObjectCommand({ Bucket: process.env.R2_BUCKET_NAME!, Key: video.sourceUrl! }), { expiresIn: 300 });
+        const fetchRes = await fetch(presigned);
+        if (!fetchRes.ok) throw new Error(`Download failed: ${fetchRes.status}`);
+        const videoBuffer = Buffer.from(await fetchRes.arrayBuffer());
+
+        const tmpIn  = path.join(os.tmpdir(), `bt-in-${Date.now()}.mp4`);
+        const tmpOut = path.join(os.tmpdir(), `bt-out-${Date.now()}.jpg`);
+        fs.writeFileSync(tmpIn, videoBuffer);
+        await new Promise<void>((resolve, reject) => {
+          execFile("ffmpeg", ["-i", tmpIn, "-ss", "0.5", "-vframes", "1", "-q:v", "3", "-y", tmpOut],
+            { maxBuffer: 10 * 1024 * 1024 }, (err) => { if (err) reject(err); else resolve(); });
+        });
+        const thumbBuffer = fs.readFileSync(tmpOut);
+        try { fs.unlinkSync(tmpIn); } catch {}
+        try { fs.unlinkSync(tmpOut); } catch {}
+
+        const thumbKey = await uploadToR2(thumbBuffer, "thumbnail.jpg", "image/jpeg", "thumbnails");
+        await db.update(videos).set({ thumbnailUrl: thumbKey }).where(eq(videos.id, video.id));
+        results.push({ id: video.id, title: video.title, status: "ok" });
+      } catch (err: any) {
+        results.push({ id: video.id, title: video.title, status: `failed: ${err.message}` });
+      }
+    }
+
+    res.json({ processed: candidates.length, results });
+  });
+
   return httpServer;
 }
