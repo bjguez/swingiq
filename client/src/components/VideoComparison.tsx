@@ -768,13 +768,13 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel, ex
             <Link2 className="w-5 h-5" />
           </Button>
           
-          <div className="flex-1 h-8 flex items-center">
-            <Slider 
-              value={progress} 
-              onValueChange={handleSeek} 
-              max={100} 
+          <div className="flex-1 h-12 flex items-center">
+            <Slider
+              value={progress}
+              onValueChange={handleSeek}
+              max={100}
               step={0.1}
-              className="w-full" 
+              className="w-full"
               data-testid="slider-progress"
             />
           </div>
@@ -786,20 +786,20 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel, ex
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" className="h-10 w-10 text-muted-foreground hover:text-foreground" onClick={stepBackward} data-testid="button-step-back">
-              <SkipBack className="w-5 h-5" />
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" className="h-12 w-12 sm:h-10 sm:w-10 text-muted-foreground hover:text-foreground" onClick={stepBackward} data-testid="button-step-back">
+              <SkipBack className="w-6 h-6 sm:w-5 sm:h-5" />
             </Button>
             <Button
               size="icon"
-              className="h-12 w-12 rounded-full bg-primary text-primary-foreground hover:bg-primary/90"
+              className="h-16 w-16 sm:h-12 sm:w-12 rounded-full bg-primary text-primary-foreground hover:bg-primary/90"
               onClick={togglePlay}
               data-testid="button-play"
             >
-              {isPlaying ? <Pause className="w-6 h-6 ml-0.5" /> : <Play className="w-6 h-6 ml-1" />}
+              {isPlaying ? <Pause className="w-7 h-7 sm:w-6 sm:h-6 ml-0.5" /> : <Play className="w-7 h-7 sm:w-6 sm:h-6 ml-1" />}
             </Button>
-            <Button variant="ghost" size="icon" className="h-10 w-10 text-muted-foreground hover:text-foreground" onClick={stepForward} data-testid="button-step-forward">
-              <SkipForward className="w-5 h-5" />
+            <Button variant="ghost" size="icon" className="h-12 w-12 sm:h-10 sm:w-10 text-muted-foreground hover:text-foreground" onClick={stepForward} data-testid="button-step-forward">
+              <SkipForward className="w-6 h-6 sm:w-5 sm:h-5" />
             </Button>
           </div>
 
