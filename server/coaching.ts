@@ -32,7 +32,8 @@ export function setupCoachingRoutes(app: Express) {
     try {
       const coach = req.user as User | undefined;
       if (!coach) return res.status(401).json({ message: "Not authenticated" });
-      if (!(coach as any).isAdmin && (coach.accountType !== "coach" || !hasCoachAccess(coach))) return res.status(403).json({ message: "Coach subscription required" });
+      const isAdmin = !!(process.env.ADMIN_USERNAME && coach.username === process.env.ADMIN_USERNAME);
+      if (!isAdmin && (coach.accountType !== "coach" || !hasCoachAccess(coach))) return res.status(403).json({ message: "Coach subscription required" });
 
       // Verify relationship exists
       const [rel] = await db.select().from(coachPlayers).where(
@@ -66,7 +67,8 @@ export function setupCoachingRoutes(app: Express) {
     try {
       const coach = req.user as User | undefined;
       if (!coach) return res.status(401).json({ message: "Not authenticated" });
-      if (!(coach as any).isAdmin && (coach.accountType !== "coach" || !hasCoachAccess(coach))) return res.status(403).json({ message: "Coach subscription required" });
+      const isAdmin = !!(process.env.ADMIN_USERNAME && coach.username === process.env.ADMIN_USERNAME);
+      if (!isAdmin && (coach.accountType !== "coach" || !hasCoachAccess(coach))) return res.status(403).json({ message: "Coach subscription required" });
 
       const { playerId, playerVideoId, proVideoId, notes, highlightStart, highlightEnd, voiceoverUrl } = req.body;
       if (!playerId) return res.status(400).json({ message: "playerId is required" });
