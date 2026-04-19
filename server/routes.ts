@@ -3,7 +3,7 @@ import { hasCoachAccess } from "./coachAccess";
 import { createProxyMiddleware } from "http-proxy-middleware";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertMlbPlayerSchema, insertVideoSchema, insertDrillSchema, insertSessionSchema, cognitionSessions, videos } from "@shared/schema";
+import { insertMlbPlayerSchema, insertVideoSchema, insertDrillSchema, insertSessionSchema, cognitionSessions, videos, blueprintContent } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, sql as sqlFn, count as drizzleCount, or, isNull } from "drizzle-orm";
 import multer from "multer";
@@ -1478,6 +1478,31 @@ export async function registerRoutes(
     });
 
     await db.update(videos).set({ youtubeVideoId }).where(eq(videos.id, video.id));
+    res.json({ youtubeVideoId, url: `https://youtu.be/${youtubeVideoId}` });
+  });
+
+  app.post("/api/admin/blueprint/:id/push-youtube", async (req, res) => {
+    const user = req.user as any;
+    const adminUsername = process.env.ADMIN_USERNAME;
+    if (!adminUsername || user?.username !== adminUsername) return res.status(403).json({ message: "Admin only" });
+    if (!youtubeConfigured()) return res.status(503).json({ message: "YouTube credentials not configured" });
+
+    const [item] = await db.select().from(blueprintContent).where(eq(blueprintContent.id, req.params.id));
+    if (!item) return res.status(404).json({ message: "Blueprint content not found" });
+    if (!item.sourceUrl) return res.status(400).json({ message: "No source file" });
+
+    const { title, description, tags, privacyStatus, categoryId, playlistId } = req.body as {
+      title: string; description: string; tags: string[];
+      privacyStatus: YouTubePrivacy; categoryId?: string; playlistId?: string;
+    };
+
+    const presigned = await getPresignedUrl(item.sourceUrl, 600);
+    const fetchRes = await fetch(presigned);
+    if (!fetchRes.ok) return res.status(502).json({ message: "Failed to download from storage" });
+    const videoBuffer = Buffer.from(await fetchRes.arrayBuffer());
+
+    const youtubeVideoId = await uploadToYouTube({ title, description, tags, privacyStatus, categoryId, playlistId, videoBuffer });
+    await db.update(blueprintContent).set({ youtubeVideoId }).where(eq(blueprintContent.id, item.id));
     res.json({ youtubeVideoId, url: `https://youtu.be/${youtubeVideoId}` });
   });
 

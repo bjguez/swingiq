@@ -224,6 +224,7 @@ export const blueprintContent = pgTable("blueprint_content", {
   thumbnailUrl: text("thumbnail_url"),
   sortOrder: integer("sort_order").default(0),
   createdAt: timestamp("created_at").defaultNow(),
+  youtubeVideoId: text("youtube_video_id"),
 });
 
 export const playerPhaseFocus = pgTable("player_phase_focus", {

@@ -1355,34 +1355,13 @@ function BlueprintAdminTab() {
               ) : (
                 <div className="flex gap-3 overflow-x-auto pb-1">
                   {group.items.map((item: any) => (
-                    <div key={item.id} className="relative shrink-0 w-36 rounded-lg border border-border bg-secondary overflow-hidden group">
-                      {/* Thumbnail / video placeholder */}
-                      <div className="aspect-video bg-black flex items-center justify-center">
-                        {item.thumbnailUrl ? (
-                          <img src={item.thumbnailUrl} alt={item.title} className="w-full h-full object-cover" />
-                        ) : item.videoUrl ? (
-                          <a href={item.videoUrl} target="_blank" rel="noreferrer" className="flex items-center justify-center w-full h-full text-muted-foreground hover:text-primary transition-colors">
-                            <PlayCircle className="w-7 h-7 opacity-60" />
-                          </a>
-                        ) : (
-                          <Film className="w-6 h-6 text-muted-foreground opacity-30" />
-                        )}
-                      </div>
-                      {/* Info */}
-                      <div className="p-1.5">
-                        <p className="text-[11px] font-semibold leading-tight truncate">{item.title}</p>
-                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${typeColor(item.contentType)}`}>
-                          {item.contentType}
-                        </span>
-                      </div>
-                      {/* Delete button — shows on hover */}
-                      <button
-                        onClick={() => handleDelete(item.id)}
-                        className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive"
-                      >
-                        <X size={11} />
-                      </button>
-                    </div>
+                    <BlueprintContentCard
+                      key={item.id}
+                      item={item}
+                      typeColor={typeColor}
+                      onDelete={() => handleDelete(item.id)}
+                      onYouTubePushed={() => queryClient.invalidateQueries({ queryKey: ["/api/blueprint/content"] })}
+                    />
                   ))}
                 </div>
               )}
@@ -1391,6 +1370,164 @@ function BlueprintAdminTab() {
         )}
       </div>
     </div>
+  );
+}
+
+function BlueprintContentCard({ item, typeColor, onDelete, onYouTubePushed }: {
+  item: any;
+  typeColor: (t: string) => string;
+  onDelete: () => void;
+  onYouTubePushed: () => void;
+}) {
+  const [ytOpen, setYtOpen] = useState(false);
+  return (
+    <>
+    <div className="relative shrink-0 w-36 rounded-lg border border-border bg-secondary overflow-hidden group">
+      <div className="aspect-video bg-black flex items-center justify-center">
+        {item.thumbnailUrl ? (
+          <img src={item.thumbnailUrl} alt={item.title} className="w-full h-full object-cover" />
+        ) : item.videoUrl ? (
+          <a href={item.videoUrl} target="_blank" rel="noreferrer" className="flex items-center justify-center w-full h-full text-muted-foreground hover:text-primary transition-colors">
+            <PlayCircle className="w-7 h-7 opacity-60" />
+          </a>
+        ) : (
+          <Film className="w-6 h-6 text-muted-foreground opacity-30" />
+        )}
+      </div>
+      <div className="p-1.5">
+        <p className="text-[11px] font-semibold leading-tight truncate">{item.title}</p>
+        <div className="flex items-center justify-between mt-0.5">
+          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${typeColor(item.contentType)}`}>
+            {item.contentType}
+          </span>
+          {item.youtubeVideoId && (
+            <a href={`https://youtu.be/${item.youtubeVideoId}`} target="_blank" rel="noopener noreferrer">
+              <Youtube className="w-3 h-3 text-red-400 hover:text-red-300" />
+            </a>
+          )}
+        </div>
+      </div>
+      {/* Hover actions */}
+      <div className="absolute top-1 right-1 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+        {item.sourceUrl && (
+          <button
+            onClick={() => setYtOpen(true)}
+            className={`bg-black/60 rounded-full p-0.5 ${item.youtubeVideoId ? "text-red-400" : "text-white"} hover:bg-red-600`}
+            title="Push to YouTube"
+          >
+            <Youtube size={11} />
+          </button>
+        )}
+        <button
+          onClick={onDelete}
+          className="bg-black/60 text-white rounded-full p-0.5 hover:bg-destructive"
+        >
+          <X size={11} />
+        </button>
+      </div>
+    </div>
+    {ytOpen && (
+      <YouTubeBlueprintModal
+        item={item}
+        onClose={() => setYtOpen(false)}
+        onSuccess={(youtubeVideoId) => { onYouTubePushed(); setYtOpen(false); }}
+      />
+    )}
+    </>
+  );
+}
+
+function YouTubeBlueprintModal({ item, onClose, onSuccess }: { item: any; onClose: () => void; onSuccess: (id: string) => void }) {
+  const { toast } = useToast();
+  const [form, setForm] = useState({
+    title: item.title,
+    description: item.description ?? "",
+    tags: "baseball, swing mechanics, hitting, blueprint",
+    privacyStatus: "unlisted" as "public" | "unlisted" | "private",
+    categoryId: "17",
+    playlistId: "",
+  });
+  const [pushing, setPushing] = useState(false);
+  const [result, setResult] = useState<{ youtubeVideoId: string; url: string } | null>(null);
+
+  const handlePush = async () => {
+    setPushing(true);
+    try {
+      const res = await fetch(`/api/admin/blueprint/${item.id}/push-youtube`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...form, tags: form.tags.split(",").map((t: string) => t.trim()).filter(Boolean) }),
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || "Upload failed");
+      const data = await res.json();
+      setResult(data);
+      onSuccess(data.youtubeVideoId);
+      toast({ title: "Pushed to YouTube!" });
+    } catch (err: any) {
+      toast({ title: err.message || "YouTube upload failed", variant: "destructive" });
+    }
+    setPushing(false);
+  };
+
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-lg bg-card border-border text-foreground">
+        <DialogHeader>
+          <DialogTitle className="font-display text-xl uppercase tracking-wider flex items-center gap-2">
+            <Youtube className="w-5 h-5 text-red-500" /> Push to YouTube
+          </DialogTitle>
+        </DialogHeader>
+        {result ? (
+          <div className="space-y-4 py-2">
+            <div className="flex items-center gap-2 text-green-400">
+              <CheckCircle2 className="w-5 h-5" /><span className="font-semibold">Successfully uploaded!</span>
+            </div>
+            <a href={result.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-primary hover:underline text-sm">
+              <ExternalLink className="w-4 h-4" />{result.url}
+            </a>
+            <Button className="w-full" onClick={onClose}>Done</Button>
+          </div>
+        ) : (
+          <div className="space-y-3 py-2">
+            <div>
+              <label className="text-xs text-muted-foreground block mb-1">Title</label>
+              <Input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} className="bg-background" />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground block mb-1">Description</label>
+              <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={4}
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-ring"
+                placeholder="Describe this drill for YouTube viewers…" />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground block mb-1">Tags (comma-separated)</label>
+              <Input value={form.tags} onChange={e => setForm(f => ({ ...f, tags: e.target.value }))} className="bg-background" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-muted-foreground block mb-1">Privacy</label>
+                <select value={form.privacyStatus} onChange={e => setForm(f => ({ ...f, privacyStatus: e.target.value as any }))}
+                  className="w-full h-9 rounded-md border border-border bg-background px-3 text-sm">
+                  <option value="unlisted">Unlisted</option>
+                  <option value="public">Public</option>
+                  <option value="private">Private</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground block mb-1">Playlist ID (optional)</label>
+                <Input value={form.playlistId} onChange={e => setForm(f => ({ ...f, playlistId: e.target.value }))} placeholder="PLxxxxxxxx" className="bg-background" />
+              </div>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <Button variant="outline" className="flex-1" onClick={onClose} disabled={pushing}>Cancel</Button>
+              <Button className="flex-1 bg-red-600 hover:bg-red-500 text-white" onClick={handlePush} disabled={pushing || !form.title}>
+                {pushing ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Uploading…</> : <><Youtube className="w-4 h-4 mr-2" />Publish</>}
+              </Button>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
 
