@@ -1418,9 +1418,6 @@ export async function registerRoutes(
     const fs = await import("fs");
     const os = await import("os");
     const path = await import("path");
-    const { randomUUID } = await import("crypto");
-    const { GetObjectCommand } = await import("@aws-sdk/client-s3");
-    const { getSignedUrl } = await import("@aws-sdk/s3-request-presigner");
 
     const rows = await db.select({ id: videos.id, title: videos.title, sourceUrl: videos.sourceUrl })
       .from(videos)
@@ -1431,7 +1428,7 @@ export async function registerRoutes(
 
     for (const video of candidates) {
       try {
-        const presigned = await getSignedUrl(r2, new GetObjectCommand({ Bucket: process.env.R2_BUCKET_NAME!, Key: video.sourceUrl! }), { expiresIn: 300 });
+        const presigned = await getPresignedUrl(video.sourceUrl!, 300);
         const fetchRes = await fetch(presigned);
         if (!fetchRes.ok) throw new Error(`Download failed: ${fetchRes.status}`);
         const videoBuffer = Buffer.from(await fetchRes.arrayBuffer());
