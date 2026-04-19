@@ -31,20 +31,14 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
     const videoRef = useRef<HTMLVideoElement>(null);
     const [loadError, setLoadError] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
-    const firstFrameSeekDone = useRef(false);
+    // Tracks whether we've shown the first frame via autoplay interception
+    const firstFrameDone = useRef(false);
 
     useEffect(() => {
       if (src) {
         setLoadError(false);
         setIsLoading(true);
-        firstFrameSeekDone.current = false;
-        // On mobile, preload="metadata" is ignored for muted videos.
-        // play() without a user gesture is allowed for muted videos on iOS/Android.
-        // Calling play() then pause() forces the browser to decode and show the first frame.
-        const v = videoRef.current;
-        if (v) {
-          v.play().then(() => { v.pause(); setIsLoading(false); }).catch(() => {});
-        }
+        firstFrameDone.current = false;
       }
     }, [src]);
 
@@ -105,13 +99,6 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
       ...(rotation === 90 || rotation === 270 ? { width: "100%", height: "100%", maxWidth: "unset" } : {}),
     };
 
-    const handleFirstFrame = () => {
-      if (videoRef.current && !firstFrameSeekDone.current) {
-        firstFrameSeekDone.current = true;
-        videoRef.current.currentTime = 0.001;
-      }
-    };
-
     return (
       <div className={`relative ${className}`}>
         {isLoading && !poster && (
@@ -134,15 +121,23 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
           crossOrigin="anonymous"
           playsInline
           muted
-          preload="metadata"
+          autoPlay
+          preload="auto"
           onError={() => { setLoadError(true); setIsLoading(false); }}
+          onPlay={(e) => {
+            // Intercept the very first play (autoplay) to show frame 0 then pause.
+            // Subsequent plays (user-initiated) pass through normally.
+            if (!firstFrameDone.current) {
+              firstFrameDone.current = true;
+              e.currentTarget.pause();
+              setIsLoading(false);
+            }
+          }}
           onLoadedMetadata={() => {
-            handleFirstFrame();
             if (videoRef.current) onLoadedMetadata?.(videoRef.current.duration);
           }}
           onCanPlay={() => {
             setIsLoading(false);
-            handleFirstFrame();
           }}
           onTimeUpdate={() => {
             if (videoRef.current) {
