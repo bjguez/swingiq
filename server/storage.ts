@@ -135,7 +135,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getProVideos(): Promise<Video[]> {
-    return db.select().from(videos).where(eq(videos.isProVideo, true)).orderBy(videos.playerName, videos.title);
+    return db.select().from(videos).where(eq(videos.isProVideo, true)).orderBy(videos.title);
   }
 
   async getVideosByUser(userId: string): Promise<Video[]> {

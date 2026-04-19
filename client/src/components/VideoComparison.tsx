@@ -749,90 +749,89 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel, ex
       <div
         className={`flex flex-col transition-all duration-300 ${
           isFullscreen
-            ? `absolute bottom-0 inset-x-0 z-50 bg-black/80 backdrop-blur-sm border-t border-white/10 px-4 pt-3 pb-4 gap-3 ${
+            ? `absolute bottom-0 inset-x-0 z-50 bg-black/75 backdrop-blur-sm border-t border-white/10 px-3 pt-2 pb-3 gap-1.5 ${
                 controlsVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-full pointer-events-none'
               }`
-            : 'bg-secondary/30 border border-border rounded-lg p-4 gap-4'
+            : 'bg-secondary/30 border border-border rounded-lg p-4 gap-3'
         }`}
         onPointerDown={isFullscreen ? resetHideTimer : undefined}
       >
-        <div className="flex items-center gap-4">
-          <Button 
-            variant="outline" 
-            size="icon" 
-            className={`h-10 w-10 shrink-0 ${synced ? 'bg-primary/20 text-primary border-primary/50' : 'text-muted-foreground'}`}
+        {/* Slider row */}
+        <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            size="icon"
+            className={`h-8 w-8 shrink-0 ${synced ? 'bg-primary/20 text-primary border-primary/50' : 'text-muted-foreground'}`}
             onClick={() => { setSynced(s => !s); setActivePanel(null); }}
             title={synced ? "Videos synced — click to unsync" : "Videos unsynced — click to sync"}
             data-testid="button-sync"
           >
-            <Link2 className="w-5 h-5" />
+            <Link2 className="w-4 h-4" />
           </Button>
-          
           <div className="flex-1 h-12 flex items-center">
-            <Slider
-              value={progress}
-              onValueChange={handleSeek}
-              max={100}
-              step={0.1}
-              className="w-full"
-              data-testid="slider-progress"
-            />
+            <Slider value={progress} onValueChange={handleSeek} max={100} step={0.1} className="w-full" data-testid="slider-progress" />
           </div>
-          
-          <div className="text-xs font-mono text-muted-foreground w-16 sm:w-24 text-right shrink-0" data-testid="text-time">
-            <span className="hidden sm:inline">{formatTime(currentTime)}</span>
-            <span className="sm:hidden">{Math.floor(currentTime)}s</span>
+          <div className="text-xs font-mono text-muted-foreground w-12 text-right shrink-0" data-testid="text-time">
+            {Math.floor(currentTime)}s
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" className="h-12 w-12 sm:h-10 sm:w-10 text-muted-foreground hover:text-foreground" onClick={stepBackward} data-testid="button-step-back">
-              <SkipBack className="w-6 h-6 sm:w-5 sm:h-5" />
-            </Button>
-            <Button
-              size="icon"
-              className="h-16 w-16 sm:h-12 sm:w-12 rounded-full bg-primary text-primary-foreground hover:bg-primary/90"
-              onClick={togglePlay}
-              data-testid="button-play"
-            >
-              {isPlaying ? <Pause className="w-7 h-7 sm:w-6 sm:h-6 ml-0.5" /> : <Play className="w-7 h-7 sm:w-6 sm:h-6 ml-1" />}
-            </Button>
-            <Button variant="ghost" size="icon" className="h-12 w-12 sm:h-10 sm:w-10 text-muted-foreground hover:text-foreground" onClick={stepForward} data-testid="button-step-forward">
-              <SkipForward className="w-6 h-6 sm:w-5 sm:h-5" />
-            </Button>
-          </div>
-
-          <div className="flex items-center gap-1.5">
-            {/* Speed controls */}
-            <div className="flex items-center gap-0.5 bg-secondary/50 border border-border rounded-md p-1">
-              {SPEEDS.map(s => (
-                <button
-                  key={s}
-                  onClick={() => applyRate(s)}
-                  className={`px-1.5 py-0.5 rounded text-xs font-mono font-semibold transition-colors ${s === 0.25 ? 'hidden sm:block' : ''} ${
-                    playbackRate === s
-                      ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground hover:text-foreground hover:bg-secondary"
-                  }`}
-                  title={`${s}x speed ([/] to adjust)`}
-                >
-                  {s}x
-                </button>
-              ))}
+        {isFullscreen ? (
+          /* Fullscreen: compact single row to minimise video obstruction */
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5">
+              <Button variant="ghost" size="icon" className="h-9 w-9 text-white/80 hover:text-white" onClick={stepBackward} data-testid="button-step-back"><SkipBack className="w-5 h-5" /></Button>
+              <Button size="icon" className="h-11 w-11 rounded-full bg-primary text-primary-foreground hover:bg-primary/90" onClick={togglePlay} data-testid="button-play">
+                {isPlaying ? <Pause className="w-5 h-5 ml-0.5" /> : <Play className="w-5 h-5 ml-0.5" />}
+              </Button>
+              <Button variant="ghost" size="icon" className="h-9 w-9 text-white/80 hover:text-white" onClick={stepForward} data-testid="button-step-forward"><SkipForward className="w-5 h-5" /></Button>
             </div>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-10 w-10 text-muted-foreground hover:text-foreground"
-              onClick={toggleFullscreen}
-              title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
-              data-testid="button-fullscreen"
-            >
-              {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
-            </Button>
+            <div className="flex items-center gap-1">
+              <div className="flex items-center gap-0.5 bg-white/10 rounded-md p-1">
+                {SPEEDS.filter(s => s !== 0.25).map(s => (
+                  <button key={s} onClick={() => applyRate(s)}
+                    className={`px-2 py-1 rounded text-xs font-mono font-semibold transition-colors ${playbackRate === s ? "bg-primary text-primary-foreground" : "text-white/70 hover:text-white"}`}>
+                    {s}x
+                  </button>
+                ))}
+              </div>
+              <Button variant="ghost" size="icon" className="h-9 w-9 text-white/80 hover:text-white" onClick={toggleFullscreen} data-testid="button-fullscreen">
+                <Minimize className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
-        </div>
+        ) : (
+          /* Normal: centered play buttons + centered speed row */
+          <>
+            <div className="flex items-center justify-center gap-4">
+              <Button variant="ghost" size="icon" className="h-12 w-12 text-muted-foreground hover:text-foreground" onClick={stepBackward} data-testid="button-step-back">
+                <SkipBack className="w-6 h-6" />
+              </Button>
+              <Button size="icon" className="h-16 w-16 rounded-full bg-primary text-primary-foreground hover:bg-primary/90" onClick={togglePlay} data-testid="button-play">
+                {isPlaying ? <Pause className="w-7 h-7 ml-0.5" /> : <Play className="w-7 h-7 ml-1" />}
+              </Button>
+              <Button variant="ghost" size="icon" className="h-12 w-12 text-muted-foreground hover:text-foreground" onClick={stepForward} data-testid="button-step-forward">
+                <SkipForward className="w-6 h-6" />
+              </Button>
+            </div>
+            <div className="flex items-center justify-center gap-2">
+              <div className="flex items-center gap-0.5 bg-secondary/50 border border-border rounded-md p-1">
+                {SPEEDS.map(s => (
+                  <button key={s} onClick={() => applyRate(s)}
+                    className={`px-2.5 py-1.5 rounded text-xs font-mono font-semibold transition-colors ${s === 0.25 ? 'hidden sm:block' : ''} ${
+                      playbackRate === s ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+                    }`}
+                    title={`${s}x speed`}>
+                    {s}x
+                  </button>
+                ))}
+              </div>
+              <Button variant="outline" size="icon" className="h-9 w-9 text-muted-foreground hover:text-foreground" onClick={toggleFullscreen} title="Fullscreen" data-testid="button-fullscreen">
+                <Maximize className="w-4 h-4" />
+              </Button>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Fullscreen: always-visible exit button — tapping directly exits */}
