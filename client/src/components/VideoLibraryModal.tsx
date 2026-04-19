@@ -67,6 +67,7 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected }: Vi
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadCategory, setUploadCategory] = useState("Full Swing");
+  const [uploadTab, setUploadTab] = useState<"upload" | "previous">("upload");
 
   const availableCategories = [
     ...FREE_CATEGORIES,
@@ -509,7 +510,7 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected }: Vi
                 </div>
               )}
 
-              {/* Idle: upload drop zone + previous swings */}
+              {/* Idle: tabbed upload / previous swings */}
               {uploadState === "idle" && (
                 <div className="flex flex-col gap-4">
                   <input
@@ -520,78 +521,107 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected }: Vi
                     onChange={handleFileSelect}
                     data-testid="input-file-upload"
                   />
-                  {/* Category picker */}
-                  <div className="mb-3">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Swing Type</p>
-                    <div className="flex flex-wrap gap-2">
-                      {availableCategories.map(cat => (
-                        <button
-                          key={cat}
-                          type="button"
-                          onClick={() => setUploadCategory(cat)}
-                          className={`px-3 py-1.5 rounded-md text-xs font-semibold border transition-colors ${uploadCategory === cat ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:text-foreground"}`}
-                        >
-                          {cat}
-                        </button>
-                      ))}
-                    </div>
+
+                  {/* Tabs */}
+                  <div className="flex rounded-lg border border-border overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => setUploadTab("upload")}
+                      className={`flex-1 py-2 text-sm font-semibold transition-colors ${uploadTab === "upload" ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:text-foreground"}`}
+                    >
+                      Upload New
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setUploadTab("previous")}
+                      className={`flex-1 py-2 text-sm font-semibold transition-colors ${uploadTab === "previous" ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:text-foreground"}`}
+                    >
+                      Previous Swings {userVideos.length > 0 && `(${userVideos.length})`}
+                    </button>
                   </div>
 
-                  <div
-                    onClick={handleUploadClick}
-                    className="border-2 border-dashed border-border rounded-xl p-10 flex flex-col items-center justify-center text-center bg-secondary/10 hover:bg-secondary/20 transition-colors cursor-pointer"
-                    data-testid="dropzone-upload"
-                    onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      const file = e.dataTransfer.files?.[0];
-                      if (file && fileInputRef.current) {
-                        const dt = new DataTransfer();
-                        dt.items.add(file);
-                        fileInputRef.current.files = dt.files;
-                        fileInputRef.current.dispatchEvent(new Event("change", { bubbles: true }));
-                      }
-                    }}
-                  >
-                    <div className="w-14 h-14 rounded-full bg-primary/20 flex items-center justify-center mb-3 text-primary">
-                      <Upload className="w-7 h-7" />
-                    </div>
-                    <h3 className="font-display font-bold text-xl mb-1">Upload New Swing</h3>
-                    <p className="text-muted-foreground text-sm max-w-xs mb-4">
-                      Drag and drop or click to select a video file. Max 5 seconds.
-                    </p>
-                    <Button onClick={(e) => { e.stopPropagation(); handleUploadClick(); }}>
-                      Select File
-                    </Button>
-                    <p className="text-xs text-muted-foreground mt-3">MP4, MOV, WebM · Max 5 seconds</p>
-                  </div>
+                  {uploadTab === "upload" && (
+                    <>
+                      {/* Category picker */}
+                      <div>
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Swing Type</p>
+                        <div className="flex flex-wrap gap-2">
+                          {availableCategories.map(cat => (
+                            <button
+                              key={cat}
+                              type="button"
+                              onClick={() => setUploadCategory(cat)}
+                              className={`px-3 py-1.5 rounded-md text-xs font-semibold border transition-colors ${uploadCategory === cat ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:text-foreground"}`}
+                            >
+                              {cat}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
 
-                  {userVideos.length > 0 && (
-                    <div>
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Or load a previous swing</p>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-45 overflow-y-auto pr-1">
-                        {userVideos.map((video: Video) => (
-                          <button
-                            key={video.id}
-                            onClick={() => handleSelectExistingVideo(video)}
-                            className="text-left bg-secondary/30 border border-border rounded-lg overflow-hidden hover:border-primary/50 transition-colors group"
-                          >
-                            <div className="aspect-video bg-black relative flex items-center justify-center">
-                              {video.sourceUrl && <ModalThumb src={video.sourceUrl} />}
-                              <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <div className="bg-primary rounded-full p-1.5">
-                                  <PlayCircle className="w-4 h-4 text-primary-foreground" />
+                      <div
+                        onClick={handleUploadClick}
+                        className="border-2 border-dashed border-border rounded-xl p-10 flex flex-col items-center justify-center text-center bg-secondary/10 hover:bg-secondary/20 transition-colors cursor-pointer"
+                        data-testid="dropzone-upload"
+                        onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          const file = e.dataTransfer.files?.[0];
+                          if (file && fileInputRef.current) {
+                            const dt = new DataTransfer();
+                            dt.items.add(file);
+                            fileInputRef.current.files = dt.files;
+                            fileInputRef.current.dispatchEvent(new Event("change", { bubbles: true }));
+                          }
+                        }}
+                      >
+                        <div className="w-14 h-14 rounded-full bg-primary/20 flex items-center justify-center mb-3 text-primary">
+                          <Upload className="w-7 h-7" />
+                        </div>
+                        <h3 className="font-display font-bold text-xl mb-1">Upload New Swing</h3>
+                        <p className="text-muted-foreground text-sm max-w-xs mb-4">
+                          Drag and drop or click to select a video file. Max 5 seconds.
+                        </p>
+                        <Button onClick={(e) => { e.stopPropagation(); handleUploadClick(); }}>
+                          Select File
+                        </Button>
+                        <p className="text-xs text-muted-foreground mt-3">MP4, MOV, WebM · Max 5 seconds</p>
+                      </div>
+                    </>
+                  )}
+
+                  {uploadTab === "previous" && (
+                    <>
+                      {userVideos.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
+                          <p className="text-sm">No previous swings yet.</p>
+                          <button type="button" onClick={() => setUploadTab("upload")} className="mt-2 text-sm text-primary underline">Upload your first swing</button>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                          {userVideos.map((video: Video) => (
+                            <button
+                              key={video.id}
+                              onClick={() => handleSelectExistingVideo(video)}
+                              className="text-left bg-secondary/30 border border-border rounded-lg overflow-hidden hover:border-primary/50 transition-colors group"
+                            >
+                              <div className="aspect-video bg-black relative flex items-center justify-center">
+                                {video.sourceUrl && <ModalThumb src={video.sourceUrl} />}
+                                <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <div className="bg-primary rounded-full p-1.5">
+                                    <PlayCircle className="w-4 h-4 text-primary-foreground" />
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                            <div className="p-2">
-                              <p className="text-xs font-medium truncate">{video.title}</p>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
+                              <div className="p-2">
+                                <p className="text-xs font-medium truncate">{video.title}</p>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               )}
