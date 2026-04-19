@@ -30,15 +30,15 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
   ({ src, poster, onTimeUpdate, onLoadedMetadata, className, placeholder, rotation = 0, flipH = false, zoom = 1, panX = 0, panY = 0 }, ref) => {
     const videoRef = useRef<HTMLVideoElement>(null);
     const [loadError, setLoadError] = useState(false);
-    const [isLoading, setIsLoading] = useState(false);
-    // Tracks whether we've shown the first frame via autoplay interception
-    const firstFrameDone = useRef(false);
+    // framePainted: true once we've decoded a real (non-black) frame to display
+    const [framePainted, setFramePainted] = useState(false);
+    const firstPlayHandled = useRef(false);
 
     useEffect(() => {
       if (src) {
         setLoadError(false);
-        setIsLoading(true);
-        firstFrameDone.current = false;
+        setFramePainted(false);
+        firstPlayHandled.current = false;
       }
     }, [src]);
 
@@ -101,12 +101,15 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
 
     return (
       <div className={`relative ${className}`}>
-        {isLoading && !poster && (
+        {/* Spinner — shown while loading and no poster available */}
+        {!framePainted && !poster && (
           <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none bg-black">
             <div className="w-8 h-8 border-2 border-white/20 border-t-white/70 rounded-full animate-spin" />
           </div>
         )}
-        {poster && isLoading && (
+        {/* Poster — shown from the moment src is set until a real frame is painted.
+            Uses <img> (not poster attribute) to avoid crossOrigin CORS issues on mobile. */}
+        {poster && !framePainted && (
           <img
             src={poster}
             alt=""
@@ -123,21 +126,29 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
           muted
           autoPlay
           preload="auto"
-          onError={() => { setLoadError(true); setIsLoading(false); }}
+          onError={() => { setLoadError(true); setFramePainted(true); }}
           onPlay={(e) => {
-            // Intercept the very first play (autoplay) to show frame 0 then pause.
-            // Subsequent plays (user-initiated) pass through normally.
-            if (!firstFrameDone.current) {
-              firstFrameDone.current = true;
-              e.currentTarget.pause();
-              setIsLoading(false);
+            // Intercept the autoplay-triggered first play to show a real frame then pause.
+            // Seek to 0.5s to skip any black leader frames at the start.
+            if (!firstPlayHandled.current) {
+              firstPlayHandled.current = true;
+              const v = e.currentTarget;
+              v.pause();
+              v.currentTime = v.duration > 0.5 ? 0.5 : 0.1;
+            }
+          }}
+          onSeeked={() => {
+            // Once we've seeked to 0.5s and a frame is decoded, hide the poster/spinner.
+            if (firstPlayHandled.current) {
+              setFramePainted(true);
             }
           }}
           onLoadedMetadata={() => {
             if (videoRef.current) onLoadedMetadata?.(videoRef.current.duration);
           }}
           onCanPlay={() => {
-            setIsLoading(false);
+            // Desktop fallback: if autoPlay didn't fire, mark as painted so spinner clears
+            if (firstPlayHandled.current) setFramePainted(true);
           }}
           onTimeUpdate={() => {
             if (videoRef.current) {
