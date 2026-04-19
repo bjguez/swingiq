@@ -140,7 +140,33 @@ export async function registerRoutes(
     });
 
     const url = await getVideoUrl(key);
-    res.status(201).json({ ...video, presignedUrl: url });
+    res.status(201).json({ ...video, presignedUrl: url, thumbnailUrl: null });
+
+    // Generate thumbnail async (fire-and-forget) — will be available on next page load
+    (async () => {
+      try {
+        const { execFile } = await import("child_process");
+        const fs = await import("fs");
+        const os = await import("os");
+        const path = await import("path");
+        const presigned = await getPresignedUrl(key, 300);
+        const fetchRes = await fetch(presigned);
+        if (!fetchRes.ok) return;
+        const videoBuffer = Buffer.from(await fetchRes.arrayBuffer());
+        const tmpIn  = path.join(os.tmpdir(), `ct-in-${Date.now()}.mp4`);
+        const tmpOut = path.join(os.tmpdir(), `ct-out-${Date.now()}.jpg`);
+        fs.writeFileSync(tmpIn, videoBuffer);
+        await new Promise<void>((resolve, reject) => {
+          execFile("ffmpeg", ["-i", tmpIn, "-ss", "0.5", "-vframes", "1", "-q:v", "3", "-y", tmpOut],
+            { maxBuffer: 10 * 1024 * 1024 }, (err) => { if (err) reject(err); else resolve(); });
+        });
+        const thumbBuffer = fs.readFileSync(tmpOut);
+        try { fs.unlinkSync(tmpIn); } catch {}
+        try { fs.unlinkSync(tmpOut); } catch {}
+        const thumbKey = await uploadToR2(thumbBuffer, "thumbnail.jpg", "image/jpeg", "thumbnails");
+        await db.update(videos).set({ thumbnailUrl: thumbKey }).where(eq(videos.id, video.id));
+      } catch { /* best-effort */ }
+    })();
   });
 
   app.post("/api/upload", upload.single("video"), async (req, res) => {
@@ -278,7 +304,8 @@ export async function registerRoutes(
         isProVideo: false,
         userId,
       });
-      res.status(201).json({ sourceUrl: key, presignedUrl, videoId: video.id });
+      const thumbnailUrl = thumbnailKey ? await getVideoUrl(thumbnailKey) : null;
+      res.status(201).json({ sourceUrl: key, presignedUrl, videoId: video.id, thumbnailUrl });
       // Award badges async (non-blocking)
       if (userId) {
         checkAndAwardBadges(userId).then(async (newBadges) => {

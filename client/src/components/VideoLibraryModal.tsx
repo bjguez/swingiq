@@ -116,6 +116,7 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected }: Vi
 
     try {
       let url: string;
+      let thumbnailUrl: string | null = null;
 
       if (needsTrim) {
         // Trim requires server-side FFmpeg — send to server as before
@@ -141,6 +142,7 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected }: Vi
         });
 
         url = response.presignedUrl ?? response.sourceUrl;
+        thumbnailUrl = response.thumbnailUrl ?? null;
       } else {
         // Streaming upload: browser → our server (same-origin, no CORS) → R2 (streamed, no buffering)
         // Step 1: PUT file to our server which streams it straight to R2
@@ -171,10 +173,11 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected }: Vi
         }
         const video = await confirmRes.json();
         url = video.presignedUrl ?? video.sourceUrl;
+        thumbnailUrl = video.thumbnailUrl ?? null;
       }
 
       queryClient.invalidateQueries({ queryKey: ["/api/videos"] });
-      onVideoSelected?.(url, "My Swing");
+      onVideoSelected?.(url, "My Swing", undefined, thumbnailUrl);
       setIsOpen(false);
     } catch (err: any) {
       setUploadError(err.message || "Upload failed. Please try again.");
