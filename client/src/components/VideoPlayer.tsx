@@ -112,10 +112,16 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
             <div className="w-8 h-8 border-2 border-white/20 border-t-white/70 rounded-full animate-spin" />
           </div>
         )}
+        {poster && isLoading && (
+          <img
+            src={poster}
+            alt=""
+            className="absolute inset-0 w-full h-full object-contain z-10 pointer-events-none"
+          />
+        )}
         <video
           ref={videoRef}
           src={src}
-          poster={poster ?? undefined}
           className="w-full h-full object-contain"
           style={videoStyle}
           crossOrigin="anonymous"
