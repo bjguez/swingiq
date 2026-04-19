@@ -33,7 +33,7 @@ const MAX_CLIP_DURATION = 5;
 interface VideoLibraryModalProps {
   trigger: React.ReactNode;
   mode?: "user" | "pro";
-  onVideoSelected?: (url: string, label?: string, id?: string) => void;
+  onVideoSelected?: (url: string, label?: string, id?: string, thumbnailUrl?: string | null) => void;
   onCompSelected?: (url: string, label?: string) => void;
 }
 
@@ -212,7 +212,7 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected }: Vi
   };
 
   const handleSelectExistingVideo = (video: Video) => {
-    if (video.sourceUrl) onVideoSelected?.(video.sourceUrl, video.title, video.id);
+    if (video.sourceUrl) onVideoSelected?.(video.sourceUrl, video.title, video.id, video.thumbnailUrl);
     setIsOpen(false);
   };
 
@@ -220,9 +220,9 @@ export function VideoLibraryModal({ trigger, mode = "pro", onVideoSelected }: Vi
     if (!video.sourceUrl || !onVideoSelected) { setIsOpen(false); return; }
     try {
       const url = await fetchVideoPresignedUrl(video.id);
-      onVideoSelected(url, video.playerName || video.title, video.id);
+      onVideoSelected(url, video.playerName || video.title, video.id, video.thumbnailUrl);
     } catch {
-      onVideoSelected(video.sourceUrl, video.playerName || video.title, video.id);
+      onVideoSelected(video.sourceUrl, video.playerName || video.title, video.id, video.thumbnailUrl);
     }
     setIsOpen(false);
   };

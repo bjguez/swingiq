@@ -41,6 +41,8 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel, ex
 
   const [leftVideoSrc, setLeftVideoSrc] = useState<string | null>(null);
   const [rightVideoSrc, setRightVideoSrc] = useState<string | null>(null);
+  const [leftPoster, setLeftPoster] = useState<string | null>(null);
+  const [rightPoster, setRightPoster] = useState<string | null>(null);
   const [leftLabel, setLeftLabel] = useState("Amateur Swing");
   const [rightLabel, setRightLabel] = useState("Pro Swing");
   const [leftRotation, setLeftRotation] = useState<0 | 90 | 180 | 270>(0);
@@ -240,15 +242,17 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel, ex
     setRightAnnotations(annotations);
   }, []);
 
-  const handleLeftUpload = useCallback((url: string, label?: string) => {
+  const handleLeftUpload = useCallback((url: string, label?: string, _id?: string, thumbnailUrl?: string | null) => {
     setLeftVideoSrc(url);
+    setLeftPoster(thumbnailUrl ?? null);
     if (label) setLeftLabel(label);
     setLeftAnnotations([]);
     annotationHistoryRef.current = [];
   }, []);
 
-  const handleRightUpload = useCallback((url: string, label?: string) => {
+  const handleRightUpload = useCallback((url: string, label?: string, _id?: string, thumbnailUrl?: string | null) => {
     setRightVideoSrc(url);
+    setRightPoster(thumbnailUrl ?? null);
     if (label) {
       setRightLabel(label);
       onRightVideoSelected?.(label);
@@ -462,6 +466,7 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel, ex
           <VideoPlayer
             ref={leftVideoRef}
             src={leftVideoSrc}
+            poster={leftPoster}
             onTimeUpdate={handleLeftTimeUpdate}
             onLoadedMetadata={(d) => setLeftDuration(d)}
             rotation={leftRotation}
@@ -604,6 +609,7 @@ export default function VideoComparison({ externalLeftSrc, externalLeftLabel, ex
           <VideoPlayer
             ref={rightVideoRef}
             src={rightVideoSrc}
+            poster={rightPoster}
             onTimeUpdate={handleRightTimeUpdate}
             onLoadedMetadata={(d) => setRightDuration(d)}
             rotation={rightRotation}
